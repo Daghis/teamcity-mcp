@@ -70,8 +70,8 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage/lcov.info
-          flags: unittests,shard-${{ matrix.shard }}
-          name: codecov-coverage-shard-${{ matrix.shard }}
+          flags: unittests
+          name: codecov-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
       - name: Upload test results to Codecov
