@@ -1,17 +1,17 @@
 /**
  * Tests for error handling middleware
  */
-
 import { z } from 'zod';
+
 import {
-  MCPToolError,
-  MCPValidationError,
   MCPAuthError,
   MCPNotFoundError,
-  formatError,
+  MCPToolError,
+  MCPValidationError,
   asyncHandler,
-  safeJsonParse,
+  formatError,
   retry,
+  safeJsonParse,
 } from '@/middleware/error';
 
 describe('Error Classes', () => {
@@ -227,7 +227,7 @@ describe('retry', () => {
   it('should use exponential backoff', async () => {
     const delays: number[] = [];
     let lastTime = Date.now();
-    
+
     await retry(
       async () => {
         const now = Date.now();
@@ -242,7 +242,7 @@ describe('retry', () => {
       },
       { retries: 3, delay: 10, exponentialBackoff: true }
     );
-    
+
     // Second retry should have longer delay than first
     expect(delays.length).toBeGreaterThanOrEqual(2);
     if (delays.length >= 2) {
@@ -255,7 +255,7 @@ describe('retry', () => {
   it('should use fixed delay without exponential backoff', async () => {
     const delays: number[] = [];
     let lastTime = Date.now();
-    
+
     await retry(
       async () => {
         const now = Date.now();
@@ -270,12 +270,12 @@ describe('retry', () => {
       },
       { retries: 3, delay: 10, exponentialBackoff: false }
     );
-    
+
     // All delays should be similar (within reasonable tolerance)
     expect(delays.length).toBeGreaterThanOrEqual(2);
     if (delays.length >= 2) {
       const avgDelay = delays.reduce((a, b) => a + b, 0) / delays.length;
-      delays.forEach(delay => {
+      delays.forEach((delay) => {
         expect(Math.abs(delay - avgDelay)).toBeLessThan(50); // Allow 50ms tolerance
       });
     }
