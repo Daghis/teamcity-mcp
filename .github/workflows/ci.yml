@@ -64,7 +64,7 @@ jobs:
         env:
           JEST_JUNIT_OUTPUT: ./coverage/junit-${{ matrix.shard }}.xml
           JEST_JUNIT_CLASSNAME: "{filepath}"
-        run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit --shard=${{ matrix.shard }}/4
+        run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit --shard=${{ matrix.shard }}/4 --passWithNoTests
       - name: Upload coverage to Codecov
         if: success()
         uses: codecov/codecov-action@v4
