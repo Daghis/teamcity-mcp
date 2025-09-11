@@ -75,60 +75,30 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/junit-${{ matrix.shard }}.xml
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-shard-${{ matrix.shard }}
-          path: coverage/
-          if-no-files-found: ignore
-
-  coverage:
-    name: Coverage upload (merged)
-    runs-on: ubuntu-latest
-    needs: tests
-    steps:
-      - name: Download all coverage artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      - name: Merge LCOV files
-        run: |
-          set -euo pipefail
-          mkdir -p coverage-merged
-          LCOVS=$(find artifacts -type f -name 'lcov.info' | sort)
-          if [ -z "$LCOVS" ]; then
-            echo "No lcov.info files found" >&2
-            exit 1
-          fi
-          cat $LCOVS > coverage-merged/lcov.info
-          echo "Merged $(echo "$LCOVS" | wc -l | tr -d ' ') lcov files into coverage-merged/lcov.info"
-      - name: Upload merged coverage to Codecov
+      - name: Upload coverage to Codecov
+        if: success()
         uses: codecov/codecov-action@v4
         with:
-          files: coverage-merged/lcov.info
+          files: ./coverage/lcov.info
           flags: unittests
-          name: codecov-coverage-merged
+          name: codecov-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
-      - name: Collect bundle analyses (if any)
-        run: |
-          mkdir -p coverage-merged/bundles
-          find artifacts -type f -path '*/coverage/bundles/*.json' -exec cp {} coverage-merged/bundles/ \; || true
-          ls -la coverage-merged/bundles || true
+      - name: Analyze bundle
+        run: npm run build:bundle
       - name: Upload bundle analysis to Codecov
-        if: ${{ hashFiles('coverage-merged/bundles/*.json') != '' }}
+        if: ${{ success() && hashFiles('coverage/bundles/*.json') != '' }}
         uses: codecov/codecov-action@v4
         with:
           plugin: javascript-bundle
-          files: coverage-merged/bundles/*.json
+          files: ./coverage/bundles/*.json
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
 
   aggregate:
     name: Lint, Typecheck, Test (Node 20)
     runs-on: ubuntu-latest
-    needs: [lint, format, typecheck, tests, coverage]
+    needs: [lint, format, typecheck, tests]
     if: always()
     steps:
       - name: Evaluate job results
