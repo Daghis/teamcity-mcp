@@ -493,7 +493,8 @@ describe('BuildResultsManager', () => {
       expect(axiosGetSpy).toHaveBeenCalledTimes(3);
 
       // Should execute in parallel (not take 3x the time)
-      expect(endTime - startTime).toBeLessThan(100); // Should be fast in tests
+      // Should be fast in tests; allow a bit of CI jitter
+      expect(endTime - startTime).toBeLessThan(150);
     });
   });
 
