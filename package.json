@@ -75,7 +75,7 @@
     "@esbuild-plugins/tsconfig-paths": "^0.1.2",
     "@openapitools/openapi-generator-cli": "^2.23.1",
     "@trivago/prettier-plugin-sort-imports": "^5.2.2",
-    "@types/ajv": "^0.0.5",
+    "@types/ajv": "^1.0.4",
     "@types/express": "^5.0.3",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
