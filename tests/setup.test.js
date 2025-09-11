@@ -24,7 +24,7 @@ describe('Project Setup', () => {
     });
 
     test('should have required fields', () => {
-      expect(packageJson).toHaveProperty('name', '@teamcity/mcp-server');
+      expect(packageJson).toHaveProperty('name', '@daghis/teamcity-mcp');
       expect(packageJson).toHaveProperty('version');
       expect(packageJson).toHaveProperty('description');
       expect(packageJson).toHaveProperty('main');

@@ -1,5 +1,5 @@
 {
-  "name": "@teamcity/mcp-server",
+  "name": "@daghis/teamcity-mcp",
   "version": "0.1.0",
   "description": "Model Control Protocol server for TeamCity CI/CD integration with AI coding assistants",
   "main": "dist/index.js",
@@ -51,7 +51,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/teamcity-mcp.git"
+    "url": "https://github.com/Daghis/teamcity-mcp.git"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.5.0",
