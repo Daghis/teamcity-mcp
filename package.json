@@ -34,7 +34,8 @@
     "e2e": "node ./node_modules/tsx/dist/cli.mjs tests/e2e/index.ts",
     "e2e:build": "npm run build && node dist/e2e/index.js",
     "e2e:setup": "node ./node_modules/tsx/dist/cli.mjs tests/e2e/setup-playground.ts",
-    "e2e:cleanup": "node ./node_modules/tsx/dist/cli.mjs tests/e2e/cleanup.ts"
+    "e2e:cleanup": "node ./node_modules/tsx/dist/cli.mjs tests/e2e/cleanup.ts",
+    "generate:notices": "node scripts/generate-third-party-notices.cjs"
   },
   "keywords": [
     "mcp",
