@@ -53,10 +53,16 @@ Tools must return standardized JSON payloads. Tests should assert:
 
 - Imperative mood: “Add X”, “Fix Y”.
 - Include ticket IDs when applicable: `[TMCP-123] Short summary`.
+- Follow [Conventional Commits](https://www.conventionalcommits.org/):
+  - Use lower‑case `type` prefixes like `feat`, `fix`, or `chore`.
+  - Keep the summary within 72 characters.
+  - PR titles must also follow this format and will become the squash merge commit message.
+- Commit message linting runs in CI to enforce the convention.
 
 ## Pull Requests
 
 - Describe scope, rationale, and testing.
 - Link issues/tickets; include logs or CLI output if relevant.
 - Ensure CI is green and `npm run check` passes locally.
+- Use **Squash and merge** so the merge commit inherits the PR’s conventional title.
 

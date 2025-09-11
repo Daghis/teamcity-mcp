@@ -614,6 +614,10 @@ describe('BuildQueueManager', () => {
           })
         );
 
+      const completed = new Promise<void>((resolve) => {
+        manager.once('build:completed', () => resolve());
+      });
+
       await manager.monitorBuild(
         '701',
         (status) => {
@@ -622,8 +626,7 @@ describe('BuildQueueManager', () => {
         { pollInterval: 10 }
       );
 
-      // Wait for monitoring to complete
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await completed;
 
       expect(statusUpdates.length).toBeGreaterThanOrEqual(1);
       expect(statusUpdates[statusUpdates.length - 1]?.state).toBe('finished');
