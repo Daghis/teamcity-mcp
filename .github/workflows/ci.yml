@@ -47,8 +47,12 @@ jobs:
       - run: npm run typecheck
 
   tests:
-    name: Tests with coverage (unit)
+    name: Tests with coverage (unit) – shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -58,16 +62,16 @@ jobs:
       - run: npm ci
       - name: Run tests with coverage (unit-only + JUnit)
         env:
-          JEST_JUNIT_OUTPUT: ./coverage/junit.xml
+          JEST_JUNIT_OUTPUT: ./coverage/junit-${{ matrix.shard }}.xml
           JEST_JUNIT_CLASSNAME: "{filepath}"
-        run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit
+        run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit --shard=${{ matrix.shard }}/4
       - name: Upload coverage to Codecov
         if: success()
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage/lcov.info
-          flags: unittests
-          name: codecov-coverage
+          flags: unittests,shard-${{ matrix.shard }}
+          name: codecov-coverage-shard-${{ matrix.shard }}
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
       - name: Upload test results to Codecov
@@ -75,11 +79,12 @@ jobs:
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/junit-${{ matrix.shard }}.xml
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage
+          name: coverage-shard-${{ matrix.shard }}
           path: coverage/
           if-no-files-found: ignore
 
