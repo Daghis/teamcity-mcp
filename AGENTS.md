@@ -66,3 +66,64 @@
   await initializeTeamCity();
   await triggerBuild('MyBuildTypeId', 'refs/heads/main');
   ```
+
+## GitHub CLI (gh) Usage
+
+Use GitHub CLI to examine/update issues and manage PRs. Prefer body files over literal `\n` to ensure proper newlines in descriptions.
+
+### Setup
+- Verify install: `gh --version`
+- Authenticate: `gh auth login` (HTTPS, GitHub.com, device or browser flow)
+- Set repo context: `gh repo view` (should show `Daghis/teamcity-mcp`)
+
+### Issues: Inspect and Update
+- List open issues: `gh issue list --state open`
+- View details (JSON): `gh issue view 18 --json number,title,state,labels,assignees,body,url`
+- View formatted: `gh issue view 18`
+- Edit title/body: `gh issue edit 18 --title "New title" --body-file ./notes/issue-18.md`
+- Add/remove labels: `gh issue edit 18 --add-label enhancement --remove-label bug`
+- Assign/unassign: `gh issue edit 18 --add-assignee user1 --remove-assignee user2`
+- Comment: `gh issue comment 18 --body-file ./notes/comment.md`
+- Close/reopen: `gh issue close 18` | `gh issue reopen 18`
+
+### PRs: Create, Update, Review
+- Create PR from current branch:
+  - Minimal: `gh pr create --fill`
+  - Explicit: `gh pr create --base main --head feat/my-change --title "feat: ..." --body-file ./pr.md`
+  - Link issue: include `Closes #18` in the PR body.
+- Edit PR after creation:
+  - Update title/body: `gh pr edit 31 --title "..." --body-file ./pr.md`
+  - Change base: `gh pr edit 31 --base main`
+  - Add labels: `gh pr edit 31 --add-label dependencies`
+  - Mark draft/ready: `gh pr ready 31` | `gh pr create --draft ...`
+- Checkout PR branch: `gh pr checkout 31`
+- List/open PRs: `gh pr list --state open` | `gh pr view 31 --web`
+- Reviews: `gh pr review 31 --approve` | `--request-changes --body-file ./review.md`
+- Merge (maintainers): `gh pr merge 31 --squash --delete-branch` (ensure checks are green)
+
+### CI: Checks and Runs
+- PR status: `gh pr status` (current repo) or `gh pr view 31 --json statusCheckRollup`
+- List workflow runs (current branch): `gh run list --branch $(git branch --show-current)`
+- View a run: `gh run view <run-id> --log`
+- Rerun a run (maintainers): `gh run rerun <run-id>`
+
+### Advanced: Direct API with gh
+- Commit check-runs: `gh api repos/:owner/:repo/commits/<sha>/check-runs --paginate`
+- Combined status: `gh api repos/:owner/:repo/commits/<sha>/status`
+- PR payload: `gh pr view 31 --json headRefName,headRefOid,mergeable,mergeStateStatus`
+
+### Good Practices and Examples
+- Use body files to preserve newlines and bullets:
+  - Create file: `cat > /tmp/pr.md <<'MD'
+Title and summary paragraph.
+
+Bullets
+- Point A
+- Point B
+
+Closes #18.
+MD`
+  - Apply: `gh pr edit 31 --body-file /tmp/pr.md`
+- Keep commit subjects under 100 chars (commitlint default via `@commitlint/config-conventional`).
+- For Dependabot PRs: repository secrets aren’t available. Our CI skips Codecov uploads for `dependabot[bot]` but still runs tests and checks.
+- For forked PRs: treat as untrusted (no secrets). Avoid running steps that require secrets or write permissions unless guarded.
