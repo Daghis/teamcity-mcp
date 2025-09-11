@@ -19,14 +19,18 @@ const plugins = [
 ];
 
 if (process.env.CODECOV_BUNDLE) {
-  const { codecovEsbuildPlugin } = require('@codecov/bundler-plugin-esbuild');
-  plugins.push(
-    codecovEsbuildPlugin({
-      output: {
-        path: path.join(__dirname, '..', 'coverage', 'bundles')
-      }
-    })
-  );
+  try {
+    const { codecovEsbuildPlugin } = require('@codecov/bundler-plugin-esbuild');
+    plugins.push(
+      codecovEsbuildPlugin({
+        output: {
+          path: path.join(__dirname, '..', 'coverage', 'bundles')
+        }
+      })
+    );
+  } catch (err) {
+    console.warn('Codecov bundle plugin missing, skipping analysis');
+  }
 }
 
 async function build() {
