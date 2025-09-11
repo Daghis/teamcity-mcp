@@ -89,6 +89,16 @@ jobs:
           name: coverage-shard-${{ matrix.shard }}
           path: coverage/
           if-no-files-found: ignore
+      - name: Analyze bundle
+        run: npm run build:bundle
+      - name: Upload bundle analysis to Codecov
+        if: success()
+        uses: codecov/codecov-action@v4
+        with:
+          plugin: javascript-bundle
+          files: ./coverage/bundles/*.json
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   aggregate:
     name: Lint, Typecheck, Test (Node 20)
