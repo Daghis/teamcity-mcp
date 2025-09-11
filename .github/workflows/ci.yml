@@ -47,12 +47,12 @@ jobs:
       - run: npm run typecheck
 
   tests:
-    name: Tests with coverage (unit) – shard ${{ matrix.shard }}/8
+    name: Tests with coverage (unit) – shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -64,7 +64,7 @@ jobs:
         env:
           JEST_JUNIT_OUTPUT: ./coverage/junit-${{ matrix.shard }}.xml
           JEST_JUNIT_CLASSNAME: "{filepath}"
-        run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit --shard=${{ matrix.shard }}/8 --passWithNoTests
+        run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit --shard=${{ matrix.shard }}/4 --passWithNoTests
       - name: Upload coverage to Codecov
         if: success()
         uses: codecov/codecov-action@v4
