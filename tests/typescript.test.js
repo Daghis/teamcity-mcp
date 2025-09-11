@@ -78,7 +78,7 @@ describe('TypeScript Configuration', () => {
       try {
         const tscScript = path.join(rootDir, 'node_modules', 'typescript', 'bin', 'tsc');
         const node = process.execPath;
-        execSync(`"${node}" "${tscScript}" --noEmit`, {
+        execSync(`"${node}" "${tscScript}" -p tsconfig.build.json --noEmit`, {
           cwd: rootDir,
           stdio: 'pipe',
         });
