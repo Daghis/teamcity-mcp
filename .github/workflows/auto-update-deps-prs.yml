@@ -1,0 +1,54 @@
+name: Auto-update dependency PRs
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-dep-prs:
+    name: Update dependency PR branches and set auto-merge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup GH
+        run: gh --version
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: List and update dependency PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "Scanning for open dependency PRs…"
+          prs_json=$(gh pr list --repo "$REPO" --search "is:open label:dependencies" --json number,title,headRefName,mergeStateStatus,mergeable || echo '[]')
+          count=$(jq -r 'length' <<<"$prs_json")
+          echo "Found $count dependency PR(s)."
+          if [ "$count" -eq 0 ]; then exit 0; fi
+
+          for row in $(jq -c '.[]' <<<"$prs_json"); do
+            num=$(jq -r '.number' <<<"$row")
+            head=$(jq -r '.headRefName' <<<"$row")
+            ms=$(jq -r '.mergeStateStatus' <<<"$row")
+            echo "PR #$num ($head) state: $ms"
+
+            # Enable auto-merge (won't merge until checks pass)
+            gh pr merge "$num" --repo "$REPO" --squash --auto --delete-branch || true
+
+            # Update branch if behind/dirty using Update Branch API
+            if [ "$ms" = "BEHIND" ] || [ "$ms" = "DIRTY" ]; then
+              head_sha=$(gh pr view "$num" --repo "$REPO" --json headRefOid -q .headRefOid)
+              echo "Updating branch for PR #$num…"
+              gh api -X PUT \
+                -H 'Accept: application/vnd.github+json' \
+                repos/$REPO/pulls/$num/update-branch \
+                -f expected_head_sha="$head_sha" || true
+            fi
+          done
