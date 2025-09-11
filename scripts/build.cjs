@@ -12,6 +12,29 @@ const path = require('path');
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+const plugins = [
+  TsconfigPathsPlugin({
+    tsconfig: path.resolve(__dirname, '..', 'tsconfig.json')
+  })
+];
+
+if (process.env.CODECOV_BUNDLE) {
+  try {
+    // Attempt to load Codecov bundler plugin for esbuild. If unavailable,
+    // warn and continue; CI will conditionally upload only when bundles exist.
+    const { codecovEsbuildPlugin } = require('@codecov/bundler-plugin-esbuild');
+    plugins.push(
+      codecovEsbuildPlugin({
+        output: {
+          path: path.join(__dirname, '..', 'coverage', 'bundles')
+        }
+      })
+    );
+  } catch (err) {
+    console.warn('Codecov bundle plugin missing, skipping analysis');
+  }
+}
+
 async function build() {
   try {
     console.log('🔨 Building TypeScript project with esbuild...');
@@ -37,11 +60,7 @@ async function build() {
       sourcemap: !isProduction,
       minify: isProduction,
       treeShaking: true,
-      plugins: [
-        TsconfigPathsPlugin({
-          tsconfig: path.resolve(__dirname, '..', 'tsconfig.json')
-        })
-      ],
+      plugins,
       external: [
         '@modelcontextprotocol/sdk',
         'express',

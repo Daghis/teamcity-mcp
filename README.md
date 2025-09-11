@@ -184,7 +184,14 @@ npm run typecheck
 
 # Build for production
 npm run build
+
+# Analyze bundle for Codecov
+npm run build:bundle
 ```
+
+### Bundle analysis in CI
+
+The CI workflow runs `npm run build:bundle` and uploads the generated `coverage/bundles` JSON using `codecov/codecov-action` with the `javascript-bundle` plugin.
 
 ## Project Structure
 

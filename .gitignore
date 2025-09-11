@@ -5,6 +5,7 @@ node_modules/
 
 # Testing
 coverage/
+coverage/bundles/
 *.lcov
 .nyc_output
 

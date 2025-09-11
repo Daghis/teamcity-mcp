@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
 
 jobs:
   lint:
@@ -67,6 +68,12 @@ jobs:
           JEST_JUNIT_OUTPUT: ./coverage/junit-${{ matrix.shard }}.xml
           JEST_JUNIT_CLASSNAME: "{filepath}"
         run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit --shard=${{ matrix.shard }}/4 --passWithNoTests
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/junit-${{ matrix.shard }}.xml
       - name: Upload coverage to Codecov
         if: success()
         uses: codecov/codecov-action@v4
@@ -75,20 +82,17 @@ jobs:
           flags: unittests
           name: codecov-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
+          fail_ci_if_error: true
+      - name: Analyze bundle
+        run: npm run build:bundle
+      - name: Upload bundle analysis to Codecov
+        if: ${{ success() && hashFiles('coverage/bundles/*.json') != '' }}
+        uses: codecov/codecov-action@v4
         with:
+          plugin: javascript-bundle
+          files: ./coverage/bundles/*.json
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/junit-${{ matrix.shard }}.xml
-      - name: Upload coverage artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-shard-${{ matrix.shard }}
-          path: coverage/
-          if-no-files-found: ignore
+          fail_ci_if_error: true
 
   aggregate:
     name: Lint, Typecheck, Test (Node 20)
