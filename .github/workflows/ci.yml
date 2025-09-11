@@ -76,7 +76,7 @@ jobs:
           files: ./coverage/junit-${{ matrix.shard }}.xml
       - name: Upload coverage to Codecov
         if: ${{ success() && github.actor != 'dependabot[bot]' }}
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage/lcov.info
           flags: unittests
@@ -87,7 +87,7 @@ jobs:
         run: npm run build:bundle
       - name: Upload bundle analysis to Codecov
         if: ${{ success() && github.actor != 'dependabot[bot]' && hashFiles('coverage/bundles/*.json') != '' }}
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           plugin: javascript-bundle
           files: ./coverage/bundles/*.json
