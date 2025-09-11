@@ -31,6 +31,7 @@
 ## Commit & Pull Request Guidelines
 - Commits: imperative subject; include ticket when applicable, e.g., `[TMCP-123] Short summary` (≤72 chars). Add body for rationale/breaking changes.
 - PRs: link issues/tickets, describe scope and testing, include relevant logs or CLI output. Require green CI and `npm run check` locally.
+- PR descriptions should use Markdown with proper newlines. When scripting, prefer `gh pr edit --body-file` (or `--body` with actual newlines) to ensure bullets and paragraphs render correctly.
 
 ## Security & Configuration Tips
 - Never commit secrets. Configure via `.env` (e.g., `TEAMCITY_URL`, `TEAMCITY_TOKEN`, `MCP_MODE`). Use provided TeamCity client/managers; respect rate limits and retries.
