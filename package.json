@@ -66,7 +66,6 @@
     "morgan": "^1.10.0",
     "reflect-metadata": "^0.2.2",
     "tslib": "^2.8.1",
-    "uuid": "^13.0.0",
     "winston": "^3.11.0",
     "zod": "^3.22.4"
   },
@@ -81,7 +80,6 @@
     "@types/js-yaml": "^4.0.9",
     "@types/morgan": "^1.9.9",
     "@types/node": "^24.3.1",
-    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
     "axios-retry": "^4.5.0",
