@@ -3,14 +3,15 @@ import { getRequiredTool } from '@/tools';
 
 describe('tools: update_project_settings', () => {
   const prevMode = process.env['MCP_MODE'];
+  let tool: ReturnType<typeof getRequiredTool>;
   beforeAll(() => {
     process.env['MCP_MODE'] = 'full';
+    tool = getRequiredTool('update_project_settings');
   });
   afterAll(() => {
     if (typeof prevMode === 'undefined') delete process.env['MCP_MODE'];
     else process.env['MCP_MODE'] = prevMode;
   });
-  const tool = getRequiredTool('update_project_settings');
 
   it('updates only provided name', async () => {
     const setProjectField = jest.fn().mockResolvedValue({});
