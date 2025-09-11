@@ -16,6 +16,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage --runInBand",
+    "test:coverage:ci": "jest -c jest.ci.config.js --coverage --runInBand",
     "test:unit": "jest tests/unit",
     "test:integration": "node scripts/verify-integration-env.cjs && jest tests/integration",
     "test:ci": "jest --coverage --ci --reporters=default --reporters=jest-junit",
