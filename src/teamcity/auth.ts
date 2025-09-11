@@ -7,7 +7,7 @@ import type {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from 'axios';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 import { info, error as logError } from '@/utils/logger';
 
@@ -15,7 +15,7 @@ import { info, error as logError } from '@/utils/logger';
  * Generate a unique request ID for tracing
  */
 export function generateRequestId(): string {
-  return uuidv4();
+  return randomUUID();
 }
 
 /**
