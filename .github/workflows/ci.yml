@@ -11,6 +11,8 @@ on:
 permissions:
   contents: read
   checks: write
+  id-token: write
+  checks: write
 
 jobs:
   lint:
@@ -63,22 +65,32 @@ jobs:
           node-version: 20.x
           cache: npm
       - run: npm ci
+      - name: Debug Codecov context
+        run: |
+          if [ -n "${{ secrets.CODECOV_TOKEN }}" ]; then
+            echo "CODECOV_TOKEN is present (masked).";
+          else
+            echo "CODECOV_TOKEN is NOT set.";
+          fi
+          ls -la coverage || true
+          test -f coverage/lcov.info && echo "Found coverage/lcov.info" || echo "Missing coverage/lcov.info"
       - name: Run tests with coverage (unit-only + JUnit)
         env:
           JEST_JUNIT_OUTPUT: ./coverage/junit-${{ matrix.shard }}.xml
           JEST_JUNIT_CLASSNAME: "{filepath}"
         run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit --shard=${{ matrix.shard }}/4 --passWithNoTests
       - name: Upload coverage to Codecov
-        if: ${{ success() && secrets.CODECOV_TOKEN != '' }}
+        if: ${{ success() && (secrets.CODECOV_TOKEN != '' || (github.event_name == 'push')) }}
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage/lcov.info
           flags: unittests
           name: codecov-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           fail_ci_if_error: false
       - name: Upload test results to Codecov
-        if: ${{ !cancelled() && secrets.CODECOV_TOKEN != '' }}
+        if: ${{ !cancelled() && (secrets.CODECOV_TOKEN != '' ) }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -93,12 +105,13 @@ jobs:
       - name: Analyze bundle
         run: npm run build:bundle
       - name: Upload bundle analysis to Codecov
-        if: ${{ success() && secrets.CODECOV_TOKEN != '' && hashFiles('coverage/bundles/*.json') != '' }}
+        if: ${{ success() && (secrets.CODECOV_TOKEN != '' || (github.event_name == 'push')) && hashFiles('coverage/bundles/*.json') != '' }}
         uses: codecov/codecov-action@v4
         with:
           plugin: javascript-bundle
           files: ./coverage/bundles/*.json
           token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           fail_ci_if_error: false
 
   aggregate:
