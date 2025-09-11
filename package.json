@@ -16,6 +16,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage --runInBand",
+    "test:coverage:ci": "jest --coverage --runInBand --testPathIgnorePatterns='[\"/tests/e2e/\",\"/tests/integration/\"]'",
     "test:unit": "jest tests/unit",
     "test:integration": "node scripts/verify-integration-env.cjs && jest tests/integration",
     "test:ci": "jest --coverage --ci --reporters=default --reporters=jest-junit",

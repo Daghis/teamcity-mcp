@@ -36,8 +36,8 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Tests with coverage
-        run: npm run test:coverage
+      - name: Tests with coverage (unit-only)
+        run: npm run test:coverage:ci
 
       - name: Upload coverage to Codecov
         if: success()
