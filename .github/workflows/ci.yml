@@ -36,8 +36,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Tests with coverage (unit-only)
-        run: npm run test:coverage:ci
+      - name: Tests with coverage (unit-only + JUnit)
+        env:
+          JEST_JUNIT_OUTPUT: ./coverage/junit.xml
+          JEST_JUNIT_CLASSNAME: "{filepath}"
+        run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit
 
       - name: Upload coverage to Codecov
         if: success()
@@ -48,6 +51,12 @@ jobs:
           name: codecov-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload coverage artifact
         if: always()
