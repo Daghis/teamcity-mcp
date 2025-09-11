@@ -44,7 +44,7 @@ Last updated: 2025-09-11
 - eslint-plugin-import 2.32.0 — MIT
 - eslint-plugin-prettier 5.5.4 — MIT
 - jest 29.7.0 — MIT
-- jest-junit UNKNOWN — UNKNOWN
+- jest-junit 16.0.0 — Apache-2.0
 - js-yaml 4.1.0 — MIT
 - prettier 3.6.2 — MIT
 - ts-jest 29.4.1 — MIT
@@ -56,4 +56,3 @@ Last updated: 2025-09-11
 ---
 
 Note: This document is provided for convenience and does not modify any license terms. All third-party packages remain the property of their respective copyright holders and are licensed under their own terms.
-
