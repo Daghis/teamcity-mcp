@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
 
 jobs:
   lint:
@@ -68,7 +69,7 @@ jobs:
           JEST_JUNIT_CLASSNAME: "{filepath}"
         run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit --shard=${{ matrix.shard }}/4 --passWithNoTests
       - name: Upload coverage to Codecov
-        if: success()
+        if: ${{ success() && secrets.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage/lcov.info
@@ -77,7 +78,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
       - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && secrets.CODECOV_TOKEN != '' }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -92,7 +93,7 @@ jobs:
       - name: Analyze bundle
         run: npm run build:bundle
       - name: Upload bundle analysis to Codecov
-        if: ${{ success() && hashFiles('coverage/bundles/*.json') != '' }}
+        if: ${{ success() && secrets.CODECOV_TOKEN != '' && hashFiles('coverage/bundles/*.json') != '' }}
         uses: codecov/codecov-action@v4
         with:
           plugin: javascript-bundle
