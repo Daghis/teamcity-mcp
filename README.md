@@ -51,7 +51,7 @@ The TeamCity MCP Server allows developers using AI-powered coding assistants (Cl
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/teamcity-mcp.git
+git clone https://github.com/Daghis/teamcity-mcp.git
 cd teamcity-mcp
 
 # Install dependencies
@@ -68,7 +68,7 @@ npm run dev
 ### npm Package (Coming Soon)
 
 ```bash
-npx @teamcity/mcp-server --mode=dev
+npx @daghis/teamcity-mcp --mode=dev
 ```
 
 ## Configuration
@@ -242,7 +242,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 
 ## Support
 
-- GitHub Issues: [Report bugs or request features](https://github.com/yourusername/teamcity-mcp/issues)
+- GitHub Issues: [Report bugs or request features](https://github.com/Daghis/teamcity-mcp/issues)
 - Documentation: See the `docs/` folder in this repository
 
 ## Acknowledgments
