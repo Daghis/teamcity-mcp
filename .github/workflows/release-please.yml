@@ -11,10 +11,11 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    concurrency:
+      group: release-please
+      cancel-in-progress: true
     steps:
       - name: Release Please
-        uses: google-github-actions/release-please-action@v4
+        uses: googleapis/release-please-action@v4
         with:
           release-type: node
-          package-name: "@daghis/teamcity-mcp"
-
