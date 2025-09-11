@@ -69,13 +69,13 @@ jobs:
           JEST_JUNIT_CLASSNAME: "{filepath}"
         run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit --shard=${{ matrix.shard }}/4 --passWithNoTests
       - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.actor != 'dependabot[bot]' }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/junit-${{ matrix.shard }}.xml
       - name: Upload coverage to Codecov
-        if: success()
+        if: ${{ success() && github.actor != 'dependabot[bot]' }}
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage/lcov.info
@@ -86,7 +86,7 @@ jobs:
       - name: Analyze bundle
         run: npm run build:bundle
       - name: Upload bundle analysis to Codecov
-        if: ${{ success() && hashFiles('coverage/bundles/*.json') != '' }}
+        if: ${{ success() && github.actor != 'dependabot[bot]' && hashFiles('coverage/bundles/*.json') != '' }}
         uses: codecov/codecov-action@v4
         with:
           plugin: javascript-bundle
