@@ -27,7 +27,8 @@ describe('Development Tooling', () => {
     test('should run lint command without errors on clean code', () => {
       try {
         // Create a temporary clean TypeScript file
-        const testFile = path.join(rootDir, 'src', 'test-lint.ts');
+        // Use tests directory to avoid race with repo-wide lint globs
+        const testFile = path.join(rootDir, 'tests', 'temp-test-lint-src.ts');
         const cleanCode = `export const testFunction = (value: string): string => {
   return value.toUpperCase();
 };

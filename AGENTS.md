@@ -15,7 +15,7 @@
 - `npm run test:coverage` — Coverage report (thresholds enforced).
 - `npm run lint` / `npm run lint:check` — ESLint with Prettier integration.
 - `npm run format` — Format; `npm run typecheck` — TS type checking.
-- Node 24.x required. Use `.nvmrc` (24.x). Copy `.env` from `.env.example` and fill values.
+- Node 20.x required. Use `.nvmrc` (20.x). Copy `.env` from `.env.example` and fill values.
 
 ## Coding Style & Naming Conventions
 - Prettier: 2 spaces, 100 cols, single quotes, trailing commas; import order via `@trivago/prettier-plugin-sort-imports`.

@@ -32,9 +32,9 @@ describe('Project Setup', () => {
       expect(packageJson).toHaveProperty('engines');
     });
 
-    test('should specify Node.js version >= 24.0.0', () => {
+    test('should specify Node.js version >= 20.0.0', () => {
       expect(packageJson.engines).toHaveProperty('node');
-      expect(packageJson.engines.node).toMatch(/>=24/);
+      expect(packageJson.engines.node).toMatch(/>=20/);
     });
 
     test('should have essential npm scripts', () => {
@@ -56,13 +56,13 @@ describe('Project Setup', () => {
   });
 
   describe('Node.js Version', () => {
-    test('.nvmrc should exist and specify Node 24', () => {
+    test('.nvmrc should exist and specify Node 20', () => {
       const nvmrcPath = path.join(rootDir, '.nvmrc');
       expect(fs.existsSync(nvmrcPath)).toBe(true);
 
       if (fs.existsSync(nvmrcPath)) {
         const content = fs.readFileSync(nvmrcPath, 'utf8').trim();
-        expect(content).toMatch(/^24/);
+        expect(content).toMatch(/^20/);
       }
     });
   });

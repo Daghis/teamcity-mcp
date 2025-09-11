@@ -519,7 +519,8 @@ describe('measureTime', () => {
     const { result, duration } = await measureTime(operation);
 
     expect(result).toBe('result');
-    expect(duration).toBeGreaterThanOrEqual(50);
+    // Allow small timer scheduling jitter on some systems
+    expect(duration).toBeGreaterThanOrEqual(45);
     expect(duration).toBeLessThan(100);
   });
 

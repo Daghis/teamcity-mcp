@@ -39,7 +39,7 @@ The TeamCity MCP Server allows developers using AI-powered coding assistants (Cl
 
 ### Prerequisites
 
-- Node.js >= 24.0.0
+- Node.js >= 20.10.0
 - TeamCity Server 2020.1+ with REST API access
 - TeamCity authentication token
 

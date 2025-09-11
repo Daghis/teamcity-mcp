@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "engines": {
-    "node": ">=24.0.0 <25"
+    "node": ">=20.10.0 <21"
   },
   "scripts": {
     "dev": "node ./node_modules/tsx/dist/cli.mjs watch src/index.ts",
@@ -19,8 +19,8 @@
     "test:unit": "jest tests/unit",
     "test:integration": "node scripts/verify-integration-env.cjs && jest tests/integration",
     "test:ci": "jest --coverage --ci --reporters=default --reporters=jest-junit",
-    "lint": "sh -c \"node ./node_modules/eslint/bin/eslint.js 'src/**/*.{ts,tsx}' 'tests/**/*.test.{ts,tsx,js}' --fix --quiet 2>/dev/null\"",
-    "lint:check": "node ./node_modules/eslint/bin/eslint.js 'src/**/*.{ts,tsx}' 'tests/**/*.test.{ts,tsx,js}'",
+    "lint": "sh -c \"node ./node_modules/eslint/bin/eslint.js 'src/**/*.{ts,tsx}' 'tests/**/*.test.{ts,tsx,js}' --fix --no-error-on-unmatched-pattern\"",
+    "lint:check": "node ./node_modules/eslint/bin/eslint.js 'src/**/*.{ts,tsx}' 'tests/**/*.test.{ts,tsx,js}' --no-error-on-unmatched-pattern",
     "format": "node ./node_modules/prettier/bin/prettier.cjs --write 'src/**/*.{ts,tsx,json,md}' 'tests/**/*.{ts,tsx,js,json,md}'",
     "format:check": "node ./node_modules/prettier/bin/prettier.cjs --check 'src/**/*.{ts,tsx,json,md}' 'tests/**/*.{ts,tsx,js,json,md}'",
     "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.build.json",
