@@ -1,5 +1,8 @@
 # TeamCity MCP Server
 
+[![CI](https://github.com/Daghis/teamcity-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Daghis/teamcity-mcp/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Daghis/teamcity-mcp/actions/workflows/codeql.yml/badge.svg)](https://github.com/Daghis/teamcity-mcp/actions/workflows/codeql.yml)
+
 A Model Control Protocol (MCP) server that bridges AI coding assistants with JetBrains TeamCity CI/CD server, enabling natural language control of builds, tests, and deployments.
 
 ## Overview
