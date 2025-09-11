@@ -46,6 +46,7 @@ jobs:
           files: ./coverage/lcov.info
           flags: unittests
           name: codecov-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
       - name: Upload coverage artifact
