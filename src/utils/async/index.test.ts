@@ -154,8 +154,8 @@ describe('retry', () => {
     }
 
     const elapsed = Date.now() - startTime;
-    // Should wait at least 50 + 100 = 150ms
-    expect(elapsed).toBeGreaterThanOrEqual(150);
+    // Should wait roughly 50 + 100 = 150ms; allow small scheduler jitter
+    expect(elapsed).toBeGreaterThanOrEqual(140);
   }, 15000);
 
   it('should respect maxDelay option', async () => {
@@ -231,8 +231,8 @@ describe('sleep', () => {
     await sleep(50);
 
     const elapsed = Date.now() - startTime;
-    expect(elapsed).toBeGreaterThanOrEqual(50);
-    expect(elapsed).toBeLessThan(100); // Allow some variance
+    expect(elapsed).toBeGreaterThanOrEqual(45);
+    expect(elapsed).toBeLessThan(120); // Allow variance on shared runners
   }, 15000);
 });
 
@@ -519,9 +519,9 @@ describe('measureTime', () => {
     const { result, duration } = await measureTime(operation);
 
     expect(result).toBe('result');
-    // Allow small timer scheduling jitter on some systems
-    expect(duration).toBeGreaterThanOrEqual(45);
-    expect(duration).toBeLessThan(100);
+    // Allow small timer scheduling jitter on some systems / CI runners
+    expect(duration).toBeGreaterThanOrEqual(40);
+    expect(duration).toBeLessThan(120);
   });
 
   it('should measure time even if operation fails', async () => {

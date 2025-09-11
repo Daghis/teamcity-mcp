@@ -39,6 +39,16 @@ jobs:
       - name: Tests with coverage
         run: npm run test:coverage
 
+      - name: Upload coverage to Codecov
+        if: success()
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -46,4 +56,3 @@ jobs:
           name: coverage
           path: coverage/
           if-no-files-found: ignore
-
