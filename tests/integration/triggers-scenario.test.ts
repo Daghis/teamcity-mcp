@@ -9,8 +9,14 @@ const PROJECT_NAME = `E2E Triggers ${ts}`;
 const BT_ID = `E2E_TRIG_BT_${ts}`;
 const BT_NAME = `E2E Trigger BuildType ${ts}`;
 
+const hasTeamCityEnv = Boolean(
+  (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
+    (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
+);
+
 describe('Build triggers: add and delete (full) with dev verification', () => {
   afterAll(async () => {
+    if (!hasTeamCityEnv) return;
     try {
       await callTool('full', 'delete_project', { projectId: PROJECT_ID });
     } catch (_e) {
@@ -18,6 +24,7 @@ describe('Build triggers: add and delete (full) with dev verification', () => {
     }
   });
   it('creates project and build config (full)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
     const cproj = await callTool<ActionResult>('full', 'create_project', {
       id: PROJECT_ID,
       name: PROJECT_NAME,
@@ -32,6 +39,7 @@ describe('Build triggers: add and delete (full) with dev verification', () => {
   }, 60000);
 
   it('adds a vcs trigger (full) and verifies via list_build_configs (dev)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
     try {
       const addTrig = await callTool<ActionResult>('full', 'manage_build_triggers', {
         buildTypeId: BT_ID,
@@ -65,6 +73,7 @@ describe('Build triggers: add and delete (full) with dev verification', () => {
   }, 90000);
 
   it('deletes project (full)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
     const res = await callTool('full', 'delete_project', { projectId: PROJECT_ID });
     expect(res).toMatchObject({ success: true, action: 'delete_project' });
   }, 60000);
