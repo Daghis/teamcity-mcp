@@ -92,7 +92,7 @@ jobs:
       - name: Analyze bundle
         run: npm run build:bundle
       - name: Upload bundle analysis to Codecov
-        if: success()
+        if: ${{ success() && hashFiles('coverage/bundles/*.json') != '' }}
         uses: codecov/codecov-action@v4
         with:
           plugin: javascript-bundle
