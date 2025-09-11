@@ -1,0 +1,22 @@
+node_modules/
+dist/
+coverage/
+*.min.js
+*.min.css
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.husky/
+.git/
+.next/
+.cache/
+build/
+*.log
+.DS_Store
+.env*
+!.env.example
+
+# Auto-generated TeamCity API client files
+src/teamcity-client/**/*
+# Keep only the index file for imports
+!src/teamcity-client/index.ts

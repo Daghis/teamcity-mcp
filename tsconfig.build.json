@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "tests",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "src/teamcity-client/api/**/*",
+    "src/teamcity-client/models/**/*",
+    "src/teamcity-client/base.ts",
+    "src/teamcity-client/common.ts",
+    "src/teamcity-client/configuration.ts"
+  ],
+  "include": [
+    "src/**/*",
+    "!src/teamcity-client/api/**/*",
+    "!src/teamcity-client/models/**/*",
+    "!src/teamcity-client/base.ts",
+    "!src/teamcity-client/common.ts", 
+    "!src/teamcity-client/configuration.ts"
+  ],
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noPropertyAccessFromIndexSignature": false
+  }
+}

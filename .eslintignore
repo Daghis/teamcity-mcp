@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+*.js
+*.mjs
+*.cjs
+scripts/
+.husky/
+tests/*.js
+jest.config.js
+.eslintrc.js
+
+# Auto-generated TeamCity API client files
+src/teamcity-client/**/*
+# Keep only the index file for imports
+!src/teamcity-client/index.ts

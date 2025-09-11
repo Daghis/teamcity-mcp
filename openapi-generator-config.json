@@ -1,0 +1,27 @@
+{
+  "generatorName": "typescript-axios",
+  "outputDir": "./src/teamcity-client",
+  "inputSpec": "./.cache/teamcity-swagger.json",
+  "additionalProperties": {
+    "npmName": "@teamcity/client",
+    "npmVersion": "1.0.0",
+    "supportsES6": true,
+    "withSeparateModelsAndApi": true,
+    "apiPackage": "api",
+    "modelPackage": "models",
+    "withInterfaces": true,
+    "useSingleRequestParameter": true,
+    "ensureUniqueParams": true
+  },
+  "globalProperties": {
+    "skipFormModel": false,
+    "modelDocs": true,
+    "apiDocs": true,
+    "modelTests": false,
+    "apiTests": false
+  },
+  "typeMappings": {
+    "DateTime": "Date",
+    "date": "Date"
+  }
+}
