@@ -4,6 +4,7 @@
  */
 import { AxiosError } from 'axios';
 
+import { TeamCityAPIError } from '@/teamcity/errors';
 import { ErrorContext, errorLogger } from '@/utils/error-logger';
 
 import {
@@ -98,6 +99,16 @@ export class GlobalErrorHandler {
    * Transform raw errors into structured MCP errors
    */
   private transformError(error: unknown, context: ErrorContext): Error {
+    // Errors already normalized by our TeamCity client
+    if (error instanceof TeamCityAPIError) {
+      return new MCPTeamCityError(
+        this.sanitizeErrorMessage(error.message),
+        error.statusCode ?? 500,
+        error.code,
+        context.requestId
+      );
+    }
+
     // Already an MCP error
     if (error instanceof MCPToolError) {
       // Still sanitize the message if needed

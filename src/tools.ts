@@ -1014,9 +1014,16 @@ const DEV_TOOLS: ToolDefinition[] = [
     description: 'Fetch server metrics (CPU/memory/disk/load) if available',
     inputSchema: { type: 'object', properties: {} },
     handler: async (_args: unknown) => {
-      const api = TeamCityAPI.getInstance();
-      const metrics = await api.server.getAllMetrics();
-      return json(metrics.data);
+      return runTool(
+        'get_server_metrics',
+        null,
+        async () => {
+          const api = TeamCityAPI.getInstance();
+          const metrics = await api.server.getAllMetrics();
+          return json(metrics.data);
+        },
+        {}
+      );
     },
     mode: 'full',
   },
@@ -1025,9 +1032,16 @@ const DEV_TOOLS: ToolDefinition[] = [
     description: 'Get TeamCity server info (version, build number, state)',
     inputSchema: { type: 'object', properties: {} },
     handler: async (_args: unknown) => {
-      const api = TeamCityAPI.getInstance();
-      const info = await api.server.getServerInfo();
-      return json(info.data);
+      return runTool(
+        'get_server_info',
+        null,
+        async () => {
+          const api = TeamCityAPI.getInstance();
+          const info = await api.server.getServerInfo();
+          return json(info.data);
+        },
+        {}
+      );
     },
   },
   {
