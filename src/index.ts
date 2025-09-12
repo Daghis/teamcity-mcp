@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Simple TeamCity MCP Server Entry Point
  * Minimal implementation without complex DI or abstractions

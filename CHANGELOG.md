@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.1](https://github.com/Daghis/teamcity-mcp/compare/v0.9.0...v0.9.1) (2025-09-12)
+
+### Bug Fixes
+- Fix CLI execution via npx by removing duplicate shebang line in `src/index.ts` and relying on build banner. This resolves `sh: teamcity-mcp: command not found` / `Invalid or unexpected token` when running `npx -y @daghis/teamcity-mcp`.
+
 ## [0.2.1](https://github.com/Daghis/teamcity-mcp/compare/v0.2.0...v0.2.1) (2025-09-12)
 
 
