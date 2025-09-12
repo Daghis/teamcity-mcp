@@ -67,7 +67,13 @@ async function build() {
         'dotenv',
         'winston',
         'morgan',
-        'zod'
+        'zod',
+        'axios',
+        'ajv',
+        'ajv-formats',
+        'inversify',
+        'reflect-metadata',
+        'tslib'
       ],
       logLevel: 'info',
       define: {
