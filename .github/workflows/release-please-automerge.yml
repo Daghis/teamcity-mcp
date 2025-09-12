@@ -17,10 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Enable auto-merge (squash)
-        uses: peter-evans/enable-pull-request-automerge@v3
-        with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          merge-method: squash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          gh pr merge \
+            -R "${{ github.repository }}" \
+            --squash --auto \
+            "${{ github.event.pull_request.number }}"
       - name: Comment that auto-merge is enabled
         uses: actions/github-script@v7
         with:
