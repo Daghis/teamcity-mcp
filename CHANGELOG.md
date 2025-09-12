@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.2](https://github.com/Daghis/teamcity-mcp/compare/v0.2.1...v0.2.2) (2025-09-12)
+
+
+### Bug Fixes
+
+* **cli:** improve npx execution; release 0.9.2 ([#61](https://github.com/Daghis/teamcity-mcp/issues/61)) ([42577c3](https://github.com/Daghis/teamcity-mcp/commit/42577c3ed78dd7e29f21f6c8138d96da49582892))
+* **cli:** remove duplicate shebang in entrypoint; bump to 0.9.1 ([#59](https://github.com/Daghis/teamcity-mcp/issues/59)) ([740530d](https://github.com/Daghis/teamcity-mcp/commit/740530d7bfba6bc81a42f8057fd017a2f8cae14e))
+* **tools:** update_build_config uses 'settings/artifactRules' path; add tests ([#66](https://github.com/Daghis/teamcity-mcp/issues/66)) ([8b8afc6](https://github.com/Daghis/teamcity-mcp/commit/8b8afc6f41038bcde21a50a8662f90fa4acb7e9a))
+
 ## [1.0.0](https://github.com/Daghis/teamcity-mcp/compare/v0.9.2...v1.0.0) (2025-09-12)
 
 ### Features
