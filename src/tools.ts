@@ -1052,18 +1052,76 @@ const DEV_TOOLS: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        locator: { type: 'string', description: 'Optional health item locator filter' },
+        locator: {
+          type: 'string',
+          description:
+            'Optional health item locator filter. Omit or empty string fetches all items.',
+        },
       },
     },
     handler: async (args: unknown) => {
-      const schema = z.object({ locator: z.string().min(1).optional() });
+      const schema = z.object({ locator: z.string().optional() });
       return runTool(
         'list_server_health_items',
         schema,
         async (typed) => {
           const api = TeamCityAPI.getInstance();
-          const response = await api.health.getHealthItems(typed.locator);
-          return json(response.data);
+          // Normalize locator: treat empty/whitespace-only as undefined (fetch all)
+          // and adjust known-safe patterns (e.g., category:(ERROR) -> category:ERROR)
+          const normalized = (() => {
+            const raw = typeof typed.locator === 'string' ? typed.locator.trim() : undefined;
+            if (!raw || raw.length === 0) return undefined;
+            // Remove parentheses around known severities for category filter
+            return raw.replace(/category:\s*\((ERROR|WARNING|INFO)\)/g, 'category:$1');
+          })();
+          try {
+            const response = await api.health.getHealthItems(normalized);
+            return json(response.data);
+          } catch (err) {
+            // Some TeamCity versions reject locator filters for /app/rest/health (HTTP 400).
+            // Fall back to fetching all items and apply a best-effort client-side filter
+            // for common patterns to avoid failing the tool call.
+            const isHttp400 =
+              (err as { statusCode?: number })?.statusCode === 400 ||
+              (err as { code?: string })?.code === 'VALIDATION_ERROR';
+            if (!isHttp400) throw err;
+
+            const all = await api.health.getHealthItems();
+            const rawItems = (all.data?.healthItem ?? []) as Array<Record<string, unknown>>;
+
+            // Basic filter parser: key:value pairs separated by commas.
+            // Supports keys: severity, category, id. Ignores unknown keys.
+            const filter = (item: Record<string, unknown>): boolean => {
+              if (!normalized) return true;
+              const clauses = normalized
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
+              for (const c of clauses) {
+                const [k, v] = c.split(':');
+                if (!k || v === undefined) continue;
+                const key = k.trim();
+                const val = v.trim();
+                if (key === 'severity') {
+                  if (String(item['severity'] ?? '').toUpperCase() !== val.toUpperCase())
+                    return false;
+                } else if (key === 'category') {
+                  if (String(item['category'] ?? '') !== val) return false;
+                } else if (key === 'id') {
+                  if (String(item['id'] ?? '') !== val) return false;
+                }
+              }
+              return true;
+            };
+
+            const items = rawItems.filter(filter);
+            return json({
+              count: items.length,
+              healthItem: items,
+              href: '/app/rest/health',
+              note: 'Applied client-side filtering due to TeamCity 400 on locator. Unsupported filters ignored.',
+            });
+          }
         },
         args
       );

@@ -2,9 +2,7 @@ name: Auto-merge Release Please PRs
 
 on:
   pull_request:
-    # 'opened' is sufficient for Release Please (label present at creation).
-    # Include 'synchronize' for updates; omit 'labeled' to avoid duplicate runs.
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened, labeled]
     branches: [ main ]
 
 permissions:
@@ -17,21 +15,8 @@ jobs:
       startsWith(github.event.pull_request.head.ref, 'release-please--') &&
       contains(join(github.event.pull_request.labels.*.name, ','), 'autorelease: pending')
     runs-on: ubuntu-latest
-    concurrency:
-      group: release-automerge-${{ github.event.pull_request.number }}
-      cancel-in-progress: true
     steps:
-      - name: Check if auto-merge already enabled
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-        run: |
-          set -e
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          ENABLED=$(gh pr view "$PR_NUMBER" --json autoMergeRequest -q '.autoMergeRequest != null')
-          echo "enabled=$ENABLED" >> "$GITHUB_OUTPUT"
       - name: Enable auto-merge (squash)
-        if: steps.check.outputs.enabled != 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: |

@@ -1,12 +1,5 @@
 # Changelog
 
-## [1.0.3](https://github.com/Daghis/teamcity-mcp/compare/v1.0.2...v1.0.3) (2025-09-12)
-
-
-### Bug Fixes
-
-* trigger 1.0.3 release (no functional change) ([069212a](https://github.com/Daghis/teamcity-mcp/commit/069212a181861b17e7a1d5cfda05b40c2d11e933))
-
 ## [1.0.2](https://github.com/Daghis/teamcity-mcp/compare/v1.0.1...v1.0.2) (2025-09-12)
 
 

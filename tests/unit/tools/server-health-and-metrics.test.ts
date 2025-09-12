@@ -89,6 +89,90 @@ describe('tools: server health & metrics', () => {
     });
   });
 
+  it('list_server_health_items treats empty locator as no filter', async () => {
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          let receivedLocator: string | undefined;
+          const health = {
+            getHealthItems: jest.fn(async (locator?: string) => {
+              receivedLocator = locator as string | undefined;
+              return { data: { healthItem: [] } };
+            }),
+          };
+          jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance: () => ({ health }) } }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          await getRequiredTool('list_server_health_items').handler({ locator: '' });
+          expect(receivedLocator).toBeUndefined();
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('list_server_health_items normalizes category:(ERROR) to category:ERROR', async () => {
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          let receivedLocator: string | undefined;
+          const health = {
+            getHealthItems: jest.fn(async (locator?: string) => {
+              receivedLocator = locator as string | undefined;
+              return { data: { healthItem: [] } };
+            }),
+          };
+          jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance: () => ({ health }) } }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          await getRequiredTool('list_server_health_items').handler({
+            locator: 'category:(ERROR),muted:false',
+          });
+          expect(receivedLocator).toBe('category:ERROR,muted:false');
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('list_server_health_items falls back to client-side filtering on HTTP 400', async () => {
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const http400 = Object.assign(new Error('HTTP 400'), { statusCode: 400 });
+          const health = {
+            getHealthItems: jest
+              .fn()
+              // First call with locator throws 400
+              .mockImplementationOnce(async () => {
+                throw http400;
+              })
+              // Fallback without locator returns full list
+              .mockImplementationOnce(async () => ({
+                data: {
+                  healthItem: [
+                    { id: 'A', severity: 'INFO', category: 'misc' },
+                    { id: 'B', severity: 'ERROR', category: 'build' },
+                  ],
+                },
+              })),
+          };
+          jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance: () => ({ health }) } }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('list_server_health_items').handler({
+            locator: 'severity:ERROR',
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload.count).toBe(1);
+          expect(Array.isArray(payload.healthItem)).toBe(true);
+          expect(payload.healthItem[0]).toMatchObject({ id: 'B', severity: 'ERROR' });
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
   it('check_availability_guard returns ok=false on ERRORs and warnings when flagged', async () => {
     await new Promise<void>((resolve, reject) => {
       jest.isolateModules(() => {
