@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.4](https://github.com/Daghis/teamcity-mcp/compare/v1.0.3...v1.0.4) (2025-09-12)
+
+
+### Bug Fixes
+
+* **health:** accept empty locator; normalize category; fallback on 400 ([#76](https://github.com/Daghis/teamcity-mcp/issues/76)) ([174c8e9](https://github.com/Daghis/teamcity-mcp/commit/174c8e932301b1b2262bfb704a73c4647520d3bf)), closes [#75](https://github.com/Daghis/teamcity-mcp/issues/75)
+
 ## [1.0.2](https://github.com/Daghis/teamcity-mcp/compare/v1.0.1...v1.0.2) (2025-09-12)
 
 
