@@ -81,13 +81,15 @@ npx -y @daghis/teamcity-mcp
 npx -y @daghis/teamcity-mcp
 ```
 
-Register with Claude Code’s MCP (user scope):
+## Claude Code
 
-```bash
-claude mcp add teamcity -s user \
-  -- env TEAMCITY_URL="https://teamcity.example.com" TEAMCITY_TOKEN="tc_<your_token>" MCP_MODE=dev \
-     npx -y @daghis/teamcity-mcp
-```
+- Add the MCP:
+  - `claude mcp add [-s user] teamcity -- npx -y @daghis/teamcity-mcp`
+- With env vars (if not using .env):
+  - `claude mcp add [-s user] teamcity -- env TEAMCITY_URL="https://teamcity.example.com" TEAMCITY_TOKEN="tc_<your_token>" MCP_MODE=dev npx -y @daghis/teamcity-mcp`
+- Context usage (Opus 4.1, estimates):
+  - Dev (default): ~14k tokens for MCP tools
+  - Full (`MCP_MODE=full`): ~26k tokens for MCP tools
 
 ## Configuration
 

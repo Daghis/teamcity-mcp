@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0](https://github.com/Daghis/teamcity-mcp/compare/v0.9.2...v1.0.0) (2025-09-12)
+
+### Features
+- 1.0 release: stabilize API surface and defaults
+
+### Docs
+- Add Claude Code setup command and context usage estimates (dev vs full)
+
 ## [0.9.2](https://github.com/Daghis/teamcity-mcp/compare/v0.9.1...v0.9.2) (2025-09-12)
 
 ### Bug Fixes

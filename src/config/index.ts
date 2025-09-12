@@ -72,7 +72,7 @@ export function loadConfig(): ApplicationConfig {
     },
     mcp: {
       name: 'teamcity-mcp',
-      version: '0.1.0',
+      version: '1.0.0',
       protocolVersion: '1.0.0',
       capabilities: {
         tools: true,
