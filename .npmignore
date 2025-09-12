@@ -1,0 +1,69 @@
+# Source files (TypeScript)
+src/
+tests/
+
+# Build and config files
+scripts/
+.github/
+.eslintrc.js
+.eslintignore
+.prettierrc
+.prettierignore
+.commitlintrc.mjs
+jest.config.js
+jest.ci.config.js
+jest.setup.js
+tsconfig.json
+tsconfig.build.json
+tsconfig.lint.json
+openapi-generator-config.json
+openapitools.json
+
+# Development files
+.env
+.env.*
+.nvmrc
+coverage/
+docs/
+examples/
+*.log
+lint.log
+
+# Git and IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation (keep README and LICENSE)
+AGENTS.md
+ARCHITECTURE.md
+CONTRIBUTING.md
+
+# Temporary files
+*.tgz
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Test files
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+
+# OpenAPI
+swagger-spec.json
+
+# Keep only what's needed for runtime
+# - dist/
+# - package.json
+# - README.md
+# - LICENSE
+# - CHANGELOG.md
+# - THIRD_PARTY_NOTICES.md

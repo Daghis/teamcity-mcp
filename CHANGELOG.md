@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/Daghis/teamcity-mcp/compare/v0.9.1...v0.9.2) (2025-09-12)
+
+### Bug Fixes
+- Fix npx execution by ensuring single shebang in dist/index.js
+- Add .npmignore to reduce package size from 9.5MB to 3.4MB (1136 files to 8 files)
+- Add missing external dependencies to build script (axios, ajv, inversify, etc.)
+
 ## [0.9.1](https://github.com/Daghis/teamcity-mcp/compare/v0.9.0...v0.9.1) (2025-09-12)
 
 ### Bug Fixes
