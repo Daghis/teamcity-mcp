@@ -66,10 +66,27 @@ cp .env.example .env
 npm run dev
 ```
 
-### npm Package (Coming Soon)
+### npm Package
+
+Run the MCP server via npx (requires Node 20.x). Set your TeamCity environment variables inline or via a `.env` in the working directory.
 
 ```bash
-npx @daghis/teamcity-mcp --mode=dev
+# One-off run (inline envs)
+TEAMCITY_URL="https://teamcity.example.com" \
+TEAMCITY_TOKEN="tc_<your_token>" \
+MCP_MODE=dev \
+npx -y @daghis/teamcity-mcp
+
+# Or rely on .env in the current directory
+npx -y @daghis/teamcity-mcp
+```
+
+Register with Claude Code’s MCP (user scope):
+
+```bash
+claude mcp add teamcity -s user \
+  -- env TEAMCITY_URL="https://teamcity.example.com" TEAMCITY_TOKEN="tc_<your_token>" MCP_MODE=dev \
+     npx -y @daghis/teamcity-mcp
 ```
 
 ## Configuration
