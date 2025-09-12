@@ -39,7 +39,26 @@ jobs:
       - name: Verify package contents
         run: npm pack --dry-run
 
+      - name: Read package version
+        id: pkg
+        run: echo "version=$(node -p -e \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Check if version already exists on npm
+        id: exists
+        run: |
+          set -e
+          PKG_NAME=$(node -p -e "require('./package.json').name")
+          VERSION=${{ steps.pkg.outputs.version }}
+          if npm view "${PKG_NAME}@${VERSION}" version > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} already published for ${PKG_NAME}; skipping publish."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} not found on registry; will publish."
+          fi
+
       - name: Publish to npm
+        if: steps.exists.outputs.exists == 'false'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
