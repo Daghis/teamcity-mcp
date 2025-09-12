@@ -9,6 +9,7 @@ import type {
 } from 'axios';
 import { randomUUID } from 'crypto';
 
+import { TeamCityAPIError } from '@/teamcity/errors';
 import { info, error as logError } from '@/utils/logger';
 
 /**
@@ -126,7 +127,10 @@ export function logResponse(response: AxiosResponse): AxiosResponse {
  * Log error with request ID and transform
  */
 export function logAndTransformError(error: AxiosError): Promise<never> {
-  const teamcityError = extractErrorDetails(error);
+  // Build a rich TeamCityAPIError instance so downstream handlers
+  // see an Error subclass (not a plain object)
+  const requestId = (error.config as AxiosRequestConfig & { requestId?: string })?.requestId;
+  const tcError = TeamCityAPIError.fromAxiosError(error, requestId);
   const meta = (error.config as unknown as { _tcMeta?: { start: number } })?._tcMeta;
   const duration = meta?.start ? Date.now() - meta.start : undefined;
 
@@ -148,15 +152,15 @@ export function logAndTransformError(error: AxiosError): Promise<never> {
   };
 
   logError('TeamCity API request failed', undefined, {
-    requestId: teamcityError.requestId,
-    code: teamcityError.code,
-    message: sanitize(teamcityError.message) as string,
-    statusCode: teamcityError.statusCode,
-    details: sanitize(teamcityError.details),
+    requestId: tcError.requestId,
+    code: tcError.code,
+    message: sanitize(tcError.message) as string,
+    statusCode: tcError.statusCode,
+    details: sanitize(tcError.details),
     duration,
   });
 
-  return Promise.reject(teamcityError);
+  return Promise.reject(tcError);
 }
 
 /**
