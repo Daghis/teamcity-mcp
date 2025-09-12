@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/Daghis/teamcity-mcp/compare/v0.2.1...v0.2.2) (2025-09-12)
+
+
+### Bug Fixes
+
+* **cli:** remove duplicate shebang in entrypoint; bump to 0.9.1 ([#59](https://github.com/Daghis/teamcity-mcp/issues/59)) ([740530d](https://github.com/Daghis/teamcity-mcp/commit/740530d7bfba6bc81a42f8057fd017a2f8cae14e))
+
 ## [0.9.1](https://github.com/Daghis/teamcity-mcp/compare/v0.9.0...v0.9.1) (2025-09-12)
 
 ### Bug Fixes
