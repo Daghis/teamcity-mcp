@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/Daghis/teamcity-mcp/compare/v1.0.0...v1.0.1) (2025-09-12)
+
+
+### Bug Fixes
+
+* **tools:** update_build_config uses 'settings/artifactRules' path; add tests ([#66](https://github.com/Daghis/teamcity-mcp/issues/66)) ([8b8afc6](https://github.com/Daghis/teamcity-mcp/commit/8b8afc6f41038bcde21a50a8662f90fa4acb7e9a))
+
 ## [1.0.0](https://github.com/Daghis/teamcity-mcp/compare/v0.9.2...v1.0.0) (2025-09-12)
 
 ### Features
