@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/Daghis/teamcity-mcp/compare/v0.2.0...v0.2.1) (2025-09-12)
+
+
+### Bug Fixes
+
+* **mcp:** normalize TeamCity errors and wrap server info/metrics with runTool ([#53](https://github.com/Daghis/teamcity-mcp/issues/53)) ([2c8ab85](https://github.com/Daghis/teamcity-mcp/commit/2c8ab855a85e5faec4216a498c089e3a1a93ed7b))
+
 ## [0.2.0](https://github.com/Daghis/teamcity-mcp/compare/v0.1.2...v0.2.0) (2025-09-11)
 
 
