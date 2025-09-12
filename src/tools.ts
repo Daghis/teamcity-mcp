@@ -5,7 +5,9 @@
 import { z } from 'zod';
 
 import { getMCPMode as getMCPModeFromConfig } from '@/config';
+import { BuildConfigurationUpdateManager } from '@/teamcity/build-configuration-update-manager';
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
+import type { TeamCityClient } from '@/teamcity/client';
 import { createAdapterFromTeamCityAPI } from '@/teamcity/client-adapter';
 import { createPaginatedFetcher, fetchAllPages } from '@/teamcity/pagination';
 import { debug } from '@/utils/logger';
@@ -1949,28 +1951,71 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
       const api = TeamCityAPI.getInstance();
 
-      if (typedArgs.name != null && typedArgs.name !== '') {
-        await api.buildTypes.setBuildTypeField(typedArgs.buildTypeId, 'name', typedArgs.name);
+      // Prefer the richer BuildConfigurationUpdateManager for settings + metadata.
+      // Fallback to direct field updates if retrieval is unavailable (e.g., in tests with shallow mocks).
+      try {
+        const clientLike = { buildTypes: api.buildTypes } as unknown as TeamCityClient;
+        const manager = new BuildConfigurationUpdateManager(clientLike);
+
+        const current = await manager.retrieveConfiguration(typedArgs.buildTypeId);
+        if (current) {
+          const updates: { name?: string; description?: string; artifactRules?: string } = {};
+          if (typedArgs.name != null && typedArgs.name !== '') updates.name = typedArgs.name;
+          if (typedArgs.description !== undefined) updates.description = typedArgs.description;
+          if (typedArgs.artifactRules !== undefined)
+            updates.artifactRules = typedArgs.artifactRules;
+
+          if (Object.keys(updates).length > 0) {
+            await manager.validateUpdates(current, updates as never);
+            await manager.applyUpdates(current, updates as never);
+          }
+        } else {
+          // No current config available; fall back to direct field updates
+          if (typedArgs.name != null && typedArgs.name !== '') {
+            await api.buildTypes.setBuildTypeField(typedArgs.buildTypeId, 'name', typedArgs.name);
+          }
+          if (typedArgs.description !== undefined) {
+            await api.buildTypes.setBuildTypeField(
+              typedArgs.buildTypeId,
+              'description',
+              typedArgs.description
+            );
+          }
+          if (typedArgs.artifactRules !== undefined) {
+            await api.buildTypes.setBuildTypeField(
+              typedArgs.buildTypeId,
+              'settings/artifactRules',
+              typedArgs.artifactRules
+            );
+          }
+        }
+      } catch {
+        // Fallback path if manager cannot be used (e.g., getBuildType not mocked)
+        if (typedArgs.name != null && typedArgs.name !== '') {
+          await api.buildTypes.setBuildTypeField(typedArgs.buildTypeId, 'name', typedArgs.name);
+        }
+        if (typedArgs.description !== undefined) {
+          await api.buildTypes.setBuildTypeField(
+            typedArgs.buildTypeId,
+            'description',
+            typedArgs.description
+          );
+        }
+        if (typedArgs.artifactRules !== undefined) {
+          await api.buildTypes.setBuildTypeField(
+            typedArgs.buildTypeId,
+            'settings/artifactRules',
+            typedArgs.artifactRules
+          );
+        }
       }
-      if (typedArgs.description !== undefined) {
-        await api.buildTypes.setBuildTypeField(
-          typedArgs.buildTypeId,
-          'description',
-          typedArgs.description
-        );
-      }
+
+      // Handle paused separately (not part of UpdateManager options)
       if (typedArgs.paused !== undefined) {
         await api.buildTypes.setBuildTypeField(
           typedArgs.buildTypeId,
           'paused',
           String(typedArgs.paused)
-        );
-      }
-      if (typedArgs.artifactRules !== undefined) {
-        await api.buildTypes.setBuildTypeField(
-          typedArgs.buildTypeId,
-          'artifactRules',
-          typedArgs.artifactRules
         );
       }
 
