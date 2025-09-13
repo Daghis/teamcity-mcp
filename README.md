@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/daghis-teamcity-mcp-badge.png)](https://mseep.ai/app/daghis-teamcity-mcp)
+
 # TeamCity MCP Server
 
 [![CI](https://github.com/Daghis/teamcity-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Daghis/teamcity-mcp/actions/workflows/ci.yml)
