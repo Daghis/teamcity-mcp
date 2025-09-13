@@ -2281,10 +2281,11 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       const typedArgs = args as AuthorizeAgentArgs;
 
       const api = TeamCityAPI.getInstance();
-      await api.agents.setAgentField(
+      await api.agents.setAuthorizedInfo(
         typedArgs.agentId,
-        'authorized',
-        typedArgs.authorize ? 'true' : 'false'
+        undefined,
+        { status: Boolean(typedArgs.authorize) },
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
       );
       return json({
         success: true,
