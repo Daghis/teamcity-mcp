@@ -8,6 +8,7 @@
 // Import the required modules for the utilities object
 import * as asyncUtils from './async';
 import * as loggerUtils from './logger';
+import * as serviceMessageUtils from './teamcity-service-messages';
 import * as validationUtils from './validation';
 
 export * from './logger';
@@ -61,6 +62,7 @@ export type {
 // Re-export with deprecation warnings
 export * from './error-logger';
 export * from './lru-cache';
+export * from './teamcity-service-messages';
 
 // Add deprecation notice for legacy import pattern
 const warnLegacyImport = () => {
@@ -75,6 +77,7 @@ export interface IUtilities {
   logger: typeof loggerUtils;
   validation: typeof validationUtils;
   asyncUtils: typeof asyncUtils;
+  serviceMessages: typeof serviceMessageUtils;
 }
 
 // Create a utilities object for convenient access
@@ -82,6 +85,7 @@ export const utilities: IUtilities = {
   logger: loggerUtils,
   validation: validationUtils,
   asyncUtils,
+  serviceMessages: serviceMessageUtils,
 };
 
 // Default export for convenience
