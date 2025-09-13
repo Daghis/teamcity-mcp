@@ -2214,7 +2214,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       const typedArgs = args as DeleteParameterArgs;
 
       const api = TeamCityAPI.getInstance();
-      await api.buildTypes.deleteBuildParameterOfBuildType(typedArgs.buildTypeId, typedArgs.name);
+      await api.buildTypes.deleteBuildParameterOfBuildType_2(typedArgs.name, typedArgs.buildTypeId);
       return json({
         success: true,
         action: 'delete_parameter',

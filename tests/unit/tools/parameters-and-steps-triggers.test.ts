@@ -13,6 +13,7 @@ describe('tools: parameters, steps, triggers', () => {
           const createBuildParameterOfBuildType = jest.fn(async () => ({}));
           const updateBuildParameterOfBuildType = jest.fn(async () => ({}));
           const deleteBuildParameterOfBuildType = jest.fn(async () => ({}));
+          const deleteBuildParameterOfBuildType2 = jest.fn(async () => ({}));
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: {
               getInstance: () => ({
@@ -20,6 +21,7 @@ describe('tools: parameters, steps, triggers', () => {
                   createBuildParameterOfBuildType,
                   updateBuildParameterOfBuildType,
                   deleteBuildParameterOfBuildType,
+                  deleteBuildParameterOfBuildType_2: deleteBuildParameterOfBuildType2,
                 },
               }),
             },
