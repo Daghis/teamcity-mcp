@@ -2,25 +2,24 @@
 
 ## Overview
 
-The TeamCity MCP (Model Context Protocol) server provides a comprehensive set of tools for interacting with JetBrains TeamCity CI/CD server through AI-powered coding assistants. This document provides a complete reference for all available tools, their capabilities, and practical workflows.
+The TeamCity MCP (Model Context Protocol) server provides a set of tools for interacting with JetBrains TeamCity CI/CD server via AI-powered coding assistants using MCP tools. This document provides a reference for the available tools, their capabilities, and practical workflows.
 
 ## Architecture Overview
 
 ### Core Components
 
 1. **MCP Server** - Handles protocol communication and tool execution
-2. **DI System** - Advanced dependency injection with caching, metrics, and tracing
-3. **TeamCity Client** - API client with comprehensive error handling
-4. **Tool Registry** - Dynamic tool loading based on operation mode
-5. **Formatters** - Output formatting for build steps, triggers, and results
+2. **TeamCity API Client** - Singleton client for REST access with error handling
+3. **Tool Registry** - Dynamic tool loading based on operation mode
+4. **Pagination Utilities** - Consistent list pagination helpers
+5. **Error Handling & Logging** - Structured errors; logs redact sensitive values
 
 ### Key Features
 
-- **Two Operation Modes**: Dev (safe operations) and Full (complete control)
-- **Intelligent Caching**: Automatic result caching with TTL and invalidation
-- **Performance Monitoring**: Built-in metrics and distributed tracing
-- **Type Safety**: Full TypeScript with Zod schema validation
-- **Error Recovery**: Comprehensive error handling with user-friendly messages
+- **Two Operation Modes**: Dev (safe) and Full (modifying resources)
+- **Type Safety**: TypeScript with Zod input validation
+- **Pagination Support**: Standardized list pagination across tools
+- **Error Handling**: Consistent error shaping; logs redact sensitive values
 
 ## Current Implementation Notes
 
@@ -33,7 +32,7 @@ The live implementation emphasizes a simple, direct architecture. A few practica
 - Tools with pagination: `list_builds`, `list_projects`, `list_build_configs`, `list_vcs_roots`, `list_agents`, `list_agent_pools`, `list_test_failures`.
 - Enhanced results:
   - `get_build_results` supports options: `includeArtifacts`, `includeStatistics`, `includeChanges`, `includeDependencies`, `artifactFilter`, `maxArtifactSize`.
-  - `get_build_status` supports options: `includeTests`, `includeProblems`, `useEnhanced` (when true, returns a richer JSON status payload).
+  - `get_build_status` supports options: `includeTests`, `includeProblems`, `includeQueueTotals`, `includeQueueReason`.
 
 ## Operation Modes
 
@@ -50,17 +49,17 @@ Complete infrastructure management including creation, modification, and deletio
 | Tool Name                    | Description                                     | Dev | Full |
 | ---------------------------- | ----------------------------------------------- | :--: | :--: |
 | **Build Management**         |                                                 |      |      |
-| `trigger_build`              | Trigger builds with comprehensive configuration |  ✅  |  ✅  |
+| `trigger_build`              | Trigger a build                           |  ✅  |  ✅  |
 | `get_build_status`           | Get detailed build status and progress          |  ✅  |  ✅  |
 | `list_builds`                | Search and list builds with filtering           |  ✅  |  ✅  |
-| `get_build_results`          | Get comprehensive build results                 |  ✅  |  ✅  |
-| `fetch_build_log`            | Retrieve and analyze build logs                 |  ✅  |  ✅  |
+| `get_build_results`          | Get detailed build results                |  ✅  |  ✅  |
+| `fetch_build_log`            | Retrieve build logs                       |  ✅  |  ✅  |
 | `get_build_config`           | Get build configuration details                 |  ✅  |  ✅  |
 | `list_build_configs`         | List build configurations in project            |  ✅  |  ✅  |
 | **Test Analysis**            |                                                 |      |      |
 | `list_test_failures`         | Analyze failed tests across builds              |  ✅  |  ✅  |
 | `get_test_details`           | Deep dive into test results                     |  ✅  |  ✅  |
-| `analyze_build_problems`     | Intelligent build problem analysis              |  ✅  |  ✅  |
+| `analyze_build_problems`     | Report build problems and test failures   |  ✅  |  ✅  |
 | **Configuration Management** |                                                 |      |      |
 | `create_build_config`        | Create new build configurations                 |  ❌  |  ✅  |
 | `clone_build_config`         | Duplicate existing configurations               |  ❌  |  ✅  |
@@ -74,7 +73,6 @@ Complete infrastructure management including creation, modification, and deletio
 | `list_projects`              | List all projects                               |  ✅  |  ✅  |
 | `list_project_hierarchy`     | Visualize project structure                     |  ✅  |  ✅  |
 | `create_project`             | Create new projects                             |  ❌  |  ✅  |
-| `move_project`               | Reorganize project hierarchy                    |  ❌  |  ✅  |
 | `delete_project`             | Remove projects safely                          |  ❌  |  ✅  |
 | `update_project_settings`    | Modify project settings                         |  ❌  |  ✅  |
 | **Parameter Management**     |                                                 |      |      |
@@ -82,10 +80,9 @@ Complete infrastructure management including creation, modification, and deletio
 | `add_parameter`              | Add new parameters                              |  ❌  |  ✅  |
 | `update_parameter`           | Modify existing parameters                      |  ❌  |  ✅  |
 | `delete_parameter`           | Remove parameters                               |  ❌  |  ✅  |
-| `bulk_manage_parameters`     | Batch parameter operations                      |  ❌  |  ✅  |
 | **Agent Management**         |                                                 |      |      |
 | `list_agents`                | List build agents and status                    |  ✅  |  ✅  |
-| `list_agent_pools`           | List agent pools with metrics                   |  ❌  |  ✅  |
+| `list_agent_pools`           | List agent pools                          |  ✅  |  ✅  |
 | `assign_agent_to_pool`       | Move agents between pools                       |  ❌  |  ✅  |
 | `authorize_agent`            | Manage agent authorization                      |  ❌  |  ✅  |
 | **Branch Management**        |                                                 |      |      |
@@ -104,57 +101,37 @@ Complete infrastructure management including creation, modification, and deletio
 
 #### `trigger_build`
 
-**Description**: Trigger builds with comprehensive configuration options
-**Mode**: Dev
+**Description**: Trigger a TeamCity build
+**Mode**: Dev/Full
 **Key Capabilities**:
 
-- Single or multiple build triggering (comma-separated configs)
-- Branch selection with intelligent resolution
-- Personal builds for isolated testing
-- Build dependencies and chaining
-- Queue position management
-- Real-time monitoring with wait option
-- Dry run mode for validation
+- Trigger a build by build configuration ID
+- Optional branch selection
+- Optional build comment
 
 **Parameters**:
 
-- `buildConfiguration` (required): ID, name, or context (commit SHA, PR#)
-- `branch`: Branch name (defaults to main)
-- `parameters`: Array of key=value pairs
-- `personal`: Run as personal build
-- `comment`: Build description
-- `dependencies`: Build IDs to depend on
-- `moveToTop`: Prioritize in queue
-- `wait`: Wait for completion
-- `waitTimeout`: Max wait time (ms)
-- `dryRun`: Preview without queueing
+- `buildTypeId` (required): Build configuration ID
+- `branchName` (optional): Branch to build
+- `comment` (optional): Build comment/description
 
 **Example Use Cases**:
 
-```typescript
-// Trigger feature branch build
+```json
 {
-  buildConfiguration: "MyApp_Build",
-  branch: "feature/new-ui",
-  comment: "Testing UI changes",
-  moveToTop: true
-}
-
-// Trigger multiple builds with dependencies
-{
-  buildConfiguration: "Backend_Build,Frontend_Build",
-  dependencies: ["12345"],
-  parameters: ["env=staging", "deploy=true"]
+  "buildTypeId": "MyApp_Build",
+  "branchName": "feature/new-ui",
+  "comment": "Testing UI changes"
 }
 ```
 
 #### `get_build_status`
 
-**Description**: Get detailed build status and progress
+**Description**: Get build status and progress
 **Mode**: Dev
 **Key Capabilities**:
 
-- Real-time progress tracking
+- Progress tracking
 - Stage-by-stage breakdown
 - Test and artifact information
 - Time estimations
@@ -204,14 +181,11 @@ Complete infrastructure management including creation, modification, and deletio
 
 #### `fetch_build_log`
 
-**Description**: Retrieve and analyze build logs
+**Description**: Retrieve build logs
 **Mode**: Dev
 **Key Capabilities**:
 
-- Full or partial log retrieval
-- Error extraction
-- Log analysis and summarization
-- Streaming support for large logs
+- Paginated retrieval by line range
 
 **Parameters**:
 
@@ -224,14 +198,11 @@ Complete infrastructure management including creation, modification, and deletio
 
 #### `list_test_failures`
 
-**Description**: Analyze failed tests across builds
+**Description**: List failed tests for a build
 **Mode**: Dev
 **Key Capabilities**:
 
-- Stack trace parsing
-- Failure categorization
-- Historical failure tracking
-- Pattern detection
+- Basic listing with pagination
 
 **Parameters**:
 
@@ -242,14 +213,11 @@ Complete infrastructure management including creation, modification, and deletio
 
 #### `get_test_details`
 
-**Description**: Deep dive into test results
+**Description**: Get detailed information about test failures
 **Mode**: Dev
 **Key Capabilities**:
 
-- Performance analysis
-- Flakiness detection
-- Historical trends
-- Failure root cause analysis
+- Test occurrence details for a build
 
 **Parameters**:
 
@@ -260,14 +228,11 @@ Complete infrastructure management including creation, modification, and deletio
 
 #### `analyze_build_problems`
 
-**Description**: Intelligent build problem analysis
+**Description**: Build problem and failure report
 **Mode**: Dev
 **Key Capabilities**:
 
-- Problem categorization
-- Root cause detection
-- Solution suggestions
-- Impact analysis
+- Summary of problems and failed tests
 
 **Parameters**:
 
@@ -444,9 +409,7 @@ Complete infrastructure management including creation, modification, and deletio
 **Mode**: Dev
 **Key Capabilities**:
 
-- Project filtering
-- Usage tracking
-- Configuration details
+- Project filtering; basic listing
 
 **Parameters**:
 
@@ -527,21 +490,6 @@ Complete infrastructure management including creation, modification, and deletio
 - `id`: Custom ID
 - `description`: Project description
 - `copySettingsFrom`: Template project
-
-#### `move_project`
-
-**Description**: Reorganize project hierarchy
-**Mode**: Full
-**Key Capabilities**:
-
-- Cross-hierarchy moves
-- Permission preservation
-- Configuration updates
-
-**Parameters**:
-
-- `projectId` (required): Project to move
-- `targetParentId` (required): New parent
 
 #### `delete_project`
 
@@ -647,24 +595,6 @@ Complete infrastructure management including creation, modification, and deletio
 - `configId` (required): Configuration ID
 - `name` (required): Parameter name
 
-#### `bulk_manage_parameters`
-
-**Description**: Batch parameter operations
-**Mode**: Full
-**Key Capabilities**:
-
-- Multi-parameter updates
-- Import/export
-- Template application
-
-**Parameters**:
-
-- `configId` (required): Configuration ID
-- `operations`: Array of operations
-  - `action`: add, update, delete
-  - `name`: Parameter name
-  - `value`: Parameter value
-
 ### 7. Agent Management Tools
 
 #### `list_agents`
@@ -687,12 +617,10 @@ Complete infrastructure management including creation, modification, and deletio
 #### `list_agent_pools`
 
 **Description**: List agent pools
-**Mode**: Full
+**Mode**: Dev/Full
 **Key Capabilities**:
 
-- Pool metrics
-- Agent counts
-- Project assignments
+- Basic listing
 
 **Parameters**:
 
@@ -732,14 +660,11 @@ Complete infrastructure management including creation, modification, and deletio
 
 #### `list_branches`
 
-**Description**: List and analyze branches
+**Description**: List branches from recent builds
 **Mode**: Dev
 **Key Capabilities**:
 
-- Multi-mode listing (all, active, default)
-- Build status per branch
-- Last build information
-- Activity detection
+- Branch names discovered from recent builds
 
 **Parameters**:
 
@@ -751,16 +676,13 @@ Complete infrastructure management including creation, modification, and deletio
 
 #### `ping`
 
-**Description**: Health check and connection test
+**Description**: Connectivity test
 **Mode**: Dev
 **Key Capabilities**:
 
-- Server connectivity
-- Authentication validation
-- Version information
-- Performance metrics
+- Server connectivity echo
 
-**Parameters**: None
+**Parameters**: Optional `message`
 
 ## Common Workflows
 
@@ -777,9 +699,9 @@ Steps: 1. Create project structure
   4. Configure triggers
   - manage_build_triggers (add VCS trigger)
   5. Test the setup
-  - trigger_build (dry run mode)
+  - trigger_build (specify branch/comment as needed)
   6. Monitor first build
-  - trigger_build (with wait option)
+  - get_build_status
 ```
 
 ### 2. Test Failure Investigation
@@ -808,7 +730,7 @@ Steps: 1. Create staging configuration
   2. Add deployment steps
   - manage_build_steps (add Docker/K8s steps)
   3. Configure parameters
-  - bulk_manage_parameters (environment vars)
+  - add/update_parameter (environment vars)
   4. Set up triggers
   - manage_build_triggers (finish-build from tests)
   5. Create production config
@@ -1071,6 +993,6 @@ interface ToolResponse {
 
 ## Conclusion
 
-The TeamCity MCP server provides comprehensive CI/CD automation through natural language interfaces. With proper understanding of these tools and workflows, teams can achieve efficient, reliable continuous integration and deployment processes.
+The TeamCity MCP server provides CI/CD automation via MCP tools. With proper understanding of these tools and workflows, teams can achieve efficient, reliable continuous integration and deployment processes.
 
 For updates and additional information, refer to the project repository and TeamCity documentation.

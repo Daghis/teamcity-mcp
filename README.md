@@ -5,11 +5,11 @@
 [![codecov](https://codecov.io/gh/Daghis/teamcity-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/Daghis/teamcity-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A Model Control Protocol (MCP) server that bridges AI coding assistants with JetBrains TeamCity CI/CD server, enabling natural language control of builds, tests, and deployments.
+A Model Control Protocol (MCP) server that bridges AI coding assistants with JetBrains TeamCity CI/CD server, exposing TeamCity operations as MCP tools.
 
 ## Overview
 
-The TeamCity MCP Server allows developers using AI-powered coding assistants (Claude Code, Cursor, Windsurf) to interact with TeamCity directly from their development environment using natural language commands.
+The TeamCity MCP Server allows developers using AI-powered coding assistants (Claude Code, Cursor, Windsurf) to interact with TeamCity directly from their development environment via MCP tools.
 
 ## Features
 
@@ -18,7 +18,7 @@ The TeamCity MCP Server allows developers using AI-powered coding assistants (Cl
 - **Dev Mode**: Safe CI/CD operations
   - Trigger builds
   - Monitor build status and progress
-  - Fetch and analyze build logs
+  - Fetch build logs
   - Investigate test failures
   - List projects and configurations
 
@@ -32,13 +32,11 @@ The TeamCity MCP Server allows developers using AI-powered coding assistants (Cl
 
 ### 🎯 Key Capabilities
 
-- **Natural Language Control**: Execute CI/CD tasks using conversational commands
-- **Intelligent Analysis**: Automatic test failure summarization and build problem identification
-- **Real-time Monitoring**: Live build status updates via WebSocket/SSE
-- **Enterprise Security**: Token-based authentication with audit logging
-- **Modern Architecture**: Simple, direct implementation with singleton pattern
-- **Performance Optimized**: Fast startup time with minimal overhead
-- **Clean Codebase**: Well-organized modules with clear separation of concerns
+- Trigger and monitor builds, fetch logs, and inspect test failures
+- Token-based authentication to TeamCity; sensitive values redacted in logs
+- Modern architecture: simple, direct implementation with a singleton client
+- Performance-conscious: fast startup with minimal overhead
+- Clean codebase with clear module boundaries
 
 ## Installation
 
@@ -73,7 +71,7 @@ Run the MCP server via npx (requires Node 20.x). Set your TeamCity environment v
 ```bash
 # One-off run (inline envs)
 TEAMCITY_URL="https://teamcity.example.com" \
-TEAMCITY_TOKEN="tc_<your_token>" \
+TEAMCITY_TOKEN="<your_token>" \
 MCP_MODE=dev \
 npx -y @daghis/teamcity-mcp
 
