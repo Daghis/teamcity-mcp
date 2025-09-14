@@ -373,7 +373,7 @@ export class BuildConfigurationUpdateManager {
         /* eslint-disable no-await-in-loop */
         for (const paramName of updates.removeParameters) {
           try {
-            await this.client.buildTypes.deleteBuildParameterOfBuildType(
+            await this.client.buildTypes.deleteBuildParameterOfBuildType_2(
               paramName,
               currentConfig.id
             );
