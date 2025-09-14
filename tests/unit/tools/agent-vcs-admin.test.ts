@@ -11,13 +11,13 @@ describe('tools: agent admin & VCS', () => {
     jest.clearAllMocks();
   });
 
-  it('authorize_agent sets authorized field and returns JSON', async () => {
+  it('authorize_agent sets authorized state via authorizedInfo and returns JSON', async () => {
     await new Promise<void>((resolve, reject) => {
       jest.isolateModules(() => {
         (async () => {
-          const setAgentField = jest.fn(async () => ({}));
+          const setAuthorizedInfo = jest.fn(async () => ({}));
           jest.doMock('@/api-client', () => ({
-            TeamCityAPI: { getInstance: () => ({ agents: { setAgentField } }) },
+            TeamCityAPI: { getInstance: () => ({ agents: { setAuthorizedInfo } }) },
           }));
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
