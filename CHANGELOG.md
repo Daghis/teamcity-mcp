@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.5](https://github.com/Daghis/teamcity-mcp/compare/v1.0.4...v1.0.5) (2025-09-14)
+
+
+### Bug Fixes
+
+* delete_parameter: correct endpoint + arg order ([#84](https://github.com/Daghis/teamcity-mcp/issues/84)) ([9832821](https://github.com/Daghis/teamcity-mcp/commit/9832821e65fd945ec5ff0da2b85f744f413e7782))
+
 ## [1.0.4](https://github.com/Daghis/teamcity-mcp/compare/v1.0.3...v1.0.4) (2025-09-12)
 
 
