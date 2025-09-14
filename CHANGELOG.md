@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.6](https://github.com/Daghis/teamcity-mcp/compare/v1.0.5...v1.0.6) (2025-09-14)
+
+
+### Bug Fixes
+
+* authorize_agent uses authorizedInfo JSON endpoint (TeamCity 2025.07 compatibility) ([#83](https://github.com/Daghis/teamcity-mcp/issues/83)) ([198fd02](https://github.com/Daghis/teamcity-mcp/commit/198fd02ca8b6e89d83f87a1a94aafeadda593504)), closes [#78](https://github.com/Daghis/teamcity-mcp/issues/78)
+
 ## [1.0.5](https://github.com/Daghis/teamcity-mcp/compare/v1.0.4...v1.0.5) (2025-09-14)
 
 
