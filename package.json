@@ -33,7 +33,7 @@
     "check": "npm run typecheck && npm run lint:check && npm run format:check",
     "clean": "rm -rf dist coverage",
     "fetch:swagger": "node ./node_modules/tsx/dist/cli.mjs scripts/fetch-swagger-spec.ts",
-    "generate:client": "openapi-generator-cli generate -c openapi-generator-config.json",
+    "generate:client": "npm exec -y @openapitools/openapi-generator-cli@2.23.1 -- generate -c openapi-generator-config.json",
     "update:client": "npm run fetch:swagger -- --force && npm run generate:client",
     "e2e": "node ./node_modules/tsx/dist/cli.mjs tests/e2e/index.ts",
     "e2e:build": "npm run build && node dist/e2e/index.js",
@@ -75,7 +75,6 @@
   "devDependencies": {
     "@codecov/bundler-plugin-core": "^1.9.1",
     "@esbuild-plugins/tsconfig-paths": "^0.1.2",
-    "@openapitools/openapi-generator-cli": "^2.23.1",
     "@trivago/prettier-plugin-sort-imports": "^5.2.2",
     "@types/ajv": "^1.0.4",
     "@types/express": "^5.0.3",
@@ -103,9 +102,6 @@
     "typescript": "^5.3.2"
   },
   "overrides": {
-    "axios": "^1.12.1",
-    "@openapitools/openapi-generator-cli@*": {
-      "axios": "1.12.1"
-    }
+    "axios": "^1.12.1"
   }
 }
