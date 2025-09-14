@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/Daghis/teamcity-mcp/compare/v1.0.6...v1.1.0) (2025-09-14)
+
+
+### Features
+
+* **utils:** add TeamCity service message escaping ([#85](https://github.com/Daghis/teamcity-mcp/issues/85)) ([6ee3b72](https://github.com/Daghis/teamcity-mcp/commit/6ee3b72e4db065faa0e01c7046328e1d4e1375c8))
+
 ## [1.0.6](https://github.com/Daghis/teamcity-mcp/compare/v1.0.5...v1.0.6) (2025-09-14)
 
 
