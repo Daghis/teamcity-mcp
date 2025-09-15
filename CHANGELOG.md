@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/Daghis/teamcity-mcp/compare/v1.1.0...v1.2.0) (2025-09-15)
+
+
+### Features
+
+* **tools:** add VCS root property management tools + integration test ([#95](https://github.com/Daghis/teamcity-mcp/issues/95)) ([13bbe17](https://github.com/Daghis/teamcity-mcp/commit/13bbe178564a53564aad4fcdb99bb3f2e5db4cb8))
+
 ## [1.1.0](https://github.com/Daghis/teamcity-mcp/compare/v1.0.6...v1.1.0) (2025-09-14)
 
 
