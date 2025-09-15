@@ -33,13 +33,14 @@ describe('TeamCityLogger file transports', () => {
   });
 
   it('adds file transports when enableFile=true and parses file size units', () => {
-    // m => MB, k => KB, invalid => fallback
+    // m => MB, k => KB, g => GB, invalid => fallback
     new TeamCityLogger({ enableConsole: false, enableFile: true, maxFileSize: '5m' });
     new TeamCityLogger({ enableConsole: false, enableFile: true, maxFileSize: '128k' });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     new TeamCityLogger({ enableConsole: false, enableFile: true, maxFileSize: 'invalid' as any });
+    new TeamCityLogger({ enableConsole: false, enableFile: true, maxFileSize: '1g' });
 
-    expect(capturedOptions.length).toBe(3);
+    expect(capturedOptions.length).toBe(4);
     for (const opts of capturedOptions) {
       const o = opts as Record<string, unknown>;
       const transports = Array.isArray(o['transports']) ? (o['transports'] as unknown[]) : [];
@@ -50,5 +51,19 @@ describe('TeamCityLogger file transports', () => {
       expect(names?.some((n) => n?.endsWith('error.log'))).toBe(true);
       expect(names?.some((n) => n?.endsWith('combined.log'))).toBe(true);
     }
+
+    // Validate numeric maxsize values on transports
+    const allFiles = capturedOptions.flatMap((opts) => {
+      const o = opts as Record<string, unknown>;
+      const transports = Array.isArray(o['transports']) ? (o['transports'] as unknown[]) : [];
+      return transports.filter((t) => (t as { filename?: string }).filename);
+    });
+    const sizes = allFiles
+      .map((t) => (t as { maxsize?: number }).maxsize)
+      .filter((v): v is number => typeof v === 'number');
+    expect(sizes).toContain(5 * 1024 * 1024);
+    expect(sizes).toContain(128 * 1024);
+    expect(sizes).toContain(1 * 1024 * 1024 * 1024);
+    expect(sizes).toContain(10 * 1024 * 1024); // default for invalid
   });
 });
