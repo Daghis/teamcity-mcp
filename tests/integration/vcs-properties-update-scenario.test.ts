@@ -1,0 +1,74 @@
+import { afterAll, describe, expect, it } from '@jest/globals';
+
+import type { ActionResult, ListResult } from '../types/tool-results';
+import { callTool } from './lib/mcp-runner';
+
+const hasTeamCityEnv = Boolean(
+  (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
+    (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
+);
+
+const ts = Date.now();
+const PROJECT_ID = `E2E_VCS_PROPS_${ts}`;
+const PROJECT_NAME = `E2E VCS Props ${ts}`;
+const VCS_ID = `E2E_VCS_ROOT_PROPS_${ts}`;
+const VCS_NAME = `E2E VCS Root Props ${ts}`;
+
+describe('VCS root property updates: full writes + dev reads', () => {
+  afterAll(async () => {
+    if (!hasTeamCityEnv) return;
+    try {
+      await callTool('full', 'delete_project', { projectId: PROJECT_ID });
+    } catch (_e) {
+      // ignore cleanup errors
+    }
+  });
+
+  it('creates project and VCS root (full)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    const cproj = await callTool<ActionResult>('full', 'create_project', {
+      id: PROJECT_ID,
+      name: PROJECT_NAME,
+    });
+    expect(cproj).toMatchObject({ success: true, action: 'create_project' });
+
+    const createVcs = await callTool<ActionResult>('full', 'create_vcs_root', {
+      projectId: PROJECT_ID,
+      id: VCS_ID,
+      name: VCS_NAME,
+      vcsName: 'jetbrains.git',
+      url: 'https://example.com/repo.git',
+      branch: 'refs/heads/main',
+    });
+    expect(createVcs).toMatchObject({ success: true, action: 'create_vcs_root' });
+  }, 60000);
+
+  it('updates branch and branchSpec via MCP and verifies with dev', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
+
+    const update = await callTool<ActionResult>('full', 'update_vcs_root_properties', {
+      id: VCS_ID,
+      branch: 'refs/heads/main',
+      branchSpec: ['+:refs/heads/*', '+:refs/pull/*/head'],
+    });
+    expect(update).toMatchObject({ success: true, action: 'update_vcs_root_properties' });
+
+    const get = (await callTool('dev', 'get_vcs_root', { id: VCS_ID })) as unknown as {
+      id: string;
+      properties?: { property?: Array<{ name?: string; value?: string }> };
+    };
+    expect(get.id).toBe(VCS_ID);
+    const props = get.properties?.property ?? [];
+    const branch = props.find((p) => p.name === 'branch');
+    const branchSpec = props.find((p) => p.name === 'branchSpec');
+    expect(branch?.value).toBe('refs/heads/main');
+    expect(branchSpec?.value?.includes('+:refs/heads/*')).toBe(true);
+    expect(branchSpec?.value?.includes('+:refs/pull/*/head')).toBe(true);
+
+    const list = (await callTool('dev', 'list_vcs_roots', {
+      projectId: PROJECT_ID,
+    })) as unknown as ListResult<{ id: string }>;
+    const found = (list.items ?? []).some((r) => r.id === VCS_ID);
+    expect(found).toBe(true);
+  }, 60000);
+});

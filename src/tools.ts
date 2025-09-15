@@ -940,6 +940,151 @@ const DEV_TOOLS: ToolDefinition[] = [
     },
   },
 
+  {
+    name: 'set_vcs_root_property',
+    description: 'Set a single VCS root property (e.g., branch, branchSpec, url)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'VCS root ID' },
+        name: { type: 'string', description: 'Property name (e.g., branch, branchSpec, url)' },
+        value: { type: 'string', description: 'Property value' },
+      },
+      required: ['id', 'name', 'value'],
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        value: z.string(),
+      });
+      return runTool(
+        'set_vcs_root_property',
+        schema,
+        async (typed) => {
+          const api = TeamCityAPI.getInstance();
+          await api.vcsRoots.setVcsRootProperty(typed.id, typed.name, typed.value, {
+            headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' },
+          });
+          return json({
+            success: true,
+            action: 'set_vcs_root_property',
+            id: typed.id,
+            name: typed.name,
+          });
+        },
+        args
+      );
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'delete_vcs_root_property',
+    description: 'Delete a single VCS root property',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'VCS root ID' },
+        name: { type: 'string', description: 'Property name' },
+      },
+      required: ['id', 'name'],
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({ id: z.string().min(1), name: z.string().min(1) });
+      return runTool(
+        'delete_vcs_root_property',
+        schema,
+        async (typed) => {
+          const api = TeamCityAPI.getInstance();
+          await api.vcsRoots.deleteVcsRootProperty(typed.id, typed.name);
+          return json({
+            success: true,
+            action: 'delete_vcs_root_property',
+            id: typed.id,
+            name: typed.name,
+          });
+        },
+        args
+      );
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'update_vcs_root_properties',
+    description: 'Update common VCS root properties in one call',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'VCS root ID' },
+        url: { type: 'string', description: 'Repository URL' },
+        branch: { type: 'string', description: 'Default branch (e.g., refs/heads/main)' },
+        branchSpec: {
+          oneOf: [
+            { type: 'string', description: 'Branch spec as newline-delimited string' },
+            { type: 'array', items: { type: 'string' }, description: 'Array of branch spec lines' },
+          ],
+        },
+        checkoutRules: { type: 'string', description: 'Checkout rules' },
+      },
+      required: ['id'],
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({
+        id: z.string().min(1),
+        url: z.string().min(1).optional(),
+        branch: z.string().min(1).optional(),
+        branchSpec: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
+        checkoutRules: z.string().min(1).optional(),
+      });
+      return runTool(
+        'update_vcs_root_properties',
+        schema,
+        async (typed) => {
+          const api = TeamCityAPI.getInstance();
+
+          const properties: { name: string; value: string }[] = [];
+          if (typeof typed.url === 'string') properties.push({ name: 'url', value: typed.url });
+          if (typeof typed.branch === 'string')
+            properties.push({ name: 'branch', value: typed.branch });
+          if (typeof typed.checkoutRules === 'string')
+            properties.push({ name: 'checkout-rules', value: typed.checkoutRules });
+          if (typed.branchSpec !== undefined) {
+            const value = Array.isArray(typed.branchSpec)
+              ? typed.branchSpec.join('\n')
+              : typed.branchSpec;
+            properties.push({ name: 'branchSpec', value });
+          }
+
+          if (properties.length === 0) {
+            return json({
+              success: true,
+              action: 'update_vcs_root_properties',
+              id: typed.id,
+              updated: 0,
+            });
+          }
+
+          await api.vcsRoots.setVcsRootProperties(
+            typed.id,
+            undefined,
+            { property: properties },
+            { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+          );
+          return json({
+            success: true,
+            action: 'update_vcs_root_properties',
+            id: typed.id,
+            updated: properties.length,
+          });
+        },
+        args
+      );
+    },
+    mode: 'full',
+  },
+
   // === Queue (read-only) ===
   {
     name: 'list_queued_builds',
