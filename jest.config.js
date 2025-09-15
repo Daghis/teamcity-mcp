@@ -45,8 +45,6 @@ module.exports = {
     '!src/teamcity/index.ts',
     '!src/teamcity/client.ts',
     '!src/teamcity/config.ts',
-    // Exclude integration-heavy direct API wrapper from unit coverage
-    '!src/api-client.ts',
     // Temporarily exclude complex managers pending dedicated tests
     '!src/teamcity/build-config-manager.ts',
     '!src/teamcity/build-configuration-clone-manager.ts',
@@ -54,10 +52,7 @@ module.exports = {
     // Temporarily exclude swagger and middleware layers from coverage thresholds
     '!src/swagger/**/*.ts',
     '!src/middleware/**/*.ts',
-    '!src/errors/index.ts',
-    '!src/config/index.ts',
-    '!src/tools.ts',
-    '!src/formatters/*.ts'
+    '!src/tools.ts'
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
