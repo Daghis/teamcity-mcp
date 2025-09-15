@@ -1,7 +1,7 @@
-import { describe, expect, it, afterAll } from '@jest/globals';
+import { afterAll, describe, expect, it } from '@jest/globals';
 
-import { callTool } from './lib/mcp-runner';
 import type { ActionResult, ListResult } from '../types/tool-results';
+import { callTool } from './lib/mcp-runner';
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
@@ -72,4 +72,3 @@ describe('VCS root property updates: full writes + dev reads', () => {
     expect(found).toBe(true);
   }, 60000);
 });
-
