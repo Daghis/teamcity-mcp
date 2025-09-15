@@ -118,4 +118,104 @@ describe('tools: agent admin & VCS', () => {
       });
     });
   });
+
+  it('set_vcs_root_property sets property and returns JSON', async () => {
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const setVcsRootProperty = jest.fn(async () => ({}));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: { getInstance: () => ({ vcsRoots: { setVcsRootProperty } }) },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('set_vcs_root_property').handler({
+            id: 'VCS1',
+            name: 'branch',
+            value: 'refs/heads/main',
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'set_vcs_root_property',
+            id: 'VCS1',
+            name: 'branch',
+          });
+          expect(setVcsRootProperty).toHaveBeenCalledWith(
+            'VCS1',
+            'branch',
+            'refs/heads/main',
+            expect.any(Object)
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('delete_vcs_root_property deletes property and returns JSON', async () => {
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const deleteVcsRootProperty = jest.fn(async () => ({}));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: { getInstance: () => ({ vcsRoots: { deleteVcsRootProperty } }) },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('delete_vcs_root_property').handler({
+            id: 'VCS1',
+            name: 'branchSpec',
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'delete_vcs_root_property',
+            id: 'VCS1',
+            name: 'branchSpec',
+          });
+          expect(deleteVcsRootProperty).toHaveBeenCalledWith('VCS1', 'branchSpec');
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('update_vcs_root_properties updates multiple properties and returns JSON', async () => {
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const setVcsRootProperties = jest.fn(async () => ({}));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: { getInstance: () => ({ vcsRoots: { setVcsRootProperties } }) },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('update_vcs_root_properties').handler({
+            id: 'VCS1',
+            branch: 'refs/heads/main',
+            branchSpec: ['+:refs/heads/*', '+:refs/pull/*/head'],
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'update_vcs_root_properties',
+            id: 'VCS1',
+            updated: 2,
+          });
+          expect(setVcsRootProperties).toHaveBeenCalled();
+          const [idArg, _fieldsArg, bodyArg] = (setVcsRootProperties.mock.calls[0] ??
+            []) as unknown[];
+          expect(idArg).toBe('VCS1');
+          expect(bodyArg).toMatchObject({
+            property: [
+              { name: 'branch', value: 'refs/heads/main' },
+              { name: 'branchSpec', value: '+:refs/heads/*\n+:refs/pull/*/head' },
+            ],
+          });
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
 });
