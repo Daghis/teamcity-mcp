@@ -2,8 +2,10 @@
  * TeamCity API Client Wrapper
  * Provides authentication and configuration for the generated client
  *
- * @deprecated Prefer using the unified TeamCityAPI (src/api-client.ts) directly.
- *             Managers should depend on a small adapter interface instead of this class.
+ * @deprecated Prefer using {@link initializeTeamCity} / {@link createTeamCityClient}
+ *             which return the adapter built from the unified TeamCityAPI. This
+ *             wrapper remains temporarily for legacy consumers during the
+ *             migration to the adapter interface.
  */
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 import axiosRetry from 'axios-retry';

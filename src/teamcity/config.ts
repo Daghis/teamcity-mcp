@@ -3,6 +3,7 @@
  */
 import { getConfig, getTeamCityOptions } from '@/config';
 
+import type { TeamCityAPIClientConfig } from '@/api-client';
 import type { TeamCityClientConfig } from './client';
 
 export interface TeamCityConnectionConfig {
@@ -137,10 +138,18 @@ export function mergeConfig(...configs: Array<Partial<TeamCityFullConfig>>): Tea
 /**
  * Convert full config to client config
  */
-export function toClientConfig(config: TeamCityFullConfig): TeamCityClientConfig {
+export function toApiClientConfig(config: TeamCityFullConfig): TeamCityAPIClientConfig {
   return {
     baseUrl: config.connection.baseUrl,
     token: config.connection.token,
+  };
+}
+
+export function toClientConfig(config: TeamCityFullConfig): TeamCityClientConfig {
+  const baseConfig = toApiClientConfig(config);
+
+  return {
+    ...baseConfig,
     timeout: config.connection.timeout,
     retryConfig:
       config.retry?.enabled === true

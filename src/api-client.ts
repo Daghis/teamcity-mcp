@@ -35,9 +35,15 @@ import { VcsRootApi } from './teamcity-client/api/vcs-root-api';
 import { VersionedSettingsApi } from './teamcity-client/api/versioned-settings-api';
 import { Configuration } from './teamcity-client/configuration';
 
+export interface TeamCityAPIClientConfig {
+  baseUrl: string;
+  token: string;
+}
+
 export class TeamCityAPI {
   private static instance: TeamCityAPI;
   private axiosInstance: AxiosInstance;
+  public readonly http: AxiosInstance;
   private config: Configuration;
   private baseUrl: string;
 
@@ -83,6 +89,7 @@ export class TeamCityAPI {
         'Content-Type': 'application/json',
       },
     });
+    this.http = this.axiosInstance;
 
     // Configure retry with exponential backoff and error classification
     axiosRetry(this.axiosInstance, {
@@ -148,10 +155,17 @@ export class TeamCityAPI {
    * @param baseUrl Optional base URL for testing
    * @param token Optional token for testing
    */
-  static getInstance(baseUrl?: string, token?: string): TeamCityAPI {
-    // If parameters are provided, create a new instance (for testing)
-    if (baseUrl && token) {
-      this.instance = new TeamCityAPI(baseUrl, token);
+  static getInstance(
+    configOrBaseUrl?: TeamCityAPIClientConfig | string,
+    token?: string
+  ): TeamCityAPI {
+    if (configOrBaseUrl && typeof configOrBaseUrl === 'object') {
+      this.instance = new TeamCityAPI(configOrBaseUrl.baseUrl, configOrBaseUrl.token);
+      return this.instance;
+    }
+
+    if (typeof configOrBaseUrl === 'string' && token) {
+      this.instance = new TeamCityAPI(configOrBaseUrl, token);
       return this.instance;
     }
 

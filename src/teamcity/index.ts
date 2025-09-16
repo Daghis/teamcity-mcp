@@ -5,12 +5,12 @@
 import { TeamCityAPI } from '@/api-client';
 import { info, warn } from '@/utils/logger';
 
-import { TeamCityClient } from './client';
+import { createAdapterFromTeamCityAPI, type TeamCityClientAdapter } from './client-adapter';
 import {
   type TeamCityFullConfig,
   loadTeamCityConfig,
   mergeConfig,
-  toClientConfig,
+  toApiClientConfig,
   validateConfig,
 } from './config';
 
@@ -28,14 +28,14 @@ export * from '@/teamcity-client/configuration';
 /**
  * Global TeamCity client instance
  */
-let globalClient: TeamCityClient | null = null;
+let globalClient: TeamCityClientAdapter | null = null;
 
 /**
  * Initialize global TeamCity client
  */
 export async function initializeTeamCity(
   config?: Partial<TeamCityFullConfig>
-): Promise<TeamCityClient> {
+): Promise<TeamCityClientAdapter> {
   // Load configuration from environment
   const envConfig = loadTeamCityConfig();
 
@@ -49,20 +49,19 @@ export async function initializeTeamCity(
   }
 
   // Convert to client config
-  const clientConfig = toClientConfig(fullConfig);
+  const apiConfig = toApiClientConfig(fullConfig);
+  const api = TeamCityAPI.getInstance(apiConfig);
+  globalClient = createAdapterFromTeamCityAPI(api);
 
-  // Create client
-  globalClient = new TeamCityClient(clientConfig);
-
-  // Test connection
+  // Test connection through adapter so managers see singleton state
   const isConnected = await globalClient.testConnection();
   if (!isConnected) {
     warn('Failed to connect to TeamCity server', {
-      baseUrl: clientConfig.baseUrl,
+      baseUrl: apiConfig.baseUrl,
     });
   } else {
     info('Successfully connected to TeamCity server', {
-      baseUrl: clientConfig.baseUrl,
+      baseUrl: apiConfig.baseUrl,
     });
   }
 
@@ -72,7 +71,7 @@ export async function initializeTeamCity(
 /**
  * Get global TeamCity client instance
  */
-export function getTeamCityClient(): TeamCityClient {
+export function getTeamCityClient(): TeamCityClientAdapter {
   if (!globalClient) {
     throw new Error('TeamCity client not initialized. Call initializeTeamCity() first.');
   }
@@ -82,7 +81,9 @@ export function getTeamCityClient(): TeamCityClient {
 /**
  * Create a new TeamCity client instance
  */
-export function createTeamCityClient(config?: Partial<TeamCityFullConfig>): TeamCityClient {
+export function createTeamCityClient(
+  config?: Partial<TeamCityFullConfig>
+): TeamCityClientAdapter {
   const envConfig = loadTeamCityConfig();
   const fullConfig = config ? mergeConfig(envConfig, config) : envConfig;
 
@@ -91,8 +92,9 @@ export function createTeamCityClient(config?: Partial<TeamCityFullConfig>): Team
     throw new Error(`Invalid TeamCity configuration: ${validation.errors.join(', ')}`);
   }
 
-  const clientConfig = toClientConfig(fullConfig);
-  return new TeamCityClient(clientConfig);
+  const apiConfig = toApiClientConfig(fullConfig);
+  const api = TeamCityAPI.getInstance(apiConfig);
+  return createAdapterFromTeamCityAPI(api);
 }
 
 /**
@@ -254,6 +256,6 @@ export async function getBuildTestResults(buildId: number): Promise<{
  * Get build log
  */
 export async function getBuildLog(buildId: number): Promise<string> {
-  const api = TeamCityAPI.getInstance();
-  return api.getBuildLog(String(buildId));
+  const client = getTeamCityClient();
+  return client.getBuildLog(String(buildId));
 }
