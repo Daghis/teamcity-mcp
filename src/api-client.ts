@@ -13,76 +13,119 @@ import {
   validateConfiguration,
 } from '@/teamcity/auth';
 import { TeamCityAPIError, isRetryableError } from '@/teamcity/errors';
+import type { TeamCityApiSurface } from '@/teamcity/types/client';
 import { info } from '@/utils/logger';
 
 import { AgentApi } from './teamcity-client/api/agent-api';
 import { AgentPoolApi } from './teamcity-client/api/agent-pool-api';
+import { AgentTypeApi } from './teamcity-client/api/agent-type-api';
+import { AuditApi } from './teamcity-client/api/audit-api';
+import { AvatarApi } from './teamcity-client/api/avatar-api';
 import { BuildApi } from './teamcity-client/api/build-api';
 import { BuildQueueApi } from './teamcity-client/api/build-queue-api';
 import { BuildTypeApi } from './teamcity-client/api/build-type-api';
 import { ChangeApi } from './teamcity-client/api/change-api';
+import { CloudInstanceApi } from './teamcity-client/api/cloud-instance-api';
+import { DeploymentDashboardApi } from './teamcity-client/api/deployment-dashboard-api';
+import { GlobalServerSettingsApi } from './teamcity-client/api/global-server-settings-api';
+import { GroupApi } from './teamcity-client/api/group-api';
 import { HealthApi } from './teamcity-client/api/health-api';
 import { InvestigationApi } from './teamcity-client/api/investigation-api';
 import { MuteApi } from './teamcity-client/api/mute-api';
+import { NodeApi } from './teamcity-client/api/node-api';
 import { ProblemApi } from './teamcity-client/api/problem-api';
 import { ProblemOccurrenceApi } from './teamcity-client/api/problem-occurrence-api';
 import { ProjectApi } from './teamcity-client/api/project-api';
 import { RoleApi } from './teamcity-client/api/role-api';
+import { RootApi } from './teamcity-client/api/root-api';
 import { ServerApi } from './teamcity-client/api/server-api';
+import { ServerAuthenticationSettingsApi } from './teamcity-client/api/server-authentication-settings-api';
+import { TestApi } from './teamcity-client/api/test-api';
 import { TestOccurrenceApi } from './teamcity-client/api/test-occurrence-api';
 import { UserApi } from './teamcity-client/api/user-api';
 import { VcsRootApi } from './teamcity-client/api/vcs-root-api';
+import { VcsRootInstanceApi } from './teamcity-client/api/vcs-root-instance-api';
 import { VersionedSettingsApi } from './teamcity-client/api/versioned-settings-api';
 import { Configuration } from './teamcity-client/configuration';
 
+export interface TeamCityAPIClientConfig {
+  baseUrl: string;
+  token: string;
+  timeout?: number;
+}
+
+interface NormalizedClientConfig {
+  baseUrl: string;
+  token: string;
+  timeout?: number;
+}
+
 export class TeamCityAPI {
-  private static instance: TeamCityAPI;
-  private axiosInstance: AxiosInstance;
-  private config: Configuration;
-  private baseUrl: string;
+  private static instance: TeamCityAPI | undefined;
+  private static instanceConfig: NormalizedClientConfig | undefined;
+  private readonly axiosInstance: AxiosInstance;
+  private readonly config: Configuration;
+  private readonly baseUrl: string;
 
-  // API instances
-  public builds: BuildApi;
-  public projects: ProjectApi;
-  public buildTypes: BuildTypeApi;
-  public buildQueue: BuildQueueApi;
-  public tests: TestOccurrenceApi;
-  public vcsRoots: VcsRootApi;
-  public agents: AgentApi;
-  public agentPools: AgentPoolApi;
-  public server: ServerApi;
-  public health: HealthApi;
-  public changes: ChangeApi;
-  public problems: ProblemApi;
-  public problemOccurrences: ProblemOccurrenceApi;
-  public investigations: InvestigationApi;
-  public mutes: MuteApi;
-  public versionedSettings: VersionedSettingsApi;
-  public roles: RoleApi;
-  public users: UserApi;
+  /** Shared axios instance including interceptors and retry configuration. */
+  public readonly http: AxiosInstance;
+  public readonly agents: AgentApi;
+  public readonly agentPools: AgentPoolApi;
+  public readonly agentTypes: AgentTypeApi;
+  public readonly audit: AuditApi;
+  public readonly avatars: AvatarApi;
+  public readonly builds: BuildApi;
+  public readonly buildQueue: BuildQueueApi;
+  public readonly buildTypes: BuildTypeApi;
+  public readonly changes: ChangeApi;
+  public readonly cloudInstances: CloudInstanceApi;
+  public readonly deploymentDashboards: DeploymentDashboardApi;
+  public readonly globalServerSettings: GlobalServerSettingsApi;
+  public readonly groups: GroupApi;
+  public readonly health: HealthApi;
+  public readonly investigations: InvestigationApi;
+  public readonly mutes: MuteApi;
+  public readonly nodes: NodeApi;
+  public readonly problems: ProblemApi;
+  public readonly problemOccurrences: ProblemOccurrenceApi;
+  public readonly projects: ProjectApi;
+  public readonly roles: RoleApi;
+  public readonly root: RootApi;
+  public readonly server: ServerApi;
+  public readonly serverAuthSettings: ServerAuthenticationSettingsApi;
+  public readonly testMetadata: TestApi;
+  public readonly tests: TestOccurrenceApi;
+  public readonly users: UserApi;
+  public readonly vcsRoots: VcsRootApi;
+  public readonly vcsRootInstances: VcsRootInstanceApi;
+  public readonly versionedSettings: VersionedSettingsApi;
+  /**
+   * Immutable map of generated REST modules keyed by their resource category.
+   * Managers should depend on this surface to access TeamCity endpoints.
+   */
+  public readonly modules: Readonly<TeamCityApiSurface>;
 
-  private constructor(baseUrl: string, token: string) {
-    // Remove trailing slash from base URL
-    const basePath = baseUrl.replace(/\/$/, '');
+  private constructor(config: TeamCityAPIClientConfig) {
+    const basePath = config.baseUrl.replace(/\/$/, '');
+    const timeout = config.timeout ?? 30000;
 
-    // Validate configuration
-    const validation = validateConfiguration(basePath, token);
+    const validation = validateConfiguration(basePath, config.token);
     if (!validation.isValid) {
       throw new Error(`Invalid TeamCity configuration: ${validation.errors.join(', ')}`);
     }
 
-    // Create axios instance with basic config and default headers
     this.baseUrl = basePath;
 
     this.axiosInstance = axios.create({
       baseURL: basePath,
-      timeout: 30000,
+      timeout,
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${config.token}`,
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
     });
+    this.http = this.axiosInstance;
 
     // Configure retry with exponential backoff and error classification
     axiosRetry(this.axiosInstance, {
@@ -108,59 +151,112 @@ export class TeamCityAPI {
     this.axiosInstance.interceptors.request.use((config) => addRequestId(config));
     this.axiosInstance.interceptors.response.use(logResponse, logAndTransformError);
 
-    // Create configuration for generated API clients
     this.config = new Configuration({
       basePath,
-      accessToken: token,
+      accessToken: config.token,
       baseOptions: {
+        timeout,
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${config.token}`,
           Accept: 'application/json',
         },
       },
     });
 
-    // Initialize API clients
-    this.builds = new BuildApi(this.config, basePath, this.axiosInstance);
-    this.projects = new ProjectApi(this.config, basePath, this.axiosInstance);
-    this.buildTypes = new BuildTypeApi(this.config, basePath, this.axiosInstance);
-    this.buildQueue = new BuildQueueApi(this.config, basePath, this.axiosInstance);
-    this.tests = new TestOccurrenceApi(this.config, basePath, this.axiosInstance);
-    this.vcsRoots = new VcsRootApi(this.config, basePath, this.axiosInstance);
-    this.agents = new AgentApi(this.config, basePath, this.axiosInstance);
-    this.agentPools = new AgentPoolApi(this.config, basePath, this.axiosInstance);
-    this.server = new ServerApi(this.config, basePath, this.axiosInstance);
-    this.health = new HealthApi(this.config, basePath, this.axiosInstance);
-    this.changes = new ChangeApi(this.config, basePath, this.axiosInstance);
-    this.problems = new ProblemApi(this.config, basePath, this.axiosInstance);
-    this.problemOccurrences = new ProblemOccurrenceApi(this.config, basePath, this.axiosInstance);
-    this.investigations = new InvestigationApi(this.config, basePath, this.axiosInstance);
-    this.mutes = new MuteApi(this.config, basePath, this.axiosInstance);
-    this.versionedSettings = new VersionedSettingsApi(this.config, basePath, this.axiosInstance);
-    this.roles = new RoleApi(this.config, basePath, this.axiosInstance);
-    this.users = new UserApi(this.config, basePath, this.axiosInstance);
+    this.builds = this.createApi(BuildApi);
+    this.projects = this.createApi(ProjectApi);
+    this.buildTypes = this.createApi(BuildTypeApi);
+    this.buildQueue = this.createApi(BuildQueueApi);
+    this.tests = this.createApi(TestOccurrenceApi);
+    this.testMetadata = this.createApi(TestApi);
+    this.vcsRoots = this.createApi(VcsRootApi);
+    this.vcsRootInstances = this.createApi(VcsRootInstanceApi);
+    this.agents = this.createApi(AgentApi);
+    this.agentPools = this.createApi(AgentPoolApi);
+    this.agentTypes = this.createApi(AgentTypeApi);
+    this.audit = this.createApi(AuditApi);
+    this.avatars = this.createApi(AvatarApi);
+    this.server = this.createApi(ServerApi);
+    this.serverAuthSettings = this.createApi(ServerAuthenticationSettingsApi);
+    this.health = this.createApi(HealthApi);
+    this.changes = this.createApi(ChangeApi);
+    this.problems = this.createApi(ProblemApi);
+    this.problemOccurrences = this.createApi(ProblemOccurrenceApi);
+    this.investigations = this.createApi(InvestigationApi);
+    this.mutes = this.createApi(MuteApi);
+    this.versionedSettings = this.createApi(VersionedSettingsApi);
+    this.roles = this.createApi(RoleApi);
+    this.users = this.createApi(UserApi);
+    this.cloudInstances = this.createApi(CloudInstanceApi);
+    this.deploymentDashboards = this.createApi(DeploymentDashboardApi);
+    this.globalServerSettings = this.createApi(GlobalServerSettingsApi);
+    this.groups = this.createApi(GroupApi);
+    this.nodes = this.createApi(NodeApi);
+    this.root = this.createApi(RootApi);
 
-    info('TeamCityAPI initialized', { baseUrl: basePath });
+    this.modules = Object.freeze({
+      agents: this.agents,
+      agentPools: this.agentPools,
+      agentTypes: this.agentTypes,
+      audit: this.audit,
+      avatars: this.avatars,
+      builds: this.builds,
+      buildQueue: this.buildQueue,
+      buildTypes: this.buildTypes,
+      changes: this.changes,
+      cloudInstances: this.cloudInstances,
+      deploymentDashboards: this.deploymentDashboards,
+      globalServerSettings: this.globalServerSettings,
+      groups: this.groups,
+      health: this.health,
+      investigations: this.investigations,
+      mutes: this.mutes,
+      nodes: this.nodes,
+      problems: this.problems,
+      problemOccurrences: this.problemOccurrences,
+      projects: this.projects,
+      roles: this.roles,
+      root: this.root,
+      server: this.server,
+      serverAuthSettings: this.serverAuthSettings,
+      tests: this.tests,
+      testMetadata: this.testMetadata,
+      users: this.users,
+      vcsRoots: this.vcsRoots,
+      vcsRootInstances: this.vcsRootInstances,
+      versionedSettings: this.versionedSettings,
+    });
+
+    info('TeamCityAPI initialized', { baseUrl: basePath, timeout });
   }
 
   /**
    * Get or create singleton instance
-   * @param baseUrl Optional base URL for testing
-   * @param token Optional token for testing
    */
-  static getInstance(baseUrl?: string, token?: string): TeamCityAPI {
-    // If parameters are provided, create a new instance (for testing)
-    if (baseUrl && token) {
-      this.instance = new TeamCityAPI(baseUrl, token);
+  static getInstance(config: TeamCityAPIClientConfig): TeamCityAPI;
+  static getInstance(baseUrl?: string, token?: string): TeamCityAPI;
+  static getInstance(arg1?: string | TeamCityAPIClientConfig, arg2?: string): TeamCityAPI {
+    const requestedConfig = this.normalizeArgs(arg1, arg2);
+
+    if (requestedConfig) {
+      if (this.instance != null && this.configsEqual(this.instanceConfig, requestedConfig)) {
+        return this.instance;
+      }
+
+      this.instance = new TeamCityAPI(requestedConfig);
+      this.instanceConfig = requestedConfig;
       return this.instance;
     }
 
-    // Otherwise use singleton pattern with centralized config
     if (this.instance == null) {
-      const baseUrl = getTeamCityUrl();
-      const tokenStr = getTeamCityToken();
-      this.instance = new TeamCityAPI(baseUrl, tokenStr);
+      const envConfig = this.normalizeConfig({
+        baseUrl: getTeamCityUrl(),
+        token: getTeamCityToken(),
+      });
+      this.instance = new TeamCityAPI(envConfig);
+      this.instanceConfig = envConfig;
     }
+
     return this.instance;
   }
 
@@ -386,10 +482,48 @@ export class TeamCityAPI {
    * Reset instance (mainly for testing)
    */
   static reset() {
-    this.instance = null as unknown as TeamCityAPI;
+    this.instance = undefined;
+    this.instanceConfig = undefined;
   }
 
   private toBuildLocator(buildId: string): string {
     return buildId.includes(':') ? buildId : `id:${buildId}`;
+  }
+
+  private createApi<T>(
+    apiCtor: new (configuration: Configuration, basePath?: string, axios?: AxiosInstance) => T
+  ): T {
+    return new apiCtor(this.config, this.baseUrl, this.axiosInstance);
+  }
+
+  private static normalizeArgs(
+    arg1?: string | TeamCityAPIClientConfig,
+    arg2?: string
+  ): NormalizedClientConfig | undefined {
+    if (arg1 != null && typeof arg1 === 'object') {
+      return this.normalizeConfig(arg1);
+    }
+
+    if (typeof arg1 === 'string' && typeof arg2 === 'string') {
+      return this.normalizeConfig({ baseUrl: arg1, token: arg2 });
+    }
+
+    return undefined;
+  }
+
+  private static normalizeConfig(config: TeamCityAPIClientConfig): NormalizedClientConfig {
+    return {
+      baseUrl: config.baseUrl.replace(/\/$/, ''),
+      token: config.token,
+      timeout: config.timeout,
+    };
+  }
+
+  private static configsEqual(a?: NormalizedClientConfig, b?: NormalizedClientConfig): boolean {
+    if (a == null || b == null) {
+      return false;
+    }
+
+    return a.baseUrl === b.baseUrl && a.token === b.token && a.timeout === b.timeout;
   }
 }
