@@ -5,6 +5,7 @@
 import { z } from 'zod';
 
 import { getMCPMode as getMCPModeFromConfig } from '@/config';
+import { type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import { BuildConfigurationUpdateManager } from '@/teamcity/build-configuration-update-manager';
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
 import type { TeamCityClient } from '@/teamcity/client';
@@ -1769,6 +1770,535 @@ const DEV_TOOLS: ToolDefinition[] = [
     },
   },
 
+  // === Changes, Problems & Diagnostics ===
+  {
+    name: 'list_changes',
+    description: 'List VCS changes (supports pagination)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        locator: { type: 'string', description: 'Optional change locator to filter results' },
+        projectId: { type: 'string', description: 'Filter by project ID via locator helper' },
+        buildId: { type: 'string', description: 'Filter by build ID via locator helper' },
+        pageSize: { type: 'number', description: 'Items per page (default 100)' },
+        maxPages: { type: 'number', description: 'Max pages to fetch (when all=true)' },
+        all: { type: 'boolean', description: 'Fetch all pages up to maxPages' },
+        fields: {
+          type: 'string',
+          description: 'Optional fields selector for server-side projection',
+        },
+      },
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({
+        locator: z.string().min(1).optional(),
+        projectId: z.string().min(1).optional(),
+        buildId: z.string().min(1).optional(),
+        pageSize: z.number().int().min(1).max(1000).optional(),
+        maxPages: z.number().int().min(1).max(1000).optional(),
+        all: z.boolean().optional(),
+        fields: z.string().min(1).optional(),
+      });
+      return runTool(
+        'list_changes',
+        schema,
+        async (typed) => {
+          const api = TeamCityAPI.getInstance();
+          const baseParts: string[] = [];
+          if (typed.locator) baseParts.push(typed.locator);
+          if (typed.projectId) baseParts.push(`project:(id:${typed.projectId})`);
+          if (typed.buildId) baseParts.push(`build:(id:${typed.buildId})`);
+
+          const pageSize = typed.pageSize ?? 100;
+          const baseFetch = async ({ count, start }: { count?: number; start?: number }) => {
+            const parts = [...baseParts];
+            if (typeof count === 'number') parts.push(`count:${count}`);
+            if (typeof start === 'number') parts.push(`start:${start}`);
+            const locator = parts.length > 0 ? parts.join(',') : undefined;
+            return api.changes.getAllChanges(locator as string | undefined, typed.fields);
+          };
+
+          const fetcher = createPaginatedFetcher(
+            baseFetch,
+            (response: unknown) => {
+              const data = response as { change?: unknown[]; count?: number };
+              return Array.isArray(data.change) ? (data.change as unknown[]) : [];
+            },
+            (response: unknown) => {
+              const data = response as { count?: number };
+              return typeof data.count === 'number' ? data.count : undefined;
+            }
+          );
+
+          if (typed.all) {
+            const items = await fetchAllPages(fetcher, { pageSize, maxPages: typed.maxPages });
+            return json({ items, pagination: { mode: 'all', pageSize, fetched: items.length } });
+          }
+
+          const firstPage = await fetcher({ count: pageSize, start: 0 });
+          return json({ items: firstPage.items, pagination: { page: 1, pageSize } });
+        },
+        args
+      );
+    },
+  },
+
+  {
+    name: 'list_problems',
+    description: 'List build problems (supports pagination)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        locator: { type: 'string', description: 'Optional problem locator to filter results' },
+        projectId: { type: 'string', description: 'Filter by project ID via locator helper' },
+        buildId: { type: 'string', description: 'Filter by build ID via locator helper' },
+        pageSize: { type: 'number', description: 'Items per page (default 100)' },
+        maxPages: { type: 'number', description: 'Max pages to fetch (when all=true)' },
+        all: { type: 'boolean', description: 'Fetch all pages up to maxPages' },
+        fields: {
+          type: 'string',
+          description: 'Optional fields selector for server-side projection',
+        },
+      },
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({
+        locator: z.string().min(1).optional(),
+        projectId: z.string().min(1).optional(),
+        buildId: z.string().min(1).optional(),
+        pageSize: z.number().int().min(1).max(1000).optional(),
+        maxPages: z.number().int().min(1).max(1000).optional(),
+        all: z.boolean().optional(),
+        fields: z.string().min(1).optional(),
+      });
+      return runTool(
+        'list_problems',
+        schema,
+        async (typed) => {
+          const api = TeamCityAPI.getInstance();
+          const baseParts: string[] = [];
+          if (typed.locator) baseParts.push(typed.locator);
+          if (typed.projectId) baseParts.push(`project:(id:${typed.projectId})`);
+          if (typed.buildId) baseParts.push(`build:(id:${typed.buildId})`);
+
+          const pageSize = typed.pageSize ?? 100;
+          const baseFetch = async ({ count, start }: { count?: number; start?: number }) => {
+            const parts = [...baseParts];
+            if (typeof count === 'number') parts.push(`count:${count}`);
+            if (typeof start === 'number') parts.push(`start:${start}`);
+            const locator = parts.length > 0 ? parts.join(',') : undefined;
+            return api.problems.getAllBuildProblems(locator as string | undefined, typed.fields);
+          };
+
+          const fetcher = createPaginatedFetcher(
+            baseFetch,
+            (response: unknown) => {
+              const data = response as { problem?: unknown[]; count?: number };
+              return Array.isArray(data.problem) ? (data.problem as unknown[]) : [];
+            },
+            (response: unknown) => {
+              const data = response as { count?: number };
+              return typeof data.count === 'number' ? data.count : undefined;
+            }
+          );
+
+          if (typed.all) {
+            const items = await fetchAllPages(fetcher, { pageSize, maxPages: typed.maxPages });
+            return json({ items, pagination: { mode: 'all', pageSize, fetched: items.length } });
+          }
+
+          const firstPage = await fetcher({ count: pageSize, start: 0 });
+          return json({ items: firstPage.items, pagination: { page: 1, pageSize } });
+        },
+        args
+      );
+    },
+  },
+
+  {
+    name: 'list_problem_occurrences',
+    description: 'List problem occurrences (supports pagination)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        locator: {
+          type: 'string',
+          description: 'Optional problem occurrence locator to filter results',
+        },
+        buildId: { type: 'string', description: 'Filter by build ID via locator helper' },
+        problemId: {
+          type: 'string',
+          description: 'Filter by problem ID via locator helper',
+        },
+        pageSize: { type: 'number', description: 'Items per page (default 100)' },
+        maxPages: { type: 'number', description: 'Max pages to fetch (when all=true)' },
+        all: { type: 'boolean', description: 'Fetch all pages up to maxPages' },
+        fields: {
+          type: 'string',
+          description: 'Optional fields selector for server-side projection',
+        },
+      },
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({
+        locator: z.string().min(1).optional(),
+        buildId: z.string().min(1).optional(),
+        problemId: z.string().min(1).optional(),
+        pageSize: z.number().int().min(1).max(1000).optional(),
+        maxPages: z.number().int().min(1).max(1000).optional(),
+        all: z.boolean().optional(),
+        fields: z.string().min(1).optional(),
+      });
+      return runTool(
+        'list_problem_occurrences',
+        schema,
+        async (typed) => {
+          const api = TeamCityAPI.getInstance();
+          const baseParts: string[] = [];
+          if (typed.locator) baseParts.push(typed.locator);
+          if (typed.buildId) baseParts.push(`build:(id:${typed.buildId})`);
+          if (typed.problemId) baseParts.push(`problem:(id:${typed.problemId})`);
+
+          const pageSize = typed.pageSize ?? 100;
+          const baseFetch = async ({ count, start }: { count?: number; start?: number }) => {
+            const parts = [...baseParts];
+            if (typeof count === 'number') parts.push(`count:${count}`);
+            if (typeof start === 'number') parts.push(`start:${start}`);
+            const locator = parts.length > 0 ? parts.join(',') : undefined;
+            return api.problemOccurrences.getAllBuildProblemOccurrences(
+              locator as string | undefined,
+              typed.fields
+            );
+          };
+
+          const fetcher = createPaginatedFetcher(
+            baseFetch,
+            (response: unknown) => {
+              const data = response as { problemOccurrence?: unknown[]; count?: number };
+              return Array.isArray(data.problemOccurrence)
+                ? (data.problemOccurrence as unknown[])
+                : [];
+            },
+            (response: unknown) => {
+              const data = response as { count?: number };
+              return typeof data.count === 'number' ? data.count : undefined;
+            }
+          );
+
+          if (typed.all) {
+            const items = await fetchAllPages(fetcher, { pageSize, maxPages: typed.maxPages });
+            return json({ items, pagination: { mode: 'all', pageSize, fetched: items.length } });
+          }
+
+          const firstPage = await fetcher({ count: pageSize, start: 0 });
+          return json({ items: firstPage.items, pagination: { page: 1, pageSize } });
+        },
+        args
+      );
+    },
+  },
+
+  {
+    name: 'list_investigations',
+    description: 'List open investigations (supports pagination)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        locator: {
+          type: 'string',
+          description: 'Optional investigation locator to filter results',
+        },
+        projectId: { type: 'string', description: 'Filter by project ID via locator helper' },
+        buildTypeId: {
+          type: 'string',
+          description: 'Filter by build configuration ID via locator helper',
+        },
+        assigneeUsername: {
+          type: 'string',
+          description: 'Filter by responsible user username via locator helper',
+        },
+        pageSize: { type: 'number', description: 'Items per page (default 100)' },
+        maxPages: { type: 'number', description: 'Max pages to fetch (when all=true)' },
+        all: { type: 'boolean', description: 'Fetch all pages up to maxPages' },
+        fields: {
+          type: 'string',
+          description: 'Optional fields selector for server-side projection',
+        },
+      },
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({
+        locator: z.string().min(1).optional(),
+        projectId: z.string().min(1).optional(),
+        buildTypeId: z.string().min(1).optional(),
+        assigneeUsername: z.string().min(1).optional(),
+        pageSize: z.number().int().min(1).max(1000).optional(),
+        maxPages: z.number().int().min(1).max(1000).optional(),
+        all: z.boolean().optional(),
+        fields: z.string().min(1).optional(),
+      });
+      return runTool(
+        'list_investigations',
+        schema,
+        async (typed) => {
+          const api = TeamCityAPI.getInstance();
+          const baseParts: string[] = [];
+          if (typed.locator) baseParts.push(typed.locator);
+          if (typed.projectId) baseParts.push(`project:(id:${typed.projectId})`);
+          if (typed.buildTypeId) baseParts.push(`buildType:(id:${typed.buildTypeId})`);
+          if (typed.assigneeUsername)
+            baseParts.push(`responsible:(user:(username:${typed.assigneeUsername}))`);
+
+          const pageSize = typed.pageSize ?? 100;
+          const baseFetch = async ({ count, start }: { count?: number; start?: number }) => {
+            const parts = [...baseParts];
+            if (typeof count === 'number') parts.push(`count:${count}`);
+            if (typeof start === 'number') parts.push(`start:${start}`);
+            const locator = parts.length > 0 ? parts.join(',') : undefined;
+            return api.investigations.getAllInvestigations(
+              locator as string | undefined,
+              typed.fields
+            );
+          };
+
+          const fetcher = createPaginatedFetcher(
+            baseFetch,
+            (response: unknown) => {
+              const data = response as { investigation?: unknown[]; count?: number };
+              return Array.isArray(data.investigation) ? (data.investigation as unknown[]) : [];
+            },
+            (response: unknown) => {
+              const data = response as { count?: number };
+              return typeof data.count === 'number' ? data.count : undefined;
+            }
+          );
+
+          if (typed.all) {
+            const items = await fetchAllPages(fetcher, { pageSize, maxPages: typed.maxPages });
+            return json({ items, pagination: { mode: 'all', pageSize, fetched: items.length } });
+          }
+
+          const firstPage = await fetcher({ count: pageSize, start: 0 });
+          return json({ items: firstPage.items, pagination: { page: 1, pageSize } });
+        },
+        args
+      );
+    },
+  },
+
+  {
+    name: 'list_muted_tests',
+    description: 'List muted tests (supports pagination)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        locator: { type: 'string', description: 'Optional mute locator to filter results' },
+        projectId: { type: 'string', description: 'Filter by project ID via locator helper' },
+        buildTypeId: {
+          type: 'string',
+          description: 'Filter by build configuration ID via locator helper',
+        },
+        testNameId: { type: 'string', description: 'Filter by test name ID via locator helper' },
+        pageSize: { type: 'number', description: 'Items per page (default 100)' },
+        maxPages: { type: 'number', description: 'Max pages to fetch (when all=true)' },
+        all: { type: 'boolean', description: 'Fetch all pages up to maxPages' },
+        fields: {
+          type: 'string',
+          description: 'Optional fields selector for server-side projection',
+        },
+      },
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({
+        locator: z.string().min(1).optional(),
+        projectId: z.string().min(1).optional(),
+        buildTypeId: z.string().min(1).optional(),
+        testNameId: z.string().min(1).optional(),
+        pageSize: z.number().int().min(1).max(1000).optional(),
+        maxPages: z.number().int().min(1).max(1000).optional(),
+        all: z.boolean().optional(),
+        fields: z.string().min(1).optional(),
+      });
+      return runTool(
+        'list_muted_tests',
+        schema,
+        async (typed) => {
+          const api = TeamCityAPI.getInstance();
+          const baseParts: string[] = [];
+          if (typed.locator) baseParts.push(typed.locator);
+          if (typed.projectId) baseParts.push(`project:(id:${typed.projectId})`);
+          if (typed.buildTypeId) baseParts.push(`buildType:(id:${typed.buildTypeId})`);
+          if (typed.testNameId) baseParts.push(`test:(id:${typed.testNameId})`);
+
+          const pageSize = typed.pageSize ?? 100;
+          const baseFetch = async ({ count, start }: { count?: number; start?: number }) => {
+            const parts = [...baseParts];
+            if (typeof count === 'number') parts.push(`count:${count}`);
+            if (typeof start === 'number') parts.push(`start:${start}`);
+            const locator = parts.length > 0 ? parts.join(',') : undefined;
+            return api.mutes.getAllMutedTests(locator as string | undefined, typed.fields);
+          };
+
+          const fetcher = createPaginatedFetcher(
+            baseFetch,
+            (response: unknown) => {
+              const data = response as { mute?: unknown[]; count?: number };
+              return Array.isArray(data.mute) ? (data.mute as unknown[]) : [];
+            },
+            (response: unknown) => {
+              const data = response as { count?: number };
+              return typeof data.count === 'number' ? data.count : undefined;
+            }
+          );
+
+          if (typed.all) {
+            const items = await fetchAllPages(fetcher, { pageSize, maxPages: typed.maxPages });
+            return json({ items, pagination: { mode: 'all', pageSize, fetched: items.length } });
+          }
+
+          const firstPage = await fetcher({ count: pageSize, start: 0 });
+          return json({ items: firstPage.items, pagination: { page: 1, pageSize } });
+        },
+        args
+      );
+    },
+  },
+
+  {
+    name: 'get_versioned_settings_status',
+    description: 'Get Versioned Settings status for a locator',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        locator: {
+          type: 'string',
+          description: 'Locator identifying a project/buildType for Versioned Settings',
+        },
+        fields: {
+          type: 'string',
+          description: 'Optional fields selector for server-side projection',
+        },
+      },
+      required: ['locator'],
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({
+        locator: z.string().min(1),
+        fields: z.string().min(1).optional(),
+      });
+      return runTool(
+        'get_versioned_settings_status',
+        schema,
+        async (typed) => {
+          const api = TeamCityAPI.getInstance();
+          const response = await api.versionedSettings.getVersionedSettingsStatus(
+            typed.locator,
+            typed.fields
+          );
+          return json(response.data);
+        },
+        args
+      );
+    },
+  },
+
+  {
+    name: 'list_users',
+    description: 'List TeamCity users (supports pagination)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        locator: { type: 'string', description: 'Optional user locator to filter results' },
+        groupId: { type: 'string', description: 'Filter by group ID via locator helper' },
+        pageSize: { type: 'number', description: 'Items per page (default 100)' },
+        maxPages: { type: 'number', description: 'Max pages to fetch (when all=true)' },
+        all: { type: 'boolean', description: 'Fetch all pages up to maxPages' },
+        fields: {
+          type: 'string',
+          description: 'Optional fields selector for server-side projection',
+        },
+      },
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({
+        locator: z.string().min(1).optional(),
+        groupId: z.string().min(1).optional(),
+        pageSize: z.number().int().min(1).max(1000).optional(),
+        maxPages: z.number().int().min(1).max(1000).optional(),
+        all: z.boolean().optional(),
+        fields: z.string().min(1).optional(),
+      });
+      return runTool(
+        'list_users',
+        schema,
+        async (typed) => {
+          const api = TeamCityAPI.getInstance();
+          const baseParts: string[] = [];
+          if (typed.locator) baseParts.push(typed.locator);
+          if (typed.groupId) baseParts.push(`group:(id:${typed.groupId})`);
+
+          const pageSize = typed.pageSize ?? 100;
+          const baseFetch = async ({ count, start }: { count?: number; start?: number }) => {
+            const parts = [...baseParts];
+            if (typeof count === 'number') parts.push(`count:${count}`);
+            if (typeof start === 'number') parts.push(`start:${start}`);
+            const locator = parts.length > 0 ? parts.join(',') : undefined;
+            return api.users.getAllUsers(locator as string | undefined, typed.fields);
+          };
+
+          const fetcher = createPaginatedFetcher(
+            baseFetch,
+            (response: unknown) => {
+              const data = response as { user?: unknown[]; count?: number };
+              return Array.isArray(data.user) ? (data.user as unknown[]) : [];
+            },
+            (response: unknown) => {
+              const data = response as { count?: number };
+              return typeof data.count === 'number' ? data.count : undefined;
+            }
+          );
+
+          if (typed.all) {
+            const items = await fetchAllPages(fetcher, { pageSize, maxPages: typed.maxPages });
+            return json({ items, pagination: { mode: 'all', pageSize, fetched: items.length } });
+          }
+
+          const firstPage = await fetcher({ count: pageSize, start: 0 });
+          return json({ items: firstPage.items, pagination: { page: 1, pageSize } });
+        },
+        args
+      );
+    },
+  },
+
+  {
+    name: 'list_roles',
+    description: 'List defined roles and their permissions',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fields: {
+          type: 'string',
+          description: 'Optional fields selector for server-side projection',
+        },
+      },
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({ fields: z.string().min(1).optional() });
+      return runTool(
+        'list_roles',
+        schema,
+        async (typed) => {
+          const api = TeamCityAPI.getInstance();
+          const response = await api.roles.getRoles(typed.fields);
+          const roles = (response.data?.role ?? []) as unknown[];
+          return json({ items: roles, count: roles.length });
+        },
+        args
+      );
+    },
+  },
+
   {
     name: 'list_branches',
     description: 'List branches for a project or build configuration',
@@ -2692,6 +3222,106 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             canceled,
             paused: typed.paused,
             ids: typed.buildTypeIds,
+          });
+        },
+        args
+      );
+    },
+    mode: 'full',
+  },
+
+  // === Test Administration ===
+  {
+    name: 'mute_tests',
+    description: 'Mute tests within a project or build configuration scope',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        testNameIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Test name IDs to mute',
+        },
+        buildTypeId: {
+          type: 'string',
+          description: 'Scope mute to a specific build configuration ID',
+        },
+        projectId: {
+          type: 'string',
+          description: 'Scope mute to a project (required if buildTypeId omitted)',
+        },
+        comment: { type: 'string', description: 'Optional mute comment' },
+        until: {
+          type: 'string',
+          description: 'Optional ISO timestamp to auto-unmute (yyyyMMddTHHmmss+ZZZZ)',
+        },
+        fields: {
+          type: 'string',
+          description: 'Optional fields selector for server-side projection',
+        },
+      },
+      required: ['testNameIds'],
+    },
+    handler: async (args: unknown) => {
+      const schema = z
+        .object({
+          testNameIds: z.array(z.string().min(1)).min(1),
+          buildTypeId: z.string().min(1).optional(),
+          projectId: z.string().min(1).optional(),
+          comment: z.string().optional(),
+          until: z.string().min(1).optional(),
+          fields: z.string().min(1).optional(),
+        })
+        .refine((value) => Boolean(value.buildTypeId) || Boolean(value.projectId), {
+          message: 'Either buildTypeId or projectId must be provided',
+          path: [],
+        });
+
+      return runTool(
+        'mute_tests',
+        schema,
+        async (typed) => {
+          const api = TeamCityAPI.getInstance();
+          let scope: { buildType?: { id: string }; project?: { id: string } };
+          if (typed.buildTypeId) {
+            scope = { buildType: { id: typed.buildTypeId } };
+          } else if (typed.projectId) {
+            scope = { project: { id: typed.projectId } };
+          } else {
+            throw new Error('Scope must include a buildTypeId or projectId');
+          }
+
+          const payload: Mutes = {
+            mute: [
+              {
+                scope,
+                target: {
+                  tests: {
+                    test: typed.testNameIds.map((id) => ({ id })),
+                  },
+                },
+                assignment: typed.comment ? { text: typed.comment } : undefined,
+                resolution: typed.until
+                  ? { type: ResolutionTypeEnum.AtTime, time: typed.until }
+                  : undefined,
+              },
+            ],
+          };
+
+          const response = await api.mutes.muteMultipleTests(typed.fields, payload, {
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+          });
+
+          const muted = Array.isArray(typed.testNameIds) ? typed.testNameIds.length : 0;
+          return json({
+            success: true,
+            action: 'mute_tests',
+            muted,
+            scope,
+            response: response.data,
           });
         },
         args
