@@ -2,12 +2,19 @@ import { BuildResultsManager } from '@/teamcity/build-results-manager';
 import type { TeamCityClientAdapter } from '@/teamcity/client-adapter';
 
 type MockAdapter = {
+  modules: {
+    builds: {
+      getBuild: jest.Mock;
+      getMultipleBuilds: jest.Mock;
+      getBuildProblems: jest.Mock;
+    };
+  };
+  request: jest.Mock;
   builds: {
     getBuild: jest.Mock;
     getMultipleBuilds: jest.Mock;
     getBuildProblems: jest.Mock;
   };
-  getBuildCount: jest.Mock;
   listBuildArtifacts: jest.Mock;
   downloadArtifactContent: jest.Mock;
   getBuildStatistics: jest.Mock;
@@ -21,13 +28,18 @@ describe('BuildResultsManager', () => {
   let mockClient: MockAdapter;
 
   beforeEach(() => {
+    const builds = {
+      getBuild: jest.fn(),
+      getMultipleBuilds: jest.fn(),
+      getBuildProblems: jest.fn(),
+    };
+
     mockClient = {
-      builds: {
-        getBuild: jest.fn(),
-        getMultipleBuilds: jest.fn(),
-        getBuildProblems: jest.fn(),
+      modules: {
+        builds,
       },
-      getBuildCount: jest.fn(),
+      request: jest.fn(),
+      builds,
       listBuildArtifacts: jest.fn().mockResolvedValue({ data: {} }),
       downloadArtifactContent: jest.fn().mockResolvedValue({ data: new ArrayBuffer(0) }),
       getBuildStatistics: jest.fn().mockResolvedValue({ data: { property: [] } }),

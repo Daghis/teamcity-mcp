@@ -1,20 +1,27 @@
 /**
  * Tests for BuildListManager
  */
-import type { AxiosResponse } from 'axios';
+import type { AxiosInstance, AxiosResponse } from 'axios';
 
 import { BuildListManager } from '@/teamcity/build-list-manager';
-import type { TeamCityClientAdapter } from '@/teamcity/client-adapter';
+import type { TeamCityUnifiedClient } from '@/teamcity/types/client';
 
 describe('BuildListManager', () => {
   let manager: BuildListManager;
   type MockClient = {
+    modules: {
+      builds: {
+        getBuild: jest.Mock;
+        getMultipleBuilds: jest.Mock;
+        getBuildProblems: jest.Mock;
+      };
+    };
+    request: jest.Mock;
     builds: {
       getBuild: jest.Mock;
       getMultipleBuilds: jest.Mock;
       getBuildProblems: jest.Mock;
     };
-    getBuildCount: jest.Mock;
     listBuildArtifacts: jest.Mock;
     downloadArtifactContent: jest.Mock;
     getBuildStatistics: jest.Mock;
@@ -23,16 +30,24 @@ describe('BuildListManager', () => {
     baseUrl: string;
   };
   let mockClient: MockClient;
+  let axiosGetMock: jest.Mock;
 
   beforeEach(() => {
     // Create mock TeamCity client
+    axiosGetMock = jest.fn();
+    const axiosStub = { get: axiosGetMock } as unknown as AxiosInstance;
+    const builds = {
+      getBuild: jest.fn(),
+      getMultipleBuilds: jest.fn(),
+      getBuildProblems: jest.fn(),
+    };
+
     mockClient = {
-      builds: {
-        getBuild: jest.fn(),
-        getMultipleBuilds: jest.fn(),
-        getBuildProblems: jest.fn(),
+      modules: {
+        builds,
       },
-      getBuildCount: jest.fn(),
+      request: jest.fn((fn) => fn({ axios: axiosStub, baseUrl: 'https://teamcity.example.com' })),
+      builds,
       listBuildArtifacts: jest.fn(),
       downloadArtifactContent: jest.fn(),
       getBuildStatistics: jest.fn(),
@@ -41,7 +56,7 @@ describe('BuildListManager', () => {
       baseUrl: 'https://teamcity.example.com',
     };
 
-    manager = new BuildListManager(mockClient as unknown as TeamCityClientAdapter);
+    manager = new BuildListManager(mockClient as unknown as TeamCityUnifiedClient);
 
     // Clear cache before each test without using `any`
     type PrivateAccess = { cache: Map<string, unknown> };
@@ -86,7 +101,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       const result = await manager.listBuilds({});
 
@@ -115,7 +130,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       await manager.listBuilds({ project: 'MyProject' });
 
@@ -138,7 +153,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       const result = await manager.listBuilds({});
 
@@ -162,7 +177,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       const result = await manager.listBuilds({ limit: 50 });
 
@@ -179,7 +194,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       await manager.listBuilds({ limit: 2000 });
 
@@ -194,7 +209,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       await manager.listBuilds({ offset: 100, limit: 10 });
 
@@ -216,7 +231,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       const result = await manager.listBuilds({ limit: 100 });
 
@@ -231,7 +246,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       const result = await manager.listBuilds({ status: 'SUCCESS' });
 
@@ -250,7 +265,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       await manager.listBuilds({
         project: 'MyProject',
@@ -270,7 +285,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       await manager.listBuilds({
         sinceDate: '2025-08-01T00:00:00Z',
@@ -288,7 +303,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       await manager.listBuilds({
         running: true,
@@ -324,7 +339,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       const result = await manager.listBuilds({});
 
@@ -363,7 +378,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       const result = await manager.listBuilds({});
 
@@ -397,7 +412,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       // First call
       const result1 = await manager.listBuilds({ project: 'MyProject' });
@@ -406,7 +421,7 @@ describe('BuildListManager', () => {
       const result2 = await manager.listBuilds({ project: 'MyProject' });
 
       // Should only call API once
-      expect(mockClient.builds.getMultipleBuilds).toHaveBeenCalledTimes(1);
+      expect(mockClient.modules.builds.getMultipleBuilds).toHaveBeenCalledTimes(1);
 
       // Results should be identical
       expect(result1).toEqual(result2);
@@ -431,14 +446,14 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds
+      mockClient.modules.builds.getMultipleBuilds
         .mockResolvedValueOnce(mockResponse1)
         .mockResolvedValueOnce(mockResponse2);
 
       await manager.listBuilds({ project: 'Project1' });
       await manager.listBuilds({ project: 'Project2' });
 
-      expect(mockClient.builds.getMultipleBuilds).toHaveBeenCalledTimes(2);
+      expect(mockClient.modules.builds.getMultipleBuilds).toHaveBeenCalledTimes(2);
     });
 
     it('should respect cache TTL', async () => {
@@ -453,11 +468,11 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       // First call
       const result = await manager.listBuilds({ project: 'MyProject' });
-      expect(mockClient.builds.getMultipleBuilds).toHaveBeenCalledTimes(1);
+      expect(mockClient.modules.builds.getMultipleBuilds).toHaveBeenCalledTimes(1);
 
       // Advance time by 29 seconds (still within TTL)
       jest.advanceTimersByTime(29000);
@@ -467,13 +482,13 @@ describe('BuildListManager', () => {
       const again = await manager.listBuilds({ project: 'MyProject' });
       expect(again.builds).toEqual(result.builds);
       // Confirm no additional client calls while within TTL
-      expect(mockClient.builds.getMultipleBuilds).toHaveBeenCalledTimes(1);
+      expect(mockClient.modules.builds.getMultipleBuilds).toHaveBeenCalledTimes(1);
 
       // Advance time by 2 more seconds (total 31 seconds, exceeds TTL)
       jest.advanceTimersByTime(2000);
       await manager.listBuilds({ project: 'MyProject' });
       // After TTL expires, client should be called again
-      expect(mockClient.builds.getMultipleBuilds).toHaveBeenCalledTimes(2);
+      expect(mockClient.modules.builds.getMultipleBuilds).toHaveBeenCalledTimes(2);
 
       // Behavior-first: returns builds after TTL
 
@@ -490,7 +505,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       // First call
       await manager.listBuilds({ project: 'MyProject' });
@@ -517,7 +532,7 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.getBuildCount.mockResolvedValue({
+      axiosGetMock.mockResolvedValue({
         data: '150',
         status: 200,
         statusText: 'OK',
@@ -525,7 +540,7 @@ describe('BuildListManager', () => {
         config: {} as never,
       } as AxiosResponse<string>);
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockBuildsResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockBuildsResponse);
 
       const result = await manager.listBuilds({
         project: 'MyProject',
@@ -533,7 +548,14 @@ describe('BuildListManager', () => {
       });
 
       expect(result.metadata.totalCount).toBe(150);
-      expect(mockClient.getBuildCount).toHaveBeenCalledWith(expect.any(String));
+      expect(mockClient.request).toHaveBeenCalledTimes(1);
+      expect(axiosGetMock).toHaveBeenCalledWith(
+        '/app/rest/builds/count',
+        expect.objectContaining({
+          headers: { Accept: 'text/plain' },
+          responseType: 'text',
+        })
+      );
     });
 
     it('should not fetch total count by default', async () => {
@@ -544,24 +566,24 @@ describe('BuildListManager', () => {
         },
       };
 
-      mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       const result = await manager.listBuilds({ project: 'MyProject' });
 
       expect(result.metadata.totalCount).toBeUndefined();
-      expect(mockClient.getBuildCount).not.toHaveBeenCalled();
+      expect(mockClient.request).not.toHaveBeenCalled();
     });
   });
 
   describe('Error Handling', () => {
     it('should handle API errors gracefully', async () => {
-      mockClient.builds.getMultipleBuilds.mockRejectedValue(new Error('Network error'));
+      mockClient.modules.builds.getMultipleBuilds.mockRejectedValue(new Error('Network error'));
 
       await expect(manager.listBuilds({})).rejects.toThrow('Failed to fetch builds');
     });
 
     it('should handle malformed responses', async () => {
-      mockClient.builds.getMultipleBuilds.mockResolvedValue({
+      mockClient.modules.builds.getMultipleBuilds.mockResolvedValue({
         data: {
           // Missing 'build' array
           count: 5,

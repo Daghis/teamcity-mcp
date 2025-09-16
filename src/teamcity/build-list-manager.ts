@@ -4,7 +4,7 @@
 import { errorLogger } from '@/utils/error-logger';
 
 import { BuildQueryBuilder, type BuildStatus } from './build-query-builder';
-import type { TeamCityClientAdapter } from './client-adapter';
+import type { TeamCityUnifiedClient } from './types/client';
 
 export interface BuildListParams {
   project?: string;
@@ -56,7 +56,7 @@ interface CacheEntry {
 }
 
 export class BuildListManager {
-  private client: TeamCityClientAdapter;
+  private client: TeamCityUnifiedClient;
   private cache: Map<string, CacheEntry> = new Map();
   private static readonly cacheTtlMs = 30000; // 30 seconds
   private static readonly defaultLimit = 100;
@@ -64,7 +64,7 @@ export class BuildListManager {
   private static readonly fields =
     'id,buildTypeId,number,status,state,branchName,startDate,finishDate,queuedDate,statusText,href,webUrl';
 
-  constructor(client: TeamCityClientAdapter) {
+  constructor(client: TeamCityUnifiedClient) {
     this.client = client;
   }
 
@@ -88,7 +88,10 @@ export class BuildListManager {
       const locator = this.buildLocator(params);
 
       // Fetch builds from API
-      const response = await this.client.builds.getMultipleBuilds(locator, BuildListManager.fields);
+      const response = await this.client.modules.builds.getMultipleBuilds(
+        locator,
+        BuildListManager.fields
+      );
 
       // Parse response
       const builds = this.parseBuilds(response.data);
@@ -222,7 +225,16 @@ export class BuildListManager {
         .filter((part) => !part.startsWith('count:') && !part.startsWith('start:'))
         .join(',');
 
-      const response = await this.client.getBuildCount(countLocator || undefined);
+      const response = await this.client.request((ctx) =>
+        ctx.axios.get<string>('/app/rest/builds/count', {
+          params: countLocator ? { locator: countLocator } : undefined,
+          headers: {
+            Accept: 'text/plain',
+          },
+          responseType: 'text',
+          transformResponse: [(data) => data],
+        })
+      );
       const rawCount = response.data;
       const parsedCount = parseInt(typeof rawCount === 'string' ? rawCount : String(rawCount), 10);
 
