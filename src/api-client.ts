@@ -20,10 +20,18 @@ import { AgentPoolApi } from './teamcity-client/api/agent-pool-api';
 import { BuildApi } from './teamcity-client/api/build-api';
 import { BuildQueueApi } from './teamcity-client/api/build-queue-api';
 import { BuildTypeApi } from './teamcity-client/api/build-type-api';
+import { ChangeApi } from './teamcity-client/api/change-api';
 import { HealthApi } from './teamcity-client/api/health-api';
+import { InvestigationApi } from './teamcity-client/api/investigation-api';
+import { MuteApi } from './teamcity-client/api/mute-api';
+import { ProblemApi } from './teamcity-client/api/problem-api';
+import { ProblemOccurrenceApi } from './teamcity-client/api/problem-occurrence-api';
 import { ProjectApi } from './teamcity-client/api/project-api';
+import { RoleApi } from './teamcity-client/api/role-api';
 import { ServerApi } from './teamcity-client/api/server-api';
 import { TestOccurrenceApi } from './teamcity-client/api/test-occurrence-api';
+import { UserApi } from './teamcity-client/api/user-api';
+import { VersionedSettingsApi } from './teamcity-client/api/versioned-settings-api';
 import { VcsRootApi } from './teamcity-client/api/vcs-root-api';
 import { Configuration } from './teamcity-client/configuration';
 
@@ -43,6 +51,14 @@ export class TeamCityAPI {
   public agentPools: AgentPoolApi;
   public server: ServerApi;
   public health: HealthApi;
+  public changes: ChangeApi;
+  public problems: ProblemApi;
+  public problemOccurrences: ProblemOccurrenceApi;
+  public investigations: InvestigationApi;
+  public mutes: MuteApi;
+  public versionedSettings: VersionedSettingsApi;
+  public roles: RoleApi;
+  public users: UserApi;
 
   private constructor(baseUrl: string, token: string) {
     // Remove trailing slash from base URL
@@ -112,6 +128,14 @@ export class TeamCityAPI {
     this.agentPools = new AgentPoolApi(this.config, basePath, this.axiosInstance);
     this.server = new ServerApi(this.config, basePath, this.axiosInstance);
     this.health = new HealthApi(this.config, basePath, this.axiosInstance);
+    this.changes = new ChangeApi(this.config, basePath, this.axiosInstance);
+    this.problems = new ProblemApi(this.config, basePath, this.axiosInstance);
+    this.problemOccurrences = new ProblemOccurrenceApi(this.config, basePath, this.axiosInstance);
+    this.investigations = new InvestigationApi(this.config, basePath, this.axiosInstance);
+    this.mutes = new MuteApi(this.config, basePath, this.axiosInstance);
+    this.versionedSettings = new VersionedSettingsApi(this.config, basePath, this.axiosInstance);
+    this.roles = new RoleApi(this.config, basePath, this.axiosInstance);
+    this.users = new UserApi(this.config, basePath, this.axiosInstance);
 
     info('TeamCityAPI initialized', { baseUrl: basePath });
   }

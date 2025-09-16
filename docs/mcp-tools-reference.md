@@ -57,6 +57,20 @@ This document lists all Model Context Protocol (MCP) tools exposed by the TeamCi
 - `analyze_build_problems` — Problems + failing tests summary
   - Args: `buildId: string`
 
+### Changes & Diagnostics
+- `list_changes` — List version control changes (paginated)
+  - Args: `locator?: string`, `projectId?: string`, `buildId?: string`, `pageSize?: number`, `maxPages?: number`, `all?: boolean`, `fields?: string`
+- `list_problems` — List build problems (paginated)
+  - Args: `locator?: string`, `projectId?: string`, `buildId?: string`, `pageSize?: number`, `maxPages?: number`, `all?: boolean`, `fields?: string`
+- `list_problem_occurrences` — List problem occurrences (paginated)
+  - Args: `locator?: string`, `buildId?: string`, `problemId?: string`, `pageSize?: number`, `maxPages?: number`, `all?: boolean`, `fields?: string`
+- `list_investigations` — List investigations (paginated)
+  - Args: `locator?: string`, `projectId?: string`, `buildTypeId?: string`, `assigneeUsername?: string`, `pageSize?: number`, `maxPages?: number`, `all?: boolean`, `fields?: string`
+- `list_muted_tests` — List muted tests (paginated)
+  - Args: `locator?: string`, `projectId?: string`, `buildTypeId?: string`, `testNameId?: string`, `pageSize?: number`, `maxPages?: number`, `all?: boolean`, `fields?: string`
+- `get_versioned_settings_status` — Versioned Settings status for a locator
+  - Args: `locator: string`, `fields?: string`
+
 ### Build Configurations
 - `list_build_configs` — List build configurations (paginated)
   - Args: `locator?: string`, `projectId?: string`, `pageSize?: number`, `maxPages?: number`, `all?: boolean`, `fields?: string`
@@ -132,6 +146,12 @@ This document lists all Model Context Protocol (MCP) tools exposed by the TeamCi
   - Args: `buildId: string`, `includeDisabled?: boolean`
   - Mode: dev, full
 
+### Users & Roles
+- `list_users` — List users (paginated)
+  - Args: `locator?: string`, `groupId?: string`, `pageSize?: number`, `maxPages?: number`, `all?: boolean`, `fields?: string`
+- `list_roles` — List defined roles and permissions
+  - Args: `fields?: string`
+
 ### Tests
 - `list_test_failures` — List failing tests for a build (paginated)
   - Args: `buildId: string`, `pageSize?: number`, `maxPages?: number`, `all?: boolean`, `fields?: string`
@@ -164,6 +184,11 @@ This document lists all Model Context Protocol (MCP) tools exposed by the TeamCi
   - Args: `poolId: string`, `cancelQueuedForBuildTypeId?: string`, `comment?: string`, `until?: string`
 - `resume_queue_for_pool` — Re-enable all agents in a pool
   - Args: `poolId: string`
+
+### Test Administration (full)
+- `mute_tests` — Mute tests within a project or build configuration scope
+  - Args: `testNameIds: string[]`, `buildTypeId?: string`, `projectId?: string`, `comment?: string`, `until?: string`, `fields?: string`
+  - Mode: full
 
 ### Server Health & Metrics
 - `get_server_info` — Returns `/app/rest/server`

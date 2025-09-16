@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+* **tools:** expose change, problem, investigation, mute, versioned-settings, and user/role MCP tools ([#107](https://github.com/Daghis/teamcity-mcp/issues/107))
+
 ## [1.2.1](https://github.com/Daghis/teamcity-mcp/compare/v1.2.0...v1.2.1) (2025-09-16)
 
 
