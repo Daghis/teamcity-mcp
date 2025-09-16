@@ -1072,11 +1072,12 @@ const DEV_TOOLS: ToolDefinition[] = [
             { property: properties },
             { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
           );
+          const logicalUpdated = properties.length;
           return json({
             success: true,
             action: 'update_vcs_root_properties',
             id: typed.id,
-            updated: properties.length,
+            updated: logicalUpdated,
           });
         },
         args

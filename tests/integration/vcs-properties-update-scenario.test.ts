@@ -71,4 +71,28 @@ describe('VCS root property updates: full writes + dev reads', () => {
     const found = (list.items ?? []).some((r) => r.id === VCS_ID);
     expect(found).toBe(true);
   }, 60000);
+
+  it('sets multiple refs via JSON update and verifies persistence', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
+
+    // Update via JSON batch with array input; tool joins with newlines
+    const update2 = await callTool<ActionResult>('full', 'update_vcs_root_properties', {
+      id: VCS_ID,
+      branchSpec: ['+:refs/heads/*', '+:refs/tags/*'],
+    });
+    expect(update2).toMatchObject({ success: true, action: 'update_vcs_root_properties' });
+
+    const get2 = (await callTool('dev', 'get_vcs_root', { id: VCS_ID })) as unknown as {
+      id: string;
+      properties?: { property?: Array<{ name?: string; value?: string }> };
+    };
+    expect(get2.id).toBe(VCS_ID);
+    const props2 = get2.properties?.property ?? [];
+    const branchSpec2 = props2.find((p) => p.name === 'branchSpec');
+    expect(branchSpec2?.value?.includes('+:refs/heads/*')).toBe(true);
+    expect(branchSpec2?.value?.includes('+:refs/tags/*')).toBe(true);
+    // Optionally assert it contains exactly two lines
+    const lines = (branchSpec2?.value ?? '').split('\n').filter(Boolean);
+    expect(lines.length).toBeGreaterThanOrEqual(2);
+  }, 60000);
 });
