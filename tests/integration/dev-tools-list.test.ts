@@ -23,6 +23,13 @@ const EXPECTED_DEV_TOOLS = new Set([
   'fetch_build_log',
   'get_build_results',
   'analyze_build_problems',
+  // Changes & diagnostics
+  'list_changes',
+  'list_problems',
+  'list_problem_occurrences',
+  'list_investigations',
+  'list_muted_tests',
+  'get_versioned_settings_status',
   // Build Configs
   'list_build_configs',
   'get_build_config',
@@ -42,6 +49,9 @@ const EXPECTED_DEV_TOOLS = new Set([
   'list_agents',
   'list_agent_pools',
   'get_agent_enabled_info',
+  // Users & roles
+  'list_users',
+  'list_roles',
   // Compatibility (read-only)
   'get_compatible_build_types_for_agent',
   'get_incompatible_build_types_for_agent',
