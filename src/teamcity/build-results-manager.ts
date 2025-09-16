@@ -1,9 +1,6 @@
 /**
  * BuildResultsManager - Manages comprehensive build results retrieval
  */
-import axios from 'axios';
-
-import { getTeamCityToken, getTeamCityUrl } from '@/config';
 import { warn } from '@/utils/logger';
 
 import type { TeamCityClientAdapter } from './client-adapter';
@@ -85,6 +82,7 @@ interface TeamCityArtifact {
   size?: number;
   modificationTime?: string;
   href?: string;
+  content?: { href?: string };
   children?: { file?: TeamCityArtifact[] };
 }
 
@@ -301,17 +299,9 @@ export class BuildResultsManager {
     options: BuildResultsOptions
   ): Promise<BuildResult['artifacts']> {
     try {
-      const baseUrl = getTeamCityUrl();
-      const token = getTeamCityToken();
-
-      const response = await axios.get(`${baseUrl}/app/rest/builds/id:${buildId}/artifacts`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
-
-      let artifacts = response.data.file ?? [];
+      const response = await this.client.listBuildArtifacts(buildId);
+      const artifactListing = response.data as { file?: TeamCityArtifact[] };
+      let artifacts = artifactListing.file ?? [];
 
       // Filter artifacts if pattern provided
       if (options.artifactFilter) {
@@ -321,6 +311,10 @@ export class BuildResultsManager {
       // Transform artifact data
       const result = await Promise.all(
         artifacts.map(async (artifact: TeamCityArtifact) => {
+          const artifactPath = artifact.fullName ?? artifact.name;
+          const downloadHref =
+            artifact.content?.href ??
+            `/app/rest/builds/id:${buildId}/artifacts/content/${artifactPath}`;
           const artifactData: {
             name: string;
             path: string;
@@ -330,10 +324,10 @@ export class BuildResultsManager {
             content?: string;
           } = {
             name: artifact.name,
-            path: artifact.fullName ?? artifact.name,
+            path: artifactPath,
             size: artifact.size ?? 0,
             modificationTime: artifact.modificationTime ?? '',
-            downloadUrl: `${baseUrl}/app/rest/builds/id:${buildId}/artifacts/content/${artifact.fullName ?? artifact.name}`,
+            downloadUrl: this.buildAbsoluteUrl(downloadHref),
           };
 
           // Download content if requested and small enough
@@ -341,12 +335,10 @@ export class BuildResultsManager {
             const maxSize = options.maxArtifactSize ?? BuildResultsManager.defaultMaxArtifactSize;
             if ((artifact.size ?? 0) <= maxSize) {
               try {
-                const contentResponse = await axios.get(artifactData.downloadUrl, {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                  },
-                  responseType: 'arraybuffer',
-                });
+                const contentResponse = await this.client.downloadArtifactContent(
+                  buildId,
+                  artifactPath
+                );
 
                 // Convert to base64
                 artifactData.content = Buffer.from(contentResponse.data).toString('base64');
@@ -384,17 +376,9 @@ export class BuildResultsManager {
    */
   private async fetchStatistics(buildId: string): Promise<BuildResult['statistics']> {
     try {
-      const baseUrl = getTeamCityUrl();
-      const token = getTeamCityToken();
-
-      const response = await axios.get(`${baseUrl}/app/rest/builds/id:${buildId}/statistics`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
-
-      const properties = response.data.property ?? [];
+      const response = await this.client.getBuildStatistics(buildId);
+      const payload = response.data as { property?: Array<{ name: string; value: string }> };
+      const properties = payload.property ?? [];
       const stats: BuildResult['statistics'] = {};
 
       for (const prop of properties) {
@@ -438,18 +422,9 @@ export class BuildResultsManager {
    */
   private async fetchChanges(buildId: string): Promise<BuildResult['changes']> {
     try {
-      const baseUrl = getTeamCityUrl();
-      const token = getTeamCityToken();
-
-      const response = await axios.get(`${baseUrl}/app/rest/changes`, {
-        params: { locator: `build:(id:${buildId})` },
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
-
-      const changes = response.data.change ?? [];
+      const response = await this.client.listChangesForBuild(buildId);
+      const changePayload = response.data as { change?: TeamCityChange[] };
+      const changes = changePayload.change ?? [];
 
       return changes.map((change: TeamCityChange) => ({
         revision: change.version,
@@ -472,19 +447,7 @@ export class BuildResultsManager {
    */
   private async fetchDependencies(buildId: string): Promise<BuildResult['dependencies']> {
     try {
-      const baseUrl = getTeamCityUrl();
-      const token = getTeamCityToken();
-
-      const response = await axios.get(
-        `${baseUrl}/app/rest/builds/id:${buildId}/snapshot-dependencies`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-        }
-      );
-
+      const response = await this.client.listSnapshotDependencies(buildId);
       const depsData = response.data as {
         build?: Array<{
           id: number;
@@ -505,6 +468,19 @@ export class BuildResultsManager {
       warn('Failed to fetch dependencies', { error, buildId });
       return [];
     }
+  }
+
+  /**
+   * Resolve absolute URLs using the shared TeamCity client base URL
+   */
+  private buildAbsoluteUrl(path: string): string {
+    if (/^https?:/i.test(path)) {
+      return path;
+    }
+    if (path.startsWith('/')) {
+      return `${this.client.baseUrl}${path}`;
+    }
+    return `${this.client.baseUrl}/${path}`;
   }
 
   /**
