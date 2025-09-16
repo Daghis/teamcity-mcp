@@ -181,6 +181,8 @@ const newBuild = await api.triggerBuild('BuildConfigId', {
 });
 ```
 
+> **Note:** The legacy helpers exported from `src/teamcity/index.ts` remain only for compatibility and include placeholder implementations. Prefer the MCP tools (see the reference linked above) or the `TeamCityAPI` shown here when automating workflows.
+
 ## Development
 
 ```bash
@@ -248,12 +250,14 @@ The MCP server exposes tools for TeamCity operations. Each tool corresponds to s
   - Build steps (script, Maven, Gradle, npm, Docker, PowerShell)
   - Triggers (VCS, schedule, finish-build, maven-snapshot)
   - Parameters and template-based configurations
-  - See the Tool Reference for details: docs/mcp-tools-reference.md
-- `CloneBuildConfig` - Duplicate configurations (coming soon)
-- `ManageBuildSteps` - Add/edit/remove steps (coming soon)
-- `ManageVCS` - Configure version control (coming soon)
+  - See the [MCP Tool Reference](docs/mcp-tools-reference.md) for argument details and additional options.
+- `clone_build_config` - Duplicate existing configurations into any project, preserving steps, triggers, and parameters.
+- `update_build_config` - Adjust names, descriptions, artifact rules, and pause state for a configuration.
+- `manage_build_steps` - Add, update, remove, or reorder build steps through a single tool surface.
+- `manage_build_triggers` - Add or delete build triggers with full property support.
+- `create_vcs_root` & `add_vcs_root_to_build` - Define VCS roots and attach them to build configurations.
 
-See also: `docs/TEAMCITY_MCP_TOOLS_GUIDE.md` for an overview. Some advanced sections in that guide describe future enhancements; the behavior above reflects the current implementation.
+See also: [`docs/TEAMCITY_MCP_TOOLS_GUIDE.md`](docs/TEAMCITY_MCP_TOOLS_GUIDE.md) for expanded workflows and examples that align with the current MCP implementation.
 
 ## Contributing
 

@@ -4,6 +4,8 @@
 
 The TeamCity MCP (Model Context Protocol) server provides a set of tools for interacting with JetBrains TeamCity CI/CD server via AI-powered coding assistants using MCP tools. This document provides a reference for the available tools, their capabilities, and practical workflows.
 
+> For exhaustive argument and mode details, see the [MCP Tool Reference](./mcp-tools-reference.md). This guide focuses on practical usage patterns and stays aligned with the shipped tool surface.
+
 ## Architecture Overview
 
 ### Core Components
@@ -33,6 +35,7 @@ The live implementation emphasizes a simple, direct architecture. A few practica
 - Enhanced results:
   - `get_build_results` supports options: `includeArtifacts`, `includeStatistics`, `includeChanges`, `includeDependencies`, `artifactFilter`, `maxArtifactSize`.
   - `get_build_status` supports options: `includeTests`, `includeProblems`, `includeQueueTotals`, `includeQueueReason`.
+- Legacy helper exports from `src/teamcity/index.ts` are retained for backwards compatibility but are not updated; use the MCP tools or `TeamCityAPI` for real workflows.
 
 ## Operation Modes
 
