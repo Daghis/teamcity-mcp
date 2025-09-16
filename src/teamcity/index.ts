@@ -5,7 +5,7 @@
 import { TeamCityAPI } from '@/api-client';
 import { info, warn } from '@/utils/logger';
 
-import { createAdapterFromTeamCityAPI, type TeamCityClientAdapter } from './client-adapter';
+import { type TeamCityClientAdapter, createAdapterFromTeamCityAPI } from './client-adapter';
 import {
   type TeamCityFullConfig,
   loadTeamCityConfig,
@@ -81,9 +81,7 @@ export function getTeamCityClient(): TeamCityClientAdapter {
 /**
  * Create a new TeamCity client instance
  */
-export function createTeamCityClient(
-  config?: Partial<TeamCityFullConfig>
-): TeamCityClientAdapter {
+export function createTeamCityClient(config?: Partial<TeamCityFullConfig>): TeamCityClientAdapter {
   const envConfig = loadTeamCityConfig();
   const fullConfig = config ? mergeConfig(envConfig, config) : envConfig;
 

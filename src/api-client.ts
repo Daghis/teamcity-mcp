@@ -35,6 +35,9 @@ import { VcsRootApi } from './teamcity-client/api/vcs-root-api';
 import { VersionedSettingsApi } from './teamcity-client/api/versioned-settings-api';
 import { Configuration } from './teamcity-client/configuration';
 
+/**
+ * Minimal configuration required to instantiate the unified TeamCityAPI.
+ */
 export interface TeamCityAPIClientConfig {
   baseUrl: string;
   token: string;
@@ -159,14 +162,21 @@ export class TeamCityAPI {
     configOrBaseUrl?: TeamCityAPIClientConfig | string,
     token?: string
   ): TeamCityAPI {
-    if (configOrBaseUrl && typeof configOrBaseUrl === 'object') {
+    if (typeof configOrBaseUrl === 'object' && configOrBaseUrl !== null) {
       this.instance = new TeamCityAPI(configOrBaseUrl.baseUrl, configOrBaseUrl.token);
       return this.instance;
     }
 
-    if (typeof configOrBaseUrl === 'string' && token) {
+    if (typeof configOrBaseUrl === 'string') {
+      if (typeof token !== 'string' || token.length === 0) {
+        throw new Error('TeamCity token is required when providing a base URL override');
+      }
       this.instance = new TeamCityAPI(configOrBaseUrl, token);
       return this.instance;
+    }
+
+    if (typeof token === 'string' && token.length > 0) {
+      throw new Error('Cannot initialize TeamCityAPI with token override without a base URL');
     }
 
     // Otherwise use singleton pattern with centralized config

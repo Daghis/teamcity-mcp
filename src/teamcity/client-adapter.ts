@@ -12,6 +12,9 @@ export interface TeamCityClientAdapter {
   buildTypes: TeamCityAPI['buildTypes'];
   buildQueue: TeamCityAPI['buildQueue'];
   tests: TeamCityAPI['tests'];
+  /**
+   * Legacy alias retained for consumers still referencing TeamCityClient#testOccurrences.
+   */
   testOccurrences: TeamCityAPI['tests'];
   vcsRoots: TeamCityAPI['vcsRoots'];
   agents: TeamCityAPI['agents'];
