@@ -17,51 +17,84 @@ import { info } from '@/utils/logger';
 
 import { AgentApi } from './teamcity-client/api/agent-api';
 import { AgentPoolApi } from './teamcity-client/api/agent-pool-api';
+import { AgentTypeApi } from './teamcity-client/api/agent-type-api';
+import { AuditApi } from './teamcity-client/api/audit-api';
+import { AvatarApi } from './teamcity-client/api/avatar-api';
 import { BuildApi } from './teamcity-client/api/build-api';
 import { BuildQueueApi } from './teamcity-client/api/build-queue-api';
 import { BuildTypeApi } from './teamcity-client/api/build-type-api';
 import { ChangeApi } from './teamcity-client/api/change-api';
+import { CloudInstanceApi } from './teamcity-client/api/cloud-instance-api';
+import { DeploymentDashboardApi } from './teamcity-client/api/deployment-dashboard-api';
+import { GlobalServerSettingsApi } from './teamcity-client/api/global-server-settings-api';
+import { GroupApi } from './teamcity-client/api/group-api';
 import { HealthApi } from './teamcity-client/api/health-api';
 import { InvestigationApi } from './teamcity-client/api/investigation-api';
 import { MuteApi } from './teamcity-client/api/mute-api';
+import { NodeApi } from './teamcity-client/api/node-api';
 import { ProblemApi } from './teamcity-client/api/problem-api';
 import { ProblemOccurrenceApi } from './teamcity-client/api/problem-occurrence-api';
 import { ProjectApi } from './teamcity-client/api/project-api';
 import { RoleApi } from './teamcity-client/api/role-api';
+import { RootApi } from './teamcity-client/api/root-api';
 import { ServerApi } from './teamcity-client/api/server-api';
+import { ServerAuthenticationSettingsApi } from './teamcity-client/api/server-authentication-settings-api';
+import { TestApi } from './teamcity-client/api/test-api';
 import { TestOccurrenceApi } from './teamcity-client/api/test-occurrence-api';
 import { UserApi } from './teamcity-client/api/user-api';
 import { VcsRootApi } from './teamcity-client/api/vcs-root-api';
+import { VcsRootInstanceApi } from './teamcity-client/api/vcs-root-instance-api';
 import { VersionedSettingsApi } from './teamcity-client/api/versioned-settings-api';
 import { Configuration } from './teamcity-client/configuration';
 
+export interface TeamCityAPIClientConfig {
+  baseUrl: string;
+  token: string;
+  timeout?: number;
+}
+
 export class TeamCityAPI {
   private static instance: TeamCityAPI;
-  private axiosInstance: AxiosInstance;
-  private config: Configuration;
-  private baseUrl: string;
+  private readonly axiosInstance: AxiosInstance;
+  private readonly config: Configuration;
+  private readonly baseUrl: string;
 
   // API instances
-  public builds: BuildApi;
-  public projects: ProjectApi;
-  public buildTypes: BuildTypeApi;
-  public buildQueue: BuildQueueApi;
-  public tests: TestOccurrenceApi;
-  public vcsRoots: VcsRootApi;
-  public agents: AgentApi;
-  public agentPools: AgentPoolApi;
-  public server: ServerApi;
-  public health: HealthApi;
-  public changes: ChangeApi;
-  public problems: ProblemApi;
-  public problemOccurrences: ProblemOccurrenceApi;
-  public investigations: InvestigationApi;
-  public mutes: MuteApi;
-  public versionedSettings: VersionedSettingsApi;
-  public roles: RoleApi;
-  public users: UserApi;
+  public readonly builds: BuildApi;
+  public readonly projects: ProjectApi;
+  public readonly buildTypes: BuildTypeApi;
+  public readonly buildQueue: BuildQueueApi;
+  public readonly tests: TestOccurrenceApi;
+  public readonly testOccurrences: TestOccurrenceApi;
+  public readonly testMetadata: TestApi;
+  public readonly vcsRoots: VcsRootApi;
+  public readonly vcsRootInstances: VcsRootInstanceApi;
+  public readonly agents: AgentApi;
+  public readonly agentPools: AgentPoolApi;
+  public readonly agentTypes: AgentTypeApi;
+  public readonly audits: AuditApi;
+  public readonly avatars: AvatarApi;
+  public readonly cloudInstances: CloudInstanceApi;
+  public readonly deploymentDashboards: DeploymentDashboardApi;
+  public readonly globalServerSettings: GlobalServerSettingsApi;
+  public readonly groups: GroupApi;
+  public readonly server: ServerApi;
+  public readonly serverAuthSettings: ServerAuthenticationSettingsApi;
+  public readonly health: HealthApi;
+  public readonly changes: ChangeApi;
+  public readonly problems: ProblemApi;
+  public readonly problemOccurrences: ProblemOccurrenceApi;
+  public readonly investigations: InvestigationApi;
+  public readonly mutes: MuteApi;
+  public readonly versionedSettings: VersionedSettingsApi;
+  public readonly roles: RoleApi;
+  public readonly users: UserApi;
+  public readonly nodes: NodeApi;
+  public readonly root: RootApi;
+  /** Shared axios instance configured with auth/retry interceptors. */
+  public readonly http: AxiosInstance;
 
-  private constructor(baseUrl: string, token: string) {
+  private constructor({ baseUrl, token, timeout }: TeamCityAPIClientConfig) {
     // Remove trailing slash from base URL
     const basePath = baseUrl.replace(/\/$/, '');
 
@@ -76,13 +109,15 @@ export class TeamCityAPI {
 
     this.axiosInstance = axios.create({
       baseURL: basePath,
-      timeout: 30000,
+      timeout: timeout ?? 30000,
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
     });
+
+    this.http = this.axiosInstance;
 
     // Configure retry with exponential backoff and error classification
     axiosRetry(this.axiosInstance, {
@@ -113,6 +148,7 @@ export class TeamCityAPI {
       basePath,
       accessToken: token,
       baseOptions: {
+        timeout: timeout ?? 30000,
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
@@ -121,24 +157,38 @@ export class TeamCityAPI {
     });
 
     // Initialize API clients
-    this.builds = new BuildApi(this.config, basePath, this.axiosInstance);
-    this.projects = new ProjectApi(this.config, basePath, this.axiosInstance);
-    this.buildTypes = new BuildTypeApi(this.config, basePath, this.axiosInstance);
-    this.buildQueue = new BuildQueueApi(this.config, basePath, this.axiosInstance);
-    this.tests = new TestOccurrenceApi(this.config, basePath, this.axiosInstance);
-    this.vcsRoots = new VcsRootApi(this.config, basePath, this.axiosInstance);
-    this.agents = new AgentApi(this.config, basePath, this.axiosInstance);
-    this.agentPools = new AgentPoolApi(this.config, basePath, this.axiosInstance);
-    this.server = new ServerApi(this.config, basePath, this.axiosInstance);
-    this.health = new HealthApi(this.config, basePath, this.axiosInstance);
-    this.changes = new ChangeApi(this.config, basePath, this.axiosInstance);
-    this.problems = new ProblemApi(this.config, basePath, this.axiosInstance);
-    this.problemOccurrences = new ProblemOccurrenceApi(this.config, basePath, this.axiosInstance);
-    this.investigations = new InvestigationApi(this.config, basePath, this.axiosInstance);
-    this.mutes = new MuteApi(this.config, basePath, this.axiosInstance);
-    this.versionedSettings = new VersionedSettingsApi(this.config, basePath, this.axiosInstance);
-    this.roles = new RoleApi(this.config, basePath, this.axiosInstance);
-    this.users = new UserApi(this.config, basePath, this.axiosInstance);
+    this.builds = this.createApi(BuildApi);
+    this.projects = this.createApi(ProjectApi);
+    this.buildTypes = this.createApi(BuildTypeApi);
+    this.buildQueue = this.createApi(BuildQueueApi);
+    this.testMetadata = this.createApi(TestApi);
+    const testOccurrenceApi = this.createApi(TestOccurrenceApi);
+    this.tests = testOccurrenceApi;
+    this.testOccurrences = testOccurrenceApi;
+    this.vcsRoots = this.createApi(VcsRootApi);
+    this.vcsRootInstances = this.createApi(VcsRootInstanceApi);
+    this.agents = this.createApi(AgentApi);
+    this.agentPools = this.createApi(AgentPoolApi);
+    this.agentTypes = this.createApi(AgentTypeApi);
+    this.audits = this.createApi(AuditApi);
+    this.avatars = this.createApi(AvatarApi);
+    this.cloudInstances = this.createApi(CloudInstanceApi);
+    this.deploymentDashboards = this.createApi(DeploymentDashboardApi);
+    this.globalServerSettings = this.createApi(GlobalServerSettingsApi);
+    this.groups = this.createApi(GroupApi);
+    this.server = this.createApi(ServerApi);
+    this.serverAuthSettings = this.createApi(ServerAuthenticationSettingsApi);
+    this.health = this.createApi(HealthApi);
+    this.changes = this.createApi(ChangeApi);
+    this.problems = this.createApi(ProblemApi);
+    this.problemOccurrences = this.createApi(ProblemOccurrenceApi);
+    this.investigations = this.createApi(InvestigationApi);
+    this.mutes = this.createApi(MuteApi);
+    this.versionedSettings = this.createApi(VersionedSettingsApi);
+    this.roles = this.createApi(RoleApi);
+    this.users = this.createApi(UserApi);
+    this.nodes = this.createApi(NodeApi);
+    this.root = this.createApi(RootApi);
 
     info('TeamCityAPI initialized', { baseUrl: basePath });
   }
@@ -148,10 +198,18 @@ export class TeamCityAPI {
    * @param baseUrl Optional base URL for testing
    * @param token Optional token for testing
    */
-  static getInstance(baseUrl?: string, token?: string): TeamCityAPI {
+  static getInstance(): TeamCityAPI;
+  static getInstance(config: TeamCityAPIClientConfig): TeamCityAPI;
+  static getInstance(baseUrl: string, token: string): TeamCityAPI;
+  static getInstance(arg1?: unknown, arg2?: unknown): TeamCityAPI {
     // If parameters are provided, create a new instance (for testing)
-    if (baseUrl && token) {
-      this.instance = new TeamCityAPI(baseUrl, token);
+    if (typeof arg1 === 'string' && typeof arg2 === 'string') {
+      this.instance = new TeamCityAPI({ baseUrl: arg1, token: arg2 });
+      return this.instance;
+    }
+
+    if (arg1 != null && typeof arg1 === 'object') {
+      this.instance = new TeamCityAPI(arg1 as TeamCityAPIClientConfig);
       return this.instance;
     }
 
@@ -159,7 +217,7 @@ export class TeamCityAPI {
     if (this.instance == null) {
       const baseUrl = getTeamCityUrl();
       const tokenStr = getTeamCityToken();
-      this.instance = new TeamCityAPI(baseUrl, tokenStr);
+      this.instance = new TeamCityAPI({ baseUrl, token: tokenStr });
     }
     return this.instance;
   }
@@ -387,6 +445,16 @@ export class TeamCityAPI {
    */
   static reset() {
     this.instance = null as unknown as TeamCityAPI;
+  }
+
+  private createApi<T>(
+    apiCtor: new (
+      configuration: Configuration,
+      basePath?: string,
+      axiosInstance?: AxiosInstance
+    ) => T
+  ): T {
+    return new apiCtor(this.config, this.baseUrl, this.axiosInstance);
   }
 
   private toBuildLocator(buildId: string): string {
