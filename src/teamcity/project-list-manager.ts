@@ -3,15 +3,15 @@
  */
 import type { Project } from '@/teamcity-client/models/project';
 import type { Projects } from '@/teamcity-client/models/projects';
-import type { TeamCityClient } from '@/teamcity/client';
+import type { TeamCityClientAdapter } from '@/teamcity/client-adapter';
 import type { ProjectInfo, ProjectListParams, ProjectListResult } from '@/types/project';
 
 export type { ProjectListParams, ProjectInfo };
 
 export class ProjectListManager {
-  private client: TeamCityClient;
+  private client: TeamCityClientAdapter;
 
-  constructor(client: TeamCityClient) {
+  constructor(client: TeamCityClientAdapter) {
     this.client = client;
   }
 
@@ -45,7 +45,7 @@ export class ProjectListManager {
       );
 
       // Extract data from AxiosResponse
-      const projectsData = response.data;
+      const projectsData = (response.data ?? {}) as Projects;
 
       // Transform response to our format
       const projects = this.transformProjects(projectsData, includeHierarchy);

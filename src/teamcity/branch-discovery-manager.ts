@@ -4,7 +4,33 @@
 import type { VcsRoot } from '@/teamcity-client/models';
 import { debug, error as logError } from '@/utils/logger';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
+
+interface BuildRevisionInfo {
+  'vcs-root-instance'?: {
+    'vcs-root-id'?: string;
+    name?: string;
+  };
+}
+
+interface BuildEntry {
+  id?: string | number;
+  buildTypeId?: string;
+  branchName?: string;
+  number?: string;
+  status?: string;
+  startDate?: string;
+  finishDate?: string;
+  webUrl?: string;
+  revisions?: {
+    revision?: BuildRevisionInfo[];
+  };
+}
+
+interface BuildListPayload {
+  build?: BuildEntry[];
+  count?: number;
+}
 
 export interface BranchInfo {
   name: string;
@@ -36,7 +62,7 @@ export interface DiscoveryOptions {
 }
 
 export class BranchDiscoveryManager {
-  constructor(private readonly client: TeamCityClient) {}
+  constructor(private readonly client: TeamCityClientAdapter) {}
 
   /**
    * Discover branches from build history for a specific build configuration
@@ -81,7 +107,7 @@ export class BranchDiscoveryManager {
       // Query builds from TeamCity
       const response = await this.client.builds.getMultipleBuilds(locator, fields);
 
-      const buildsResponse = response.data;
+      const buildsResponse = (response.data ?? {}) as BuildListPayload;
       const builds = buildsResponse.build ?? [];
 
       // Process builds to extract branch information
@@ -202,7 +228,7 @@ export class BranchDiscoveryManager {
 
       const response = await this.client.builds.getMultipleBuilds(locator, fields);
 
-      const buildsResponse = response.data;
+      const buildsResponse = (response.data ?? {}) as BuildListPayload;
       const builds = buildsResponse.build ?? [];
 
       if (builds.length > 0) {

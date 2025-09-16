@@ -2,7 +2,8 @@
  * Tests for BuildConfigNavigator
  */
 import { BuildConfigNavigator } from '@/teamcity/build-config-navigator';
-import type { TeamCityClient } from '@/teamcity/client';
+
+import { createMockTeamCityClient } from '../../test-utils/mock-teamcity-client';
 
 // Logger mocked below; direct import not required for behavior-first tests
 
@@ -15,29 +16,16 @@ jest.mock('@/utils/logger', () => ({
 
 describe('BuildConfigNavigator', () => {
   let navigator: BuildConfigNavigator;
-  type MockClient = {
-    buildTypes: { getAllBuildTypes: jest.Mock; getBuildType: jest.Mock };
-    projects: { getProject: jest.Mock; getProjects: jest.Mock };
-  };
-  let mockClient: MockClient;
+  let mockClient: ReturnType<typeof createMockTeamCityClient>;
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
 
-    // Create mock TeamCity client
-    mockClient = {
-      buildTypes: {
-        getAllBuildTypes: jest.fn(),
-        getBuildType: jest.fn(),
-      },
-      projects: {
-        getProject: jest.fn(),
-        getProjects: jest.fn(),
-      },
-    };
+    mockClient = createMockTeamCityClient();
+    mockClient.clearAllMocks();
 
-    navigator = new BuildConfigNavigator(mockClient as unknown as TeamCityClient);
+    navigator = new BuildConfigNavigator(mockClient);
 
     // Clear cache before each test without using `any`
     type PrivateNav = { cache: Map<string, unknown> };

@@ -1,7 +1,7 @@
 /**
  * Type-safe mock utilities for TeamCity client testing
  *
- * Provides properly typed mock implementations that match the real TeamCityClient
+ * Provides properly typed mock implementations that match the TeamCityClientAdapter
  * structure, eliminating the need for dangerous type assertions.
  */
 import type { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
@@ -18,7 +18,7 @@ import type {
   TeamCityStepsResponse,
   TeamCityTriggersResponse,
 } from '@/teamcity/api-types';
-import type { TeamCityClient } from '@/teamcity/client';
+import type { TeamCityClientAdapter } from '@/teamcity/client-adapter';
 
 /**
  * Mock interface for BuildTypeApi with commonly used methods
@@ -31,6 +31,7 @@ export interface MockBuildTypeApi extends Partial<InstanceType<typeof BuildTypeA
   deleteBuildType: jest.Mock;
   setBuildTypeField: jest.Mock;
   deleteBuildParameterOfBuildType: jest.Mock;
+  deleteBuildParameterOfBuildType_2: jest.Mock;
 }
 
 /**
@@ -42,6 +43,7 @@ export interface MockProjectApi extends Partial<InstanceType<typeof ProjectApi>>
   createProject: jest.Mock;
   updateProject: jest.Mock;
   deleteProject: jest.Mock;
+  getAllSubprojectsOrdered: jest.Mock;
 }
 
 /**
@@ -70,6 +72,7 @@ export interface MockBuildQueueApi extends Partial<InstanceType<typeof BuildQueu
 export interface MockVcsRootApi extends Partial<InstanceType<typeof VcsRootApi>> {
   getAllVcsRoots: jest.Mock;
   getVcsRoot: jest.Mock;
+  getVcsRootBranches: jest.Mock;
 }
 
 /**
@@ -95,6 +98,12 @@ export class MockTeamCityClient {
   public users: unknown;
   public agents: unknown;
   public agentPools: unknown;
+  public listBuildArtifacts: jest.Mock;
+  public downloadArtifactContent: jest.Mock;
+  public getBuildStatistics: jest.Mock;
+  public listChangesForBuild: jest.Mock;
+  public listSnapshotDependencies: jest.Mock;
+  public baseUrl: string;
 
   constructor() {
     // Initialize BuildTypeApi mock
@@ -106,6 +115,7 @@ export class MockTeamCityClient {
       deleteBuildType: jest.fn(),
       setBuildTypeField: jest.fn(),
       deleteBuildParameterOfBuildType: jest.fn(),
+      deleteBuildParameterOfBuildType_2: jest.fn(),
     } as MockBuildTypeApi;
 
     // Initialize ProjectApi mock
@@ -115,6 +125,7 @@ export class MockTeamCityClient {
       createProject: jest.fn(),
       updateProject: jest.fn(),
       deleteProject: jest.fn(),
+      getAllSubprojectsOrdered: jest.fn(),
     } as MockProjectApi;
 
     // Initialize BuildApi mock
@@ -137,6 +148,7 @@ export class MockTeamCityClient {
     this.vcsRoots = {
       getAllVcsRoots: jest.fn(),
       getVcsRoot: jest.fn(),
+      getVcsRootBranches: jest.fn(),
     } as MockVcsRootApi;
 
     // Initialize TestOccurrenceApi mock
@@ -151,6 +163,13 @@ export class MockTeamCityClient {
     this.users = {};
     this.agents = {};
     this.agentPools = {};
+
+    this.listBuildArtifacts = jest.fn();
+    this.downloadArtifactContent = jest.fn();
+    this.getBuildStatistics = jest.fn();
+    this.listChangesForBuild = jest.fn();
+    this.listSnapshotDependencies = jest.fn();
+    this.baseUrl = 'https://teamcity.example.com';
   }
 
   /**
@@ -171,6 +190,8 @@ export class MockTeamCityClient {
             (method as jest.Mock).mockReset();
           }
         });
+      } else if (typeof api === 'function' && 'mockReset' in api) {
+        (api as jest.Mock).mockReset();
       }
     });
   }
@@ -186,17 +207,20 @@ export class MockTeamCityClient {
             (method as jest.Mock).mockClear();
           }
         });
+      } else if (typeof api === 'function' && 'mockClear' in api) {
+        (api as jest.Mock).mockClear();
       }
     });
   }
 }
 
 /**
- * Create a fully typed mock TeamCity client
- * This returns both MockTeamCityClient and TeamCityClient types for flexibility
+ * Create a fully typed mock TeamCity adapter client
+ * This returns both MockTeamCityClient and TeamCityClientAdapter types for flexibility
  */
-export function createMockTeamCityClient(): MockTeamCityClient & TeamCityClient {
-  return new MockTeamCityClient() as MockTeamCityClient & TeamCityClient;
+export function createMockTeamCityClient(): MockTeamCityClient &
+  jest.Mocked<TeamCityClientAdapter> {
+  return new MockTeamCityClient() as MockTeamCityClient & jest.Mocked<TeamCityClientAdapter>;
 }
 
 /**
@@ -373,10 +397,12 @@ export function expectApiCall(
 }
 
 /**
- * Type assertion helper that validates a mock client has the TeamCityClient shape
+ * Type assertion helper that validates a mock client has the TeamCityClientAdapter shape
  * This provides runtime validation that our mock matches the interface
  */
-export function assertIsValidTeamCityClient(client: unknown): asserts client is TeamCityClient {
+export function assertIsValidTeamCityClient(
+  client: unknown
+): asserts client is TeamCityClientAdapter {
   const c = client as Record<string, unknown>;
 
   // Check for required API properties

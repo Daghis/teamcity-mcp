@@ -13,7 +13,8 @@ import {
   type PersonalBuildOptions,
   RequiredParameterError,
 } from '@/teamcity/build-parameters-manager';
-import type { TeamCityClient } from '@/teamcity/client';
+
+import { createMockTeamCityClient } from '../../test-utils/mock-teamcity-client';
 
 // Mock logger
 const mockLogger: Partial<Logger> = {
@@ -23,27 +24,19 @@ const mockLogger: Partial<Logger> = {
   debug: jest.fn(),
 };
 
-// Mock TeamCity client
-const mockTeamCityClient = {
-  vcsRoots: {
-    getVcsRootBranches: jest.fn(),
-    getVcsRoot: jest.fn(),
-  },
-  builds: {
-    getLatestBuild: jest.fn(),
-  },
-};
-
 // Helper to wrap response in Axios format
 const wrapResponse = <T>(data: T) => ({ data });
 
 describe('BuildParametersManager', () => {
   let manager: BuildParametersManager;
+  let mockClient: ReturnType<typeof createMockTeamCityClient>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockClient = createMockTeamCityClient();
+    mockClient.clearAllMocks();
     manager = new BuildParametersManager({
-      client: mockTeamCityClient as unknown as TeamCityClient,
+      client: mockClient,
       logger: mockLogger as unknown as Logger,
     });
   });
@@ -371,7 +364,7 @@ describe('BuildParametersManager', () => {
     it('should resolve branch from VCS root', async () => {
       const vcsRootId = 'VcsRoot1';
 
-      mockTeamCityClient.vcsRoots.getVcsRootBranches.mockResolvedValueOnce(
+      mockClient.vcsRoots.getVcsRootBranches.mockResolvedValueOnce(
         wrapResponse({
           branch: [
             { name: 'refs/heads/main', default: true },
@@ -392,7 +385,7 @@ describe('BuildParametersManager', () => {
     it('should handle short branch names', async () => {
       const vcsRootId = 'VcsRoot1';
 
-      mockTeamCityClient.vcsRoots.getVcsRootBranches.mockResolvedValueOnce(
+      mockClient.vcsRoots.getVcsRootBranches.mockResolvedValueOnce(
         wrapResponse({
           branch: [
             { name: 'refs/heads/main', default: true },
@@ -412,7 +405,7 @@ describe('BuildParametersManager', () => {
     it('should resolve default branch when not specified', async () => {
       const vcsRootId = 'VcsRoot1';
 
-      mockTeamCityClient.vcsRoots.getVcsRootBranches.mockResolvedValueOnce(
+      mockClient.vcsRoots.getVcsRootBranches.mockResolvedValueOnce(
         wrapResponse({
           branch: [
             { name: 'refs/heads/main', default: true },
@@ -432,7 +425,7 @@ describe('BuildParametersManager', () => {
     it('should handle pull request branches', async () => {
       const vcsRootId = 'VcsRoot1';
 
-      mockTeamCityClient.vcsRoots.getVcsRootBranches.mockResolvedValueOnce(
+      mockClient.vcsRoots.getVcsRootBranches.mockResolvedValueOnce(
         wrapResponse({
           branch: [
             { name: 'refs/heads/main', default: true },
@@ -454,7 +447,7 @@ describe('BuildParametersManager', () => {
     it('should validate branch exists', async () => {
       const vcsRootId = 'VcsRoot1';
 
-      mockTeamCityClient.vcsRoots.getVcsRootBranches.mockResolvedValueOnce(
+      mockClient.vcsRoots.getVcsRootBranches.mockResolvedValueOnce(
         wrapResponse({
           branch: [{ name: 'refs/heads/main', default: true }],
         })
@@ -472,7 +465,7 @@ describe('BuildParametersManager', () => {
     it('should handle tag references', async () => {
       const vcsRootId = 'VcsRoot1';
 
-      mockTeamCityClient.vcsRoots.getVcsRootBranches.mockResolvedValueOnce(
+      mockClient.vcsRoots.getVcsRootBranches.mockResolvedValueOnce(
         wrapResponse({
           branch: [
             { name: 'refs/heads/main', default: true },

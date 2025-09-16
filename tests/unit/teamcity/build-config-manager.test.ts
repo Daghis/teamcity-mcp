@@ -4,19 +4,12 @@ import {
   BuildConfigManager,
   type ManagedBuildConfiguration,
 } from '@/teamcity/build-config-manager';
-import type { TeamCityClient } from '@/teamcity/client';
+
+import { createMockTeamCityClient } from '../../test-utils/mock-teamcity-client';
 
 describe('BuildConfigManager', () => {
   let manager: BuildConfigManager;
-  let mockClient: {
-    buildTypes: {
-      getAllBuildTypes: jest.Mock;
-      getBuildType: jest.Mock;
-    };
-    projects: {
-      getAllSubprojectsOrdered: jest.Mock;
-    };
-  };
+  let mockClient: ReturnType<typeof createMockTeamCityClient>;
   let logger: Logger;
 
   const createBuildType = (overrides: Record<string, unknown> = {}) => ({
@@ -50,15 +43,8 @@ describe('BuildConfigManager', () => {
   });
 
   beforeEach(() => {
-    mockClient = {
-      buildTypes: {
-        getAllBuildTypes: jest.fn(),
-        getBuildType: jest.fn(),
-      },
-      projects: {
-        getAllSubprojectsOrdered: jest.fn(),
-      },
-    };
+    mockClient = createMockTeamCityClient();
+    mockClient.clearAllMocks();
 
     logger = {
       error: jest.fn(),
@@ -81,7 +67,7 @@ describe('BuildConfigManager', () => {
       query: jest.fn(),
     } as unknown as Logger;
 
-    manager = new BuildConfigManager(mockClient as unknown as TeamCityClient, logger);
+    manager = new BuildConfigManager(mockClient, logger);
   });
 
   it('lists configurations with filtering, sorting, and pagination', async () => {
@@ -176,7 +162,7 @@ describe('BuildConfigManager', () => {
   });
 
   it('fetches project configurations including subprojects', async () => {
-    mockClient.projects.getAllSubprojectsOrdered.mockResolvedValue({
+    (mockClient.projects.getAllSubprojectsOrdered as jest.Mock).mockResolvedValue({
       data: { project: [{ id: 'Sub_1' }, { id: 'Sub_2' }] },
     });
     mockClient.buildTypes.getAllBuildTypes.mockResolvedValue({
@@ -193,7 +179,9 @@ describe('BuildConfigManager', () => {
   });
 
   it('returns empty subproject list on API errors', async () => {
-    mockClient.projects.getAllSubprojectsOrdered.mockRejectedValue(new Error('boom'));
+    (mockClient.projects.getAllSubprojectsOrdered as jest.Mock).mockRejectedValue(
+      new Error('boom')
+    );
 
     const ids = await (
       manager as unknown as {

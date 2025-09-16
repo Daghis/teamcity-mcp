@@ -1,20 +1,15 @@
 import { BuildConfigNavigator } from '@/teamcity/build-config-navigator';
-import type { TeamCityClient } from '@/teamcity/client';
+
+import { createMockTeamCityClient } from '../../test-utils/mock-teamcity-client';
 
 describe('BuildConfigNavigator (more branches)', () => {
   let navigator: BuildConfigNavigator;
-  type MockClient = {
-    buildTypes: { getAllBuildTypes: jest.Mock };
-    projects: { getProject: jest.Mock };
-  };
-  let mockClient: MockClient;
+  let mockClient: ReturnType<typeof createMockTeamCityClient>;
 
   beforeEach(() => {
-    mockClient = {
-      buildTypes: { getAllBuildTypes: jest.fn() },
-      projects: { getProject: jest.fn() },
-    };
-    navigator = new BuildConfigNavigator(mockClient as unknown as TeamCityClient);
+    mockClient = createMockTeamCityClient();
+    mockClient.clearAllMocks();
+    navigator = new BuildConfigNavigator(mockClient);
     // clear cache
     type PrivateNav = { cache: Map<string, unknown> };
     (navigator as unknown as PrivateNav).cache.clear();

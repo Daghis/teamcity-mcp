@@ -2,46 +2,22 @@
  * Tests for BuildStatusManager
  */
 import { BuildStatusManager, type BuildStatusOptions } from '@/teamcity/build-status-manager';
-import type { TeamCityClientAdapter } from '@/teamcity/client-adapter';
 import { BuildAccessDeniedError, BuildNotFoundError } from '@/teamcity/errors';
+
+import { createMockTeamCityClient } from '../../test-utils/mock-teamcity-client';
 
 // Mock the TeamCityClient
 jest.mock('@/teamcity/client');
 
 describe('BuildStatusManager', () => {
   let manager: BuildStatusManager;
-  type MockClient = {
-    builds: {
-      getBuild: jest.Mock;
-      getMultipleBuilds: jest.Mock;
-      getBuildProblems: jest.Mock;
-    };
-    listBuildArtifacts: jest.Mock;
-    downloadArtifactContent: jest.Mock;
-    getBuildStatistics: jest.Mock;
-    listChangesForBuild: jest.Mock;
-    listSnapshotDependencies: jest.Mock;
-    baseUrl: string;
-  };
-  let mockClient: MockClient;
+  let mockClient: ReturnType<typeof createMockTeamCityClient>;
 
   beforeEach(() => {
     // Create mock TeamCity client with proper jest mocks
-    mockClient = {
-      builds: {
-        getBuild: jest.fn(),
-        getMultipleBuilds: jest.fn(),
-        getBuildProblems: jest.fn(),
-      },
-      listBuildArtifacts: jest.fn(),
-      downloadArtifactContent: jest.fn(),
-      getBuildStatistics: jest.fn(),
-      listChangesForBuild: jest.fn(),
-      listSnapshotDependencies: jest.fn(),
-      baseUrl: 'https://teamcity.example.com',
-    };
+    mockClient = createMockTeamCityClient();
 
-    manager = new BuildStatusManager(mockClient as unknown as TeamCityClientAdapter);
+    manager = new BuildStatusManager(mockClient);
   });
 
   describe('getBuildStatus', () => {

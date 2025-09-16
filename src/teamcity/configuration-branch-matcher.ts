@@ -9,7 +9,8 @@ import type { Logger } from 'winston';
 import type { BuildType } from '@/teamcity-client';
 
 import { type BranchSpec, BranchSpecificationParser } from './branch-specification-parser';
-import type { TeamCityClient } from './client';
+import { BuildConfigurationNotFoundError } from './build-configuration-resolver';
+import type { TeamCityClientAdapter } from './client-adapter';
 
 /**
  * VCS Root information extracted from build configuration
@@ -48,7 +49,7 @@ export class ConfigurationBranchMatcher {
   private parser: BranchSpecificationParser;
 
   constructor(
-    private readonly client: TeamCityClient,
+    private readonly client: TeamCityClientAdapter,
     private readonly logger: Logger,
     parser?: BranchSpecificationParser
   ) {
@@ -70,14 +71,19 @@ export class ConfigurationBranchMatcher {
         `project:(id:${projectId})`
       );
 
-      if (buildTypesResponse?.data?.buildType == null) {
+      const buildTypesData = (buildTypesResponse?.data ?? {}) as {
+        buildType?: Array<Partial<BuildType>>;
+      };
+      const buildTypes = buildTypesData.buildType ?? [];
+
+      if (buildTypes.length === 0) {
         return [];
       }
 
       const matchedConfigs: MatchedConfiguration[] = [];
 
       // Check each configuration
-      for (const buildType of buildTypesResponse.data.buildType) {
+      for (const buildType of buildTypes) {
         try {
           // Get full build type details including VCS roots
           if (buildType.id == null || buildType.id.length === 0) {
@@ -86,7 +92,10 @@ export class ConfigurationBranchMatcher {
           // Intentional per-config fetch to evaluate branch specs and VCS roots
           // eslint-disable-next-line no-await-in-loop
           const fullBuildTypeResponse = await this.client.buildTypes.getBuildType(buildType.id);
-          const fullBuildType = fullBuildTypeResponse.data;
+          const fullBuildType = (fullBuildTypeResponse.data ?? null) as Partial<BuildType> | null;
+          if (!fullBuildType) {
+            continue;
+          }
 
           // Extract branch specification
           const branchSpec = this.extractBranchSpecification(fullBuildType);
@@ -180,7 +189,10 @@ export class ConfigurationBranchMatcher {
 
       // Get full build type details
       const buildTypeResponse = await this.client.buildTypes.getBuildType(configId);
-      const buildType = buildTypeResponse.data;
+      const buildType = (buildTypeResponse.data ?? null) as Partial<BuildType> | null;
+      if (!buildType) {
+        throw new BuildConfigurationNotFoundError(`Build configuration not found`, configId);
+      }
 
       // Extract branch specification and VCS roots
       const branchSpec = this.extractBranchSpecification(buildType);
@@ -227,7 +239,7 @@ export class ConfigurationBranchMatcher {
   /**
    * Extract branch specification from build type parameters
    */
-  private extractBranchSpecification(buildType: BuildType): string {
+  private extractBranchSpecification(buildType: Partial<BuildType>): string {
     const properties = buildType.parameters?.property;
     if (!properties) {
       return '';
@@ -243,7 +255,7 @@ export class ConfigurationBranchMatcher {
   /**
    * Extract VCS root information from build type
    */
-  private extractVcsRoots(buildType: BuildType): VcsRootInfo[] {
+  private extractVcsRoots(buildType: Partial<BuildType>): VcsRootInfo[] {
     const roots: VcsRootInfo[] = [];
 
     if (!buildType['vcs-root-entries']?.['vcs-root-entry']) {

@@ -3,6 +3,8 @@ import type { Logger } from 'winston';
 import type { Project, Projects } from '@/teamcity-client/models';
 import { ProjectManager } from '@/teamcity/project-manager';
 
+import { createMockTeamCityClient } from '../../test-utils/mock-teamcity-client';
+
 const logger: Logger = { error: jest.fn() } as unknown as Logger;
 
 const makeClient = (
@@ -12,16 +14,18 @@ const makeClient = (
     getAllSubprojectsOrdered: (id: string, fields?: string) => Promise<{ data: Projects }>;
   }>
 ) => {
-  return {
-    projects: {
-      getAllProjects: impl.getAllProjects ?? (async () => ({ data: { project: [] } as Projects })),
-      getProject:
-        impl.getProject ??
-        (async (id: string) => ({ data: { id, name: id } as unknown as Project })),
-      getAllSubprojectsOrdered:
-        impl.getAllSubprojectsOrdered ?? (async () => ({ data: { project: [] } as Projects })),
-    },
-  } as unknown as import('@/teamcity/client').TeamCityClient;
+  const client = createMockTeamCityClient();
+  client.clearAllMocks();
+  (client.projects.getAllProjects as jest.Mock).mockImplementation(
+    impl.getAllProjects ?? (async () => ({ data: { project: [] } as Projects }))
+  );
+  (client.projects.getProject as jest.Mock).mockImplementation(
+    impl.getProject ?? (async (id: string) => ({ data: { id, name: id } as Project }))
+  );
+  (client.projects.getAllSubprojectsOrdered as jest.Mock).mockImplementation(
+    impl.getAllSubprojectsOrdered ?? (async () => ({ data: { project: [] } as Projects }))
+  );
+  return client;
 };
 
 describe('ProjectManager (more branches)', () => {

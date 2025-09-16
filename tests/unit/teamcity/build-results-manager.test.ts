@@ -1,40 +1,20 @@
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
-import type { TeamCityClientAdapter } from '@/teamcity/client-adapter';
 
-type MockAdapter = {
-  builds: {
-    getBuild: jest.Mock;
-    getMultipleBuilds: jest.Mock;
-    getBuildProblems: jest.Mock;
-  };
-  listBuildArtifacts: jest.Mock;
-  downloadArtifactContent: jest.Mock;
-  getBuildStatistics: jest.Mock;
-  listChangesForBuild: jest.Mock;
-  listSnapshotDependencies: jest.Mock;
-  baseUrl: string;
-};
+import { createMockTeamCityClient } from '../../test-utils/mock-teamcity-client';
 
 describe('BuildResultsManager', () => {
   let manager: BuildResultsManager;
-  let mockClient: MockAdapter;
+  let mockClient: ReturnType<typeof createMockTeamCityClient>;
 
   beforeEach(() => {
-    mockClient = {
-      builds: {
-        getBuild: jest.fn(),
-        getMultipleBuilds: jest.fn(),
-        getBuildProblems: jest.fn(),
-      },
-      listBuildArtifacts: jest.fn().mockResolvedValue({ data: {} }),
-      downloadArtifactContent: jest.fn().mockResolvedValue({ data: new ArrayBuffer(0) }),
-      getBuildStatistics: jest.fn().mockResolvedValue({ data: { property: [] } }),
-      listChangesForBuild: jest.fn().mockResolvedValue({ data: {} }),
-      listSnapshotDependencies: jest.fn().mockResolvedValue({ data: {} }),
-      baseUrl: 'https://teamcity.example.com',
-    };
+    mockClient = createMockTeamCityClient();
+    mockClient.listBuildArtifacts.mockResolvedValue({ data: {} } as never);
+    mockClient.downloadArtifactContent.mockResolvedValue({ data: new ArrayBuffer(0) } as never);
+    mockClient.getBuildStatistics.mockResolvedValue({ data: { property: [] } } as never);
+    mockClient.listChangesForBuild.mockResolvedValue({ data: {} } as never);
+    mockClient.listSnapshotDependencies.mockResolvedValue({ data: {} } as never);
 
-    manager = new BuildResultsManager(mockClient as unknown as TeamCityClientAdapter);
+    manager = new BuildResultsManager(mockClient);
     type PrivateAccess = { cache: Map<string, unknown> };
     (manager as unknown as PrivateAccess).cache.clear();
   });

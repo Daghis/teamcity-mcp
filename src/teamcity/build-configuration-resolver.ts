@@ -8,7 +8,7 @@ import type { Logger } from 'winston';
 
 import type { BuildType } from '@/teamcity-client';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
 
 /**
  * Resolved build configuration with normalized data
@@ -164,13 +164,13 @@ export class BuildConfigurationCache {
  * Main resolver class
  */
 export class BuildConfigurationResolver {
-  private client: TeamCityClient;
+  private client: TeamCityClientAdapter;
   private logger: Logger;
   private cache: BuildConfigurationCache;
   private fuzzyMatchThreshold: number;
 
   constructor(config: {
-    client: TeamCityClient;
+    client: TeamCityClientAdapter;
     logger: Logger;
     cache?: BuildConfigurationCache;
     options?: ResolverOptions;
@@ -201,7 +201,12 @@ export class BuildConfigurationResolver {
         configurationId,
         'id,name,projectId,projectName,webUrl,description,paused,templateFlag,settings,parameters,vcs-root-entries'
       );
-      const buildType = response.data;
+      const buildType = (response.data ?? null) as Partial<BuildType> | null;
+      if (!buildType) {
+        throw new BuildConfigurationNotFoundError(
+          `Build configuration with ID '${configurationId}' not found`
+        );
+      }
 
       const resolved = this.normalizeBuildType(buildType);
       this.cache.set(cacheKey, resolved);
@@ -580,7 +585,7 @@ export class BuildConfigurationResolver {
   /**
    * Get all build types with caching
    */
-  private async getAllBuildTypes(): Promise<BuildType[]> {
+  private async getAllBuildTypes(): Promise<Array<Partial<BuildType>>> {
     const cacheKey = 'all:buildTypes';
     const cached = this.cache.get(cacheKey);
 
@@ -593,7 +598,7 @@ export class BuildConfigurationResolver {
       undefined,
       'buildType(id,name,projectId,projectName,webUrl,description,paused,templateFlag,settings,parameters,vcs-root-entries)'
     );
-    const data = response.data;
+    const data = (response.data ?? {}) as { buildType?: Array<Partial<BuildType>> };
 
     return data.buildType ?? [];
   }

@@ -1,16 +1,19 @@
 import type { Project, Projects } from '@/teamcity-client/models';
 import { ProjectListManager } from '@/teamcity/project-list-manager';
 
+import { createMockTeamCityClient } from '../../test-utils/mock-teamcity-client';
+
 const makeClient = (
   impl: Partial<{
     getAllProjects: (locator: string, fields: string) => Promise<{ data: Projects }>;
   }> = {}
 ) => {
-  return {
-    projects: {
-      getAllProjects: impl.getAllProjects ?? (async () => ({ data: { project: [] } as Projects })),
-    },
-  } as unknown as import('@/teamcity/client').TeamCityClient;
+  const client = createMockTeamCityClient();
+  client.clearAllMocks();
+  client.projects.getAllProjects.mockImplementation(
+    impl.getAllProjects ?? (async () => ({ data: { project: [] } as Projects }))
+  );
+  return client;
 };
 
 describe('ProjectListManager', () => {

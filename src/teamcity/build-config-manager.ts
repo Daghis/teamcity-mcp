@@ -6,9 +6,9 @@
  */
 import type { Logger } from 'winston';
 
-import type { BuildType, BuildTypes } from '@/teamcity-client';
+import type { BuildType, BuildTypes, Projects } from '@/teamcity-client';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
 
 /**
  * Build configuration with normalized fields
@@ -83,7 +83,7 @@ export interface PaginatedBuildConfigurations {
  */
 export class BuildConfigManager {
   constructor(
-    private readonly client: TeamCityClient,
+    private readonly client: TeamCityClientAdapter,
     private readonly logger: Logger
   ) {}
 
@@ -114,7 +114,8 @@ export class BuildConfigManager {
         this.buildFieldsSpec(options.includeDetails)
       );
 
-      const allConfigs = this.normalizeBuildTypes(response.data);
+      const buildTypeData = (response.data ?? {}) as BuildTypes;
+      const allConfigs = this.normalizeBuildTypes(buildTypeData);
 
       // Apply additional filtering
       let filteredConfigs = this.applyFilters(allConfigs, filters);
@@ -179,7 +180,12 @@ export class BuildConfigManager {
         this.buildFieldsSpec(true)
       );
 
-      const template = this.normalizeBuildType(templateResponse.data);
+      const templateData = (templateResponse.data ?? null) as Partial<BuildType> | null;
+      if (!templateData) {
+        throw new Error(`Template ${templateId} not found`);
+      }
+
+      const template = this.normalizeBuildType(templateData);
 
       // Find all configurations using this template
       const allConfigs = await this.listConfigurations({
@@ -446,7 +452,8 @@ export class BuildConfigManager {
         'id,parentProjectId'
       );
 
-      const subprojects = response.data.project ?? [];
+      const subprojectData = (response.data ?? {}) as Projects;
+      const subprojects = subprojectData.project ?? [];
       return subprojects
         .map((p: { id?: string }) => p.id)
         .filter((id): id is string => Boolean(id));

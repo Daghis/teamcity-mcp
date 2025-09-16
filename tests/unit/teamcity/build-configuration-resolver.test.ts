@@ -13,6 +13,8 @@ import {
   BuildConfigurationResolver,
 } from '@/teamcity/build-configuration-resolver';
 
+import { createMockTeamCityClient } from '../../test-utils/mock-teamcity-client';
+
 // Mock logger
 const mockLogger: Partial<Logger> = {
   info: jest.fn(),
@@ -24,31 +26,18 @@ const mockLogger: Partial<Logger> = {
 // Helper to wrap response in Axios format
 const wrapResponse = <T>(data: T) => ({ data });
 
-// Mock TeamCity client
-const mockTeamCityClient = {
-  buildTypes: {
-    getAllBuildTypes: jest.fn(),
-    getBuildType: jest.fn(),
-  },
-  projects: {
-    getAllProjects: jest.fn(),
-    getProject: jest.fn(),
-  },
-  vcsRoots: {
-    getAllVcsRoots: jest.fn(),
-    getVcsRoot: jest.fn(),
-  },
-};
-
 describe('BuildConfigurationResolver', () => {
   let resolver: BuildConfigurationResolver;
   let cache: BuildConfigurationCache;
+  let mockClient: ReturnType<typeof createMockTeamCityClient>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockClient = createMockTeamCityClient();
+    mockClient.clearAllMocks();
     cache = new BuildConfigurationCache({ ttl: 60000 }); // 1 minute for tests
     resolver = new BuildConfigurationResolver({
-      client: mockTeamCityClient as unknown as import('@/teamcity/client').TeamCityClient,
+      client: mockClient,
       logger: mockLogger as unknown as Logger,
       cache,
       options: {
@@ -72,7 +61,7 @@ describe('BuildConfigurationResolver', () => {
         webUrl: 'https://teamcity.example.com/viewType.html?buildTypeId=MyProject_BuildConfig',
       };
 
-      mockTeamCityClient.buildTypes.getBuildType.mockResolvedValueOnce(wrapResponse(mockBuildType));
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(wrapResponse(mockBuildType));
 
       const result = await resolver.resolveByConfigurationId('MyProject_BuildConfig');
 
@@ -88,7 +77,7 @@ describe('BuildConfigurationResolver', () => {
         allowPersonalBuilds: false,
       });
 
-      expect(mockTeamCityClient.buildTypes.getBuildType).toHaveBeenCalledWith(
+      expect(mockClient.buildTypes.getBuildType).toHaveBeenCalledWith(
         'MyProject_BuildConfig',
         expect.any(String)
       );
@@ -101,7 +90,7 @@ describe('BuildConfigurationResolver', () => {
         projectId: 'MyProject',
       };
 
-      mockTeamCityClient.buildTypes.getBuildType.mockResolvedValueOnce(wrapResponse(mockBuildType));
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(wrapResponse(mockBuildType));
 
       // First call - should hit API
       await resolver.resolveByConfigurationId('MyProject_BuildConfig');
@@ -109,12 +98,12 @@ describe('BuildConfigurationResolver', () => {
       // Second call - should use cache
       const result = await resolver.resolveByConfigurationId('MyProject_BuildConfig');
 
-      expect(mockTeamCityClient.buildTypes.getBuildType).toHaveBeenCalledTimes(1);
+      expect(mockClient.buildTypes.getBuildType).toHaveBeenCalledTimes(1);
       expect(result.id).toBe('MyProject_BuildConfig');
     });
 
     it('should throw error for non-existent configuration ID', async () => {
-      mockTeamCityClient.buildTypes.getBuildType.mockRejectedValueOnce({
+      mockClient.buildTypes.getBuildType.mockRejectedValueOnce({
         response: { status: 404 },
       });
 
@@ -124,7 +113,7 @@ describe('BuildConfigurationResolver', () => {
     });
 
     it('should throw permission error for forbidden configuration', async () => {
-      mockTeamCityClient.buildTypes.getBuildType.mockRejectedValueOnce({
+      mockClient.buildTypes.getBuildType.mockRejectedValueOnce({
         response: {
           status: 403,
           data: { message: 'Access denied to build configuration' },
@@ -154,7 +143,7 @@ describe('BuildConfigurationResolver', () => {
         },
       ];
 
-      mockTeamCityClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
+      mockClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
         wrapResponse({
           buildType: mockBuildTypes,
           count: 2,
@@ -187,7 +176,7 @@ describe('BuildConfigurationResolver', () => {
         },
       ];
 
-      mockTeamCityClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
+      mockClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
         wrapResponse({
           buildType: mockBuildTypes,
           count: 2,
@@ -218,7 +207,7 @@ describe('BuildConfigurationResolver', () => {
         },
       ];
 
-      mockTeamCityClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
+      mockClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
         wrapResponse({
           buildType: mockBuildTypes,
           count: 2,
@@ -251,7 +240,7 @@ describe('BuildConfigurationResolver', () => {
         },
       ];
 
-      mockTeamCityClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
+      mockClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
         wrapResponse({
           buildType: mockBuildTypes,
           count: 2,
@@ -289,7 +278,7 @@ describe('BuildConfigurationResolver', () => {
       ];
 
       // Mock recent build that used this commit
-      mockTeamCityClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
+      mockClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
         wrapResponse({
           buildType: mockBuildTypes,
           count: 1,
@@ -323,7 +312,7 @@ describe('BuildConfigurationResolver', () => {
         },
       ];
 
-      mockTeamCityClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
+      mockClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
         wrapResponse({
           buildType: mockBuildTypes,
           count: 2,
@@ -356,7 +345,7 @@ describe('BuildConfigurationResolver', () => {
         },
       ];
 
-      mockTeamCityClient.projects.getAllProjects.mockResolvedValueOnce(
+      mockClient.projects.getAllProjects.mockResolvedValueOnce(
         wrapResponse({
           project: mockProjects,
           count: 2,
@@ -378,14 +367,14 @@ describe('BuildConfigurationResolver', () => {
         },
       ];
 
-      mockTeamCityClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
+      mockClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
         wrapResponse({
           buildType: mockBuildTypes,
           count: 2,
         })
       );
 
-      mockTeamCityClient.buildTypes.getBuildType.mockResolvedValueOnce(
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(
         wrapResponse({
           id: 'Backend_Build',
           name: 'Build',
@@ -417,7 +406,7 @@ describe('BuildConfigurationResolver', () => {
         },
       ];
 
-      mockTeamCityClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
+      mockClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
         wrapResponse({
           buildType: mockBuildTypes,
           count: 2,
@@ -437,25 +426,13 @@ describe('BuildConfigurationResolver', () => {
   describe('Caching', () => {
     it('should cache successful resolutions', async () => {
       // Create a completely fresh client mock to avoid cross-test contamination
-      const freshMockClient = {
-        buildTypes: {
-          getAllBuildTypes: jest.fn(),
-          getBuildType: jest.fn(),
-        },
-        projects: {
-          getAllProjects: jest.fn(),
-          getProject: jest.fn(),
-        },
-        vcsRoots: {
-          getAllVcsRoots: jest.fn(),
-          getVcsRoot: jest.fn(),
-        },
-      };
+      const freshMockClient = createMockTeamCityClient();
+      freshMockClient.clearAllMocks();
 
       // Create a completely fresh resolver to avoid cross-test contamination
       const testCache = new BuildConfigurationCache({ ttl: 60000 });
       const testResolver = new BuildConfigurationResolver({
-        client: freshMockClient as unknown as import('@/teamcity/client').TeamCityClient,
+        client: freshMockClient,
         logger: mockLogger as unknown as Logger,
         cache: testCache,
         options: {
@@ -494,7 +471,7 @@ describe('BuildConfigurationResolver', () => {
         projectId: 'Project',
       };
 
-      mockTeamCityClient.buildTypes.getBuildType.mockResolvedValue(wrapResponse(mockBuildType));
+      mockClient.buildTypes.getBuildType.mockResolvedValue(wrapResponse(mockBuildType));
 
       await resolver.resolveByConfigurationId('TTL_Build');
 
@@ -504,7 +481,7 @@ describe('BuildConfigurationResolver', () => {
       // Should make another API call
       await resolver.resolveByConfigurationId('TTL_Build');
 
-      expect(mockTeamCityClient.buildTypes.getBuildType).toHaveBeenCalledTimes(2);
+      expect(mockClient.buildTypes.getBuildType).toHaveBeenCalledTimes(2);
 
       jest.useRealTimers();
     });
@@ -516,12 +493,12 @@ describe('BuildConfigurationResolver', () => {
       });
 
       const smallResolver = new BuildConfigurationResolver({
-        client: mockTeamCityClient as unknown as import('@/teamcity/client').TeamCityClient,
+        client: mockClient,
         logger: mockLogger as unknown as Logger,
         cache: smallCache,
       });
 
-      mockTeamCityClient.buildTypes.getBuildType.mockResolvedValue(
+      mockClient.buildTypes.getBuildType.mockResolvedValue(
         wrapResponse({
           id: 'Build1',
           name: 'Build 1',
@@ -541,7 +518,7 @@ describe('BuildConfigurationResolver', () => {
 
   describe('Error Handling', () => {
     it('should provide helpful error for no matches', async () => {
-      mockTeamCityClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
+      mockClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
         wrapResponse({
           buildType: [],
           count: 0,
@@ -580,7 +557,7 @@ describe('BuildConfigurationResolver', () => {
         },
       ];
 
-      mockTeamCityClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
+      mockClient.buildTypes.getAllBuildTypes.mockResolvedValueOnce(
         wrapResponse({
           buildType: mockBuildTypes,
           count: 3,
@@ -601,7 +578,7 @@ describe('BuildConfigurationResolver', () => {
     });
 
     it('should handle network errors gracefully', async () => {
-      mockTeamCityClient.buildTypes.getBuildType.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+      mockClient.buildTypes.getBuildType.mockRejectedValueOnce(new Error('ECONNREFUSED'));
 
       await expect(resolver.resolveByConfigurationId('Any_Build')).rejects.toThrow(
         'Failed to connect to TeamCity'
@@ -609,7 +586,7 @@ describe('BuildConfigurationResolver', () => {
     });
 
     it('should handle malformed responses', async () => {
-      mockTeamCityClient.buildTypes.getBuildType.mockResolvedValueOnce(
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(
         wrapResponse({
           // Missing required fields
           name: 'Incomplete Build',
@@ -630,7 +607,7 @@ describe('BuildConfigurationResolver', () => {
         projectId: 'SecureProject',
       };
 
-      mockTeamCityClient.buildTypes.getBuildType.mockResolvedValueOnce(wrapResponse(mockBuildType));
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(wrapResponse(mockBuildType));
 
       const result = await resolver.resolveByConfigurationId('Restricted_Build', {
         checkPermissions: true,
@@ -649,7 +626,7 @@ describe('BuildConfigurationResolver', () => {
         },
       };
 
-      mockTeamCityClient.buildTypes.getBuildType.mockResolvedValueOnce(wrapResponse(mockBuildType));
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(wrapResponse(mockBuildType));
 
       const result = await resolver.resolveByConfigurationId('Personal_Build');
 

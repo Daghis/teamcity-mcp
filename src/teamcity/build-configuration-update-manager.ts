@@ -1,9 +1,10 @@
 /**
  * BuildConfigurationUpdateManager - Manages updating of build configurations
  */
+import type { BuildType } from '@/teamcity-client/models/build-type';
 import { debug, info, error as logError } from '@/utils/logger';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
 
 export interface UpdateOptions {
   name?: string;
@@ -62,9 +63,9 @@ export interface ChangeLog {
 }
 
 export class BuildConfigurationUpdateManager {
-  private client: TeamCityClient;
+  private client: TeamCityClientAdapter;
 
-  constructor(client: TeamCityClient) {
+  constructor(client: TeamCityClientAdapter) {
     this.client = client;
   }
 
@@ -78,11 +79,11 @@ export class BuildConfigurationUpdateManager {
         '$long,parameters($long),settings($long),agent-requirements($long)'
       );
 
-      if (response.data == null) {
+      const config = response.data as BuildType | null;
+
+      if (config == null) {
         return null;
       }
-
-      const config = response.data;
 
       // Extract parameters
       const parameters: Record<string, string> = {};

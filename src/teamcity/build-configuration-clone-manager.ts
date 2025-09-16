@@ -3,9 +3,10 @@
  */
 import { getTeamCityUrl } from '@/config';
 import type { BuildType } from '@/teamcity-client/models/build-type';
+import type { Project } from '@/teamcity-client/models/project';
 import { debug, info, error as logError } from '@/utils/logger';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
 import {
   type BuildTypeData,
   type BuildTypeDependency,
@@ -46,9 +47,9 @@ export interface BuildConfiguration {
 }
 
 export class BuildConfigurationCloneManager {
-  private client: TeamCityClient;
+  private client: TeamCityClientAdapter;
 
-  constructor(client: TeamCityClient) {
+  constructor(client: TeamCityClientAdapter) {
     this.client = client;
   }
 
@@ -136,9 +137,10 @@ export class BuildConfigurationCloneManager {
     try {
       const response = await this.client.projects.getProject(projectId, '$short');
 
-      const id = response.data?.id;
-      const name = response.data?.name;
-      if (id && name) {
+      const projectData = (response.data ?? null) as Partial<Project> | null;
+      const id = projectData?.id;
+      const name = projectData?.name;
+      if (typeof id === 'string' && id.length > 0 && typeof name === 'string' && name.length > 0) {
         return { id, name };
       }
       return null;
@@ -207,9 +209,15 @@ export class BuildConfigurationCloneManager {
         clonedVcsRoot as VcsRootData
       );
 
-      const newId = createResponse.data.id;
-      const newName = createResponse.data.name;
-      if (!newId || !newName) {
+      const createdVcsRoot = (createResponse.data ?? null) as Partial<VcsRootData> | null;
+      const newId = createdVcsRoot?.id;
+      const newName = createdVcsRoot?.name;
+      if (
+        typeof newId !== 'string' ||
+        newId.length === 0 ||
+        typeof newName !== 'string' ||
+        newName.length === 0
+      ) {
         throw new Error('Failed to obtain cloned VCS root id/name');
       }
       return { id: newId, name: newName };
@@ -339,7 +347,7 @@ export class BuildConfigurationCloneManager {
     }
 
     // Handle build counter
-    if (options.copyBuildCounter && source.buildNumberCounter) {
+    if (options.copyBuildCounter === true && source.buildNumberCounter != null) {
       if (configPayload.settings == null) {
         configPayload.settings = { property: [] };
       }
@@ -367,16 +375,22 @@ export class BuildConfigurationCloneManager {
       );
 
       const teamcityUrl = getTeamCityUrl();
-      const id = response.data.id;
-      const name = response.data.name;
-      if (!id || !name) {
+      const createdBuild = (response.data ?? null) as Partial<BuildType> | null;
+      const id = createdBuild?.id;
+      const name = createdBuild?.name;
+      if (
+        typeof id !== 'string' ||
+        id.length === 0 ||
+        typeof name !== 'string' ||
+        name.length === 0
+      ) {
         throw new Error('Clone response missing id or name');
       }
       const result: BuildConfiguration = {
         id,
         name,
-        projectId: response.data.projectId ?? options.targetProjectId,
-        description: response.data.description,
+        projectId: createdBuild?.projectId ?? options.targetProjectId,
+        description: createdBuild?.description,
         vcsRootId: options.vcsRootId,
         parameters: options.parameters,
         url: `${teamcityUrl}/viewType.html?buildTypeId=${id}`,

@@ -1,7 +1,7 @@
 import type { Logger } from 'winston';
 
 import { BranchSpecificationParser } from '@/teamcity/branch-specification-parser';
-import type { TeamCityClient } from '@/teamcity/client';
+import type { TeamCityClientAdapter } from '@/teamcity/client-adapter';
 import { ConfigurationBranchMatcher } from '@/teamcity/configuration-branch-matcher';
 
 import { createMockLogger } from '../../test-utils/mock-logger';
@@ -14,7 +14,7 @@ import {
 
 describe('ConfigurationBranchMatcher', () => {
   let matcher: ConfigurationBranchMatcher;
-  let mockClient: MockTeamCityClient & TeamCityClient;
+  let mockClient: MockTeamCityClient & TeamCityClientAdapter;
   let mockLogger: Logger;
   let mockParser: jest.Mocked<BranchSpecificationParser>;
 

@@ -8,7 +8,7 @@ import type { Logger } from 'winston';
 
 import type { Project, Projects } from '@/teamcity-client';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
 
 /**
  * Managed project with normalized fields
@@ -85,7 +85,7 @@ export class ProjectManager {
   private projectCache: Map<string, ManagedProject> = new Map();
 
   constructor(
-    private readonly client: TeamCityClient,
+    private readonly client: TeamCityClientAdapter,
     private readonly logger: Logger
   ) {}
 
@@ -118,7 +118,8 @@ export class ProjectManager {
       );
 
       // Normalize projects
-      let projects = await this.normalizeProjects(response.data);
+      const projectData = (response.data ?? {}) as Projects;
+      let projects = await this.normalizeProjects(projectData);
 
       // Apply additional filters
       projects = this.applyFilters(projects, filters);
@@ -209,7 +210,12 @@ export class ProjectManager {
     try {
       const response = await this.client.projects.getProject(projectId, this.buildFieldsSpec(true));
 
-      const project = this.normalizeProject(response.data);
+      const projectData = (response.data ?? null) as Project | null;
+      if (!projectData) {
+        return null;
+      }
+
+      const project = this.normalizeProject(projectData);
       this.projectCache.set(projectId, project);
 
       return project;
@@ -254,8 +260,8 @@ export class ProjectManager {
         projectId,
         'id,name'
       );
-
-      const subprojects = subprojectsResponse.data.project ?? [];
+      const subprojectsData = (subprojectsResponse.data ?? {}) as Projects;
+      const subprojects = subprojectsData.project ?? [];
 
       for (const subproject of subprojects) {
         if (subproject.id != null) {
@@ -296,8 +302,8 @@ export class ProjectManager {
       projectId,
       this.buildFieldsSpec(false)
     );
-
-    const subprojects = subprojectsResponse.data.project ?? [];
+    const subprojectsData = (subprojectsResponse.data ?? {}) as Projects;
+    const subprojects = subprojectsData.project ?? [];
 
     for (const subproject of subprojects) {
       if (subproject.id) {

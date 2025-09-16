@@ -4,7 +4,7 @@
  */
 import { debug, error as logError } from '@/utils/logger';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
 import {
   type BuildTypeProperty,
   type BuildTypeVcsRootEntry,
@@ -90,12 +90,12 @@ interface CacheEntry {
 }
 
 export class BuildConfigNavigator {
-  private client: TeamCityClient;
+  private client: TeamCityClientAdapter;
   private cache: Map<string, CacheEntry> = new Map();
   private readonly cacheTtlMs = 120000; // 120 seconds
   private readonly maxCacheSize = 100;
 
-  constructor(client: TeamCityClient) {
+  constructor(client: TeamCityClientAdapter) {
     this.client = client;
   }
 
