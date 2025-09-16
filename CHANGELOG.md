@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/Daghis/teamcity-mcp/compare/v1.2.1...v1.3.0) (2025-09-16)
+
+
+### Features
+
+* **tools:** expose change and admin REST tools ([#112](https://github.com/Daghis/teamcity-mcp/issues/112)) ([e7f4e1e](https://github.com/Daghis/teamcity-mcp/commit/e7f4e1e74bb28572ffc3ee7a0fced6090c4f92ef))
+
 ## [Unreleased]
 
 ### Features
