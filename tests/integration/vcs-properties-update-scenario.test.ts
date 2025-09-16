@@ -93,6 +93,6 @@ describe('VCS root property updates: full writes + dev reads', () => {
     expect(branchSpec2?.value?.includes('+:refs/tags/*')).toBe(true);
     // Optionally assert it contains exactly two lines
     const lines = (branchSpec2?.value ?? '').split('\n').filter(Boolean);
-    expect(lines.length).toBeGreaterThanOrEqual(2);
+    expect(lines.length).toBe(2);
   }, 60000);
 });
