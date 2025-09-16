@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/Daghis/teamcity-mcp/compare/v1.2.0...v1.2.1) (2025-09-16)
+
+
+### Bug Fixes
+
+* **tools:** ensure multi-ref branchSpec; remove alias logic ([#103](https://github.com/Daghis/teamcity-mcp/issues/103)) ([5012439](https://github.com/Daghis/teamcity-mcp/commit/5012439caa926422960d5ac569579a3a725732ad))
+
 ## [1.2.0](https://github.com/Daghis/teamcity-mcp/compare/v1.1.0...v1.2.0) (2025-09-15)
 
 
