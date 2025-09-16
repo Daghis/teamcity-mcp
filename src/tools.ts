@@ -5,13 +5,12 @@
 import { z } from 'zod';
 
 import { getMCPMode as getMCPModeFromConfig } from '@/config';
+import { type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import { BuildConfigurationUpdateManager } from '@/teamcity/build-configuration-update-manager';
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
 import type { TeamCityClient } from '@/teamcity/client';
 import { createAdapterFromTeamCityAPI } from '@/teamcity/client-adapter';
 import { createPaginatedFetcher, fetchAllPages } from '@/teamcity/pagination';
-import type { Mutes } from '@/teamcity-client/models';
-import { ResolutionTypeEnum } from '@/teamcity-client/models';
 import { debug } from '@/utils/logger';
 import { json, runTool } from '@/utils/mcp';
 
@@ -3273,9 +3272,9 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           until: z.string().min(1).optional(),
           fields: z.string().min(1).optional(),
         })
-        .refine((value) => Boolean(value.buildTypeId ?? value.projectId), {
-          message: 'Either buildTypeId or projectId is required',
-          path: ['buildTypeId'],
+        .refine((value) => Boolean(value.buildTypeId) || Boolean(value.projectId), {
+          message: 'Either buildTypeId or projectId must be provided',
+          path: [],
         });
 
       return runTool(
@@ -3283,9 +3282,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         schema,
         async (typed) => {
           const api = TeamCityAPI.getInstance();
-          const scope: { buildType?: { id: string }; project?: { id: string } } = typed.buildTypeId
-            ? { buildType: { id: typed.buildTypeId } }
-            : { project: { id: typed.projectId as string } };
+          let scope: { buildType?: { id: string }; project?: { id: string } };
+          if (typed.buildTypeId) {
+            scope = { buildType: { id: typed.buildTypeId } };
+          } else if (typed.projectId) {
+            scope = { project: { id: typed.projectId } };
+          } else {
+            throw new Error('Scope must include a buildTypeId or projectId');
+          }
 
           const payload: Mutes = {
             mute: [

@@ -1,5 +1,4 @@
-import { getRequiredTool } from '@/tools';
-import type { ToolDefinition } from '@/tools';
+import { type ToolDefinition, getRequiredTool } from '@/tools';
 
 type PaginatedMock = jest.Mock<Promise<{ data: Record<string, unknown> }>, [string?]>;
 
@@ -20,26 +19,14 @@ const createPaginatedMock = (items: unknown[], key: string): PaginatedMock =>
     return { data };
   });
 
-const getAllChanges = createPaginatedMock(
-  [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }],
-  'change'
-);
-const getAllBuildProblems = createPaginatedMock(
-  [{ id: 'p1' }, { id: 'p2' }],
-  'problem'
-);
+const getAllChanges = createPaginatedMock([{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }], 'change');
+const getAllBuildProblems = createPaginatedMock([{ id: 'p1' }, { id: 'p2' }], 'problem');
 const getAllBuildProblemOccurrences = createPaginatedMock(
   [{ id: 'o1' }, { id: 'o2' }, { id: 'o3' }],
   'problemOccurrence'
 );
-const getAllInvestigations = createPaginatedMock(
-  [{ id: 'i1' }, { id: 'i2' }],
-  'investigation'
-);
-const getAllMutedTests = createPaginatedMock(
-  [{ id: 'm1' }, { id: 'm2' }],
-  'mute'
-);
+const getAllInvestigations = createPaginatedMock([{ id: 'i1' }, { id: 'i2' }], 'investigation');
+const getAllMutedTests = createPaginatedMock([{ id: 'm1' }, { id: 'm2' }], 'mute');
 const getVersionedSettingsStatus = jest.fn(async () => ({
   data: { status: 'UP_TO_DATE', revision: '123' },
 }));

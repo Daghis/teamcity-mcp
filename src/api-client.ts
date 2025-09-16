@@ -31,8 +31,8 @@ import { RoleApi } from './teamcity-client/api/role-api';
 import { ServerApi } from './teamcity-client/api/server-api';
 import { TestOccurrenceApi } from './teamcity-client/api/test-occurrence-api';
 import { UserApi } from './teamcity-client/api/user-api';
-import { VersionedSettingsApi } from './teamcity-client/api/versioned-settings-api';
 import { VcsRootApi } from './teamcity-client/api/vcs-root-api';
+import { VersionedSettingsApi } from './teamcity-client/api/versioned-settings-api';
 import { Configuration } from './teamcity-client/configuration';
 
 export class TeamCityAPI {
