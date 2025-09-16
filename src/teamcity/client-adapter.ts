@@ -50,7 +50,8 @@ export function createAdapterFromTeamCityAPI(api: TeamCityAPI): TeamCityClientAd
   return {
     builds: api.builds as unknown as BuildApiLike,
     listBuildArtifacts: (buildId, options) => api.listBuildArtifacts(buildId, options),
-    downloadArtifactContent: (buildId, artifactPath) => api.downloadBuildArtifact(buildId, artifactPath),
+    downloadArtifactContent: (buildId, artifactPath) =>
+      api.downloadBuildArtifact(buildId, artifactPath),
     getBuildStatistics: (buildId, fields) => api.getBuildStatistics(buildId, fields),
     listChangesForBuild: (buildId, fields) => api.listChangesForBuild(buildId, fields),
     listSnapshotDependencies: (buildId) => api.listSnapshotDependencies(buildId),
