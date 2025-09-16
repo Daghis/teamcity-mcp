@@ -21,6 +21,7 @@ export * from './errors';
 export * from './circuit-breaker';
 export * from './pagination';
 export * from './config';
+export * from './types/client';
 
 // Re-export configuration
 export * from '@/teamcity-client/configuration';

@@ -23,6 +23,10 @@ describe('TeamCityAPI surface', () => {
     expect(api.testMetadata).toBeInstanceOf(TestApi);
     expect(api.tests).toBe(api.testOccurrences);
     expect(api.http.defaults.baseURL).toBe(BASE_CONFIG.baseUrl);
+    expect(api.modules.tests).toBe(api.tests);
+    expect(api.modules.testMetadata).toBe(api.testMetadata);
+    expect(api.modules.buildTypes).toBe(api.buildTypes);
+    expect(Object.isFrozen(api.modules)).toBe(true);
   });
 
   it('continues to support the legacy positional overrides', () => {

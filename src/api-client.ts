@@ -12,6 +12,7 @@ import {
   logResponse,
   validateConfiguration,
 } from '@/teamcity/auth';
+import type { TeamCityApiSurface } from '@/teamcity/types/client';
 import { TeamCityAPIError, isRetryableError } from '@/teamcity/errors';
 import { info } from '@/utils/logger';
 
@@ -46,6 +47,12 @@ import { VcsRootApi } from './teamcity-client/api/vcs-root-api';
 import { VcsRootInstanceApi } from './teamcity-client/api/vcs-root-instance-api';
 import { VersionedSettingsApi } from './teamcity-client/api/versioned-settings-api';
 import { Configuration } from './teamcity-client/configuration';
+
+export type {
+  TeamCityApiSurface,
+  TeamCityRequestContext,
+  TeamCityUnifiedClient,
+} from '@/teamcity/types/client';
 
 export interface TeamCityAPIClientConfig {
   baseUrl: string;
@@ -91,6 +98,7 @@ export class TeamCityAPI {
   public readonly users: UserApi;
   public readonly nodes: NodeApi;
   public readonly root: RootApi;
+  public readonly modules: TeamCityApiSurface;
   /** Shared axios instance configured with auth/retry interceptors. */
   public readonly http: AxiosInstance;
 
@@ -189,6 +197,38 @@ export class TeamCityAPI {
     this.users = this.createApi(UserApi);
     this.nodes = this.createApi(NodeApi);
     this.root = this.createApi(RootApi);
+    this.modules = Object.freeze({
+      agents: this.agents,
+      agentPools: this.agentPools,
+      agentTypes: this.agentTypes,
+      audits: this.audits,
+      avatars: this.avatars,
+      builds: this.builds,
+      buildQueue: this.buildQueue,
+      buildTypes: this.buildTypes,
+      changes: this.changes,
+      cloudInstances: this.cloudInstances,
+      deploymentDashboards: this.deploymentDashboards,
+      globalServerSettings: this.globalServerSettings,
+      groups: this.groups,
+      health: this.health,
+      investigations: this.investigations,
+      mutes: this.mutes,
+      nodes: this.nodes,
+      problems: this.problems,
+      problemOccurrences: this.problemOccurrences,
+      projects: this.projects,
+      roles: this.roles,
+      root: this.root,
+      server: this.server,
+      serverAuthSettings: this.serverAuthSettings,
+      testMetadata: this.testMetadata,
+      tests: this.tests,
+      users: this.users,
+      vcsRootInstances: this.vcsRootInstances,
+      vcsRoots: this.vcsRoots,
+      versionedSettings: this.versionedSettings,
+    }) as TeamCityApiSurface;
 
     info('TeamCityAPI initialized', { baseUrl: basePath });
   }
@@ -201,7 +241,10 @@ export class TeamCityAPI {
   static getInstance(): TeamCityAPI;
   static getInstance(config: TeamCityAPIClientConfig): TeamCityAPI;
   static getInstance(baseUrl: string, token: string): TeamCityAPI;
-  static getInstance(arg1?: unknown, arg2?: unknown): TeamCityAPI {
+  static getInstance(
+    arg1?: TeamCityAPIClientConfig | string,
+    arg2?: string
+  ): TeamCityAPI {
     // If parameters are provided, create a new instance (for testing)
     if (typeof arg1 === 'string' && typeof arg2 === 'string') {
       this.instance = new TeamCityAPI({ baseUrl: arg1, token: arg2 });
@@ -209,7 +252,7 @@ export class TeamCityAPI {
     }
 
     if (arg1 != null && typeof arg1 === 'object') {
-      this.instance = new TeamCityAPI(arg1 as TeamCityAPIClientConfig);
+      this.instance = new TeamCityAPI(arg1);
       return this.instance;
     }
 
