@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/Daghis/teamcity-mcp/compare/v1.3.0...v1.3.1) (2025-09-16)
+
+
+### Bug Fixes
+
+* **teamcity:** route results + problems via shared client ([#111](https://github.com/Daghis/teamcity-mcp/issues/111)) ([3797bb5](https://github.com/Daghis/teamcity-mcp/commit/3797bb57d8421e2cb243112a9b1cdfda92fff1f7))
+
 ## [1.3.0](https://github.com/Daghis/teamcity-mcp/compare/v1.2.1...v1.3.0) (2025-09-16)
 
 
