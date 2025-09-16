@@ -329,6 +329,17 @@ export class TeamCityAPI {
     );
   }
 
+  async getBuildCount(locator?: string): Promise<AxiosResponse<string>> {
+    return this.axiosInstance.get('/app/rest/builds/count', {
+      params: locator ? { locator } : undefined,
+      headers: {
+        Accept: 'text/plain',
+      },
+      responseType: 'text',
+      transformResponse: [(data) => data],
+    });
+  }
+
   async downloadBuildArtifact(
     buildId: string,
     artifactPath: string

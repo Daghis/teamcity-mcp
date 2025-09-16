@@ -16,6 +16,7 @@ describe('BuildStatusManager', () => {
       getMultipleBuilds: jest.Mock;
       getBuildProblems: jest.Mock;
     };
+    getBuildCount: jest.Mock;
     listBuildArtifacts: jest.Mock;
     downloadArtifactContent: jest.Mock;
     getBuildStatistics: jest.Mock;
@@ -33,6 +34,7 @@ describe('BuildStatusManager', () => {
         getMultipleBuilds: jest.fn(),
         getBuildProblems: jest.fn(),
       },
+      getBuildCount: jest.fn(),
       listBuildArtifacts: jest.fn(),
       downloadArtifactContent: jest.fn(),
       getBuildStatistics: jest.fn(),

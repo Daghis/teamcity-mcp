@@ -1,26 +1,47 @@
 /**
  * Tests for BuildListManager
  */
-import axios from 'axios';
+import type { AxiosResponse } from 'axios';
 
 import { BuildListManager } from '@/teamcity/build-list-manager';
-import type { TeamCityClient } from '@/teamcity/client';
-
-jest.mock('axios');
+import type { TeamCityClientAdapter } from '@/teamcity/client-adapter';
 
 describe('BuildListManager', () => {
   let manager: BuildListManager;
-  let mockClient: { builds: { getMultipleBuilds: jest.Mock } };
+  type MockClient = {
+    builds: {
+      getBuild: jest.Mock;
+      getMultipleBuilds: jest.Mock;
+      getBuildProblems: jest.Mock;
+    };
+    getBuildCount: jest.Mock;
+    listBuildArtifacts: jest.Mock;
+    downloadArtifactContent: jest.Mock;
+    getBuildStatistics: jest.Mock;
+    listChangesForBuild: jest.Mock;
+    listSnapshotDependencies: jest.Mock;
+    baseUrl: string;
+  };
+  let mockClient: MockClient;
 
   beforeEach(() => {
     // Create mock TeamCity client
     mockClient = {
       builds: {
+        getBuild: jest.fn(),
         getMultipleBuilds: jest.fn(),
+        getBuildProblems: jest.fn(),
       },
+      getBuildCount: jest.fn(),
+      listBuildArtifacts: jest.fn(),
+      downloadArtifactContent: jest.fn(),
+      getBuildStatistics: jest.fn(),
+      listChangesForBuild: jest.fn(),
+      listSnapshotDependencies: jest.fn(),
+      baseUrl: 'https://teamcity.example.com',
     };
 
-    manager = new BuildListManager(mockClient as unknown as TeamCityClient);
+    manager = new BuildListManager(mockClient as unknown as TeamCityClientAdapter);
 
     // Clear cache before each test without using `any`
     type PrivateAccess = { cache: Map<string, unknown> };
@@ -496,9 +517,13 @@ describe('BuildListManager', () => {
         },
       };
 
-      // Mock axios for direct count API call
-      const mockedAxios = axios as unknown as jest.Mocked<typeof axios>;
-      jest.spyOn(mockedAxios, 'get').mockResolvedValue({ data: '150' });
+      mockClient.getBuildCount.mockResolvedValue({
+        data: '150',
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as never,
+      } as AxiosResponse<string>);
 
       mockClient.builds.getMultipleBuilds.mockResolvedValue(mockBuildsResponse);
 
@@ -508,10 +533,7 @@ describe('BuildListManager', () => {
       });
 
       expect(result.metadata.totalCount).toBe(150);
-      expect(axios.get).toHaveBeenCalledWith(
-        expect.stringContaining('/app/rest/builds/count'),
-        expect.any(Object)
-      );
+      expect(mockClient.getBuildCount).toHaveBeenCalledWith(expect.any(String));
     });
 
     it('should not fetch total count by default', async () => {
@@ -522,15 +544,12 @@ describe('BuildListManager', () => {
         },
       };
 
-      const mockedAxios = axios as unknown as jest.Mocked<typeof axios>;
-      const getSpy = jest.spyOn(mockedAxios, 'get');
-
       mockClient.builds.getMultipleBuilds.mockResolvedValue(mockResponse);
 
       const result = await manager.listBuilds({ project: 'MyProject' });
 
       expect(result.metadata.totalCount).toBeUndefined();
-      expect(getSpy).not.toHaveBeenCalled();
+      expect(mockClient.getBuildCount).not.toHaveBeenCalled();
     });
   });
 

@@ -26,6 +26,7 @@ export interface BuildApiLike {
 
 export interface TeamCityClientAdapter {
   builds: BuildApiLike;
+  getBuildCount: (locator?: string) => Promise<AxiosResponse<string>>;
   listBuildArtifacts: (
     buildId: string,
     options?: {
@@ -49,6 +50,7 @@ export interface TeamCityClientAdapter {
 export function createAdapterFromTeamCityAPI(api: TeamCityAPI): TeamCityClientAdapter {
   return {
     builds: api.builds as unknown as BuildApiLike,
+    getBuildCount: (locator) => api.getBuildCount(locator),
     listBuildArtifacts: (buildId, options) => api.listBuildArtifacts(buildId, options),
     downloadArtifactContent: (buildId, artifactPath) =>
       api.downloadBuildArtifact(buildId, artifactPath),

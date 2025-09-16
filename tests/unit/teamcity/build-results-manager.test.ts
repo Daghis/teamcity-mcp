@@ -7,6 +7,7 @@ type MockAdapter = {
     getMultipleBuilds: jest.Mock;
     getBuildProblems: jest.Mock;
   };
+  getBuildCount: jest.Mock;
   listBuildArtifacts: jest.Mock;
   downloadArtifactContent: jest.Mock;
   getBuildStatistics: jest.Mock;
@@ -26,6 +27,7 @@ describe('BuildResultsManager', () => {
         getMultipleBuilds: jest.fn(),
         getBuildProblems: jest.fn(),
       },
+      getBuildCount: jest.fn(),
       listBuildArtifacts: jest.fn().mockResolvedValue({ data: {} }),
       downloadArtifactContent: jest.fn().mockResolvedValue({ data: new ArrayBuffer(0) }),
       getBuildStatistics: jest.fn().mockResolvedValue({ data: { property: [] } }),

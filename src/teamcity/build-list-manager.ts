@@ -1,13 +1,10 @@
 /**
  * BuildListManager - Manages build list queries with pagination and caching
  */
-import axios from 'axios';
-
-import { getTeamCityToken, getTeamCityUrl } from '@/config';
 import { errorLogger } from '@/utils/error-logger';
 
 import { BuildQueryBuilder, type BuildStatus } from './build-query-builder';
-import type { TeamCityClient } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
 
 export interface BuildListParams {
   project?: string;
@@ -59,7 +56,7 @@ interface CacheEntry {
 }
 
 export class BuildListManager {
-  private client: TeamCityClient;
+  private client: TeamCityClientAdapter;
   private cache: Map<string, CacheEntry> = new Map();
   private static readonly cacheTtlMs = 30000; // 30 seconds
   private static readonly defaultLimit = 100;
@@ -67,7 +64,7 @@ export class BuildListManager {
   private static readonly fields =
     'id,buildTypeId,number,status,state,branchName,startDate,finishDate,queuedDate,statusText,href,webUrl';
 
-  constructor(client: TeamCityClient) {
+  constructor(client: TeamCityClientAdapter) {
     this.client = client;
   }
 
@@ -219,25 +216,17 @@ export class BuildListManager {
    */
   private async getTotalCount(locator: string): Promise<number> {
     try {
-      const baseUrl = getTeamCityUrl();
-      const token = getTeamCityToken();
-
       // Remove count and start from locator for total count query
       const countLocator = locator
         .split(',')
         .filter((part) => !part.startsWith('count:') && !part.startsWith('start:'))
         .join(',');
 
-      const url = `${baseUrl}/app/rest/builds/count`;
-      const response = await axios.get(url, {
-        params: countLocator ? { locator: countLocator } : undefined,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'text/plain',
-        },
-      });
+      const response = await this.client.getBuildCount(countLocator || undefined);
+      const rawCount = response.data;
+      const parsedCount = parseInt(typeof rawCount === 'string' ? rawCount : String(rawCount), 10);
 
-      return parseInt(response.data, 10);
+      return Number.isNaN(parsedCount) ? 0 : parsedCount;
     } catch (error: unknown) {
       // Total count is optional, don't fail the main request
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
