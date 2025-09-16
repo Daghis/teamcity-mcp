@@ -91,7 +91,16 @@ describe('tools: availability & queue structured tools', () => {
           const getQueuedBuild = jest.fn(async () => ({ data: { waitReason: 'No agent' } }));
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: {
-              getInstance: () => ({ buildQueue: { getAllQueuedBuilds, getQueuedBuild } }),
+              getInstance: () => ({
+                buildQueue: { getAllQueuedBuilds, getQueuedBuild },
+                builds: {},
+                listBuildArtifacts: jest.fn(),
+                downloadBuildArtifact: jest.fn(),
+                getBuildStatistics: jest.fn(),
+                listChangesForBuild: jest.fn(),
+                listSnapshotDependencies: jest.fn(),
+                getBaseUrl: () => 'https://example.test',
+              }),
             },
           }));
           // eslint-disable-next-line @typescript-eslint/no-var-requires

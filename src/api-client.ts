@@ -2,7 +2,7 @@
  * Simple TeamCity API Client
  * Direct API wrapper without dependency injection or complex abstractions
  */
-import axios, { AxiosInstance } from 'axios';
+import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
 import axiosRetry from 'axios-retry';
 
 import { getTeamCityToken, getTeamCityUrl } from '@/config';
@@ -39,6 +39,7 @@ export class TeamCityAPI {
   private static instance: TeamCityAPI;
   private axiosInstance: AxiosInstance;
   private config: Configuration;
+  private baseUrl: string;
 
   // API instances
   public builds: BuildApi;
@@ -71,6 +72,8 @@ export class TeamCityAPI {
     }
 
     // Create axios instance with basic config and default headers
+    this.baseUrl = basePath;
+
     this.axiosInstance = axios.create({
       baseURL: basePath,
       timeout: 30000,
@@ -193,7 +196,7 @@ export class TeamCityAPI {
   }
 
   async getBuild(buildId: string) {
-    const response = await this.builds.getBuild(buildId);
+    const response = await this.builds.getBuild(this.toBuildLocator(buildId));
     return response.data;
   }
 
@@ -306,6 +309,63 @@ export class TeamCityAPI {
     return response.data;
   }
 
+  async listBuildArtifacts(
+    buildId: string,
+    options?: {
+      basePath?: string;
+      locator?: string;
+      fields?: string;
+      resolveParameters?: boolean;
+      logBuildUsage?: boolean;
+    }
+  ): Promise<AxiosResponse<unknown>> {
+    return this.builds.getFilesListOfBuild(
+      this.toBuildLocator(buildId),
+      options?.basePath,
+      options?.locator,
+      options?.fields,
+      options?.resolveParameters,
+      options?.logBuildUsage
+    );
+  }
+
+  async downloadBuildArtifact(
+    buildId: string,
+    artifactPath: string
+  ): Promise<AxiosResponse<ArrayBuffer>> {
+    const normalizedPath = artifactPath
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+    return this.axiosInstance.get(
+      `/app/rest/builds/id:${buildId}/artifacts/content/${normalizedPath}`,
+      {
+        responseType: 'arraybuffer',
+      }
+    );
+  }
+
+  async getBuildStatistics(buildId: string, fields?: string): Promise<AxiosResponse<unknown>> {
+    return this.builds.getBuildStatisticValues(this.toBuildLocator(buildId), fields);
+  }
+
+  async listChangesForBuild(buildId: string, fields?: string): Promise<AxiosResponse<unknown>> {
+    return this.axiosInstance.get('/app/rest/changes', {
+      params: {
+        locator: `build:(id:${buildId})`,
+        fields,
+      },
+    });
+  }
+
+  async listSnapshotDependencies(buildId: string): Promise<AxiosResponse<unknown>> {
+    return this.axiosInstance.get(`/app/rest/builds/id:${buildId}/snapshot-dependencies`);
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
   async listVcsRoots(projectId?: string) {
     const locator = projectId ? `affectedProject:(id:${projectId})` : undefined;
     const response = await this.vcsRoots.getAllVcsRoots(locator);
@@ -327,5 +387,9 @@ export class TeamCityAPI {
    */
   static reset() {
     this.instance = null as unknown as TeamCityAPI;
+  }
+
+  private toBuildLocator(buildId: string): string {
+    return buildId.includes(':') ? buildId : `id:${buildId}`;
   }
 }

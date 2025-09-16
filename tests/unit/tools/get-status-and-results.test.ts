@@ -25,10 +25,19 @@ describe('tools: enhanced status and results', () => {
     jest.doMock('@/teamcity/build-status-manager', () => ({ BuildStatusManager }));
 
     // Mock TeamCityAPI.getInstance to avoid env dependency
-    jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance: () => ({ builds: {} }) } }));
-    // Re-require tools after mocking the module
-    // Mock TeamCityAPI.getInstance to avoid env dependency
-    jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance: () => ({ builds: {} }) } }));
+    jest.doMock('@/api-client', () => ({
+      TeamCityAPI: {
+        getInstance: () => ({
+          builds: {},
+          listBuildArtifacts: jest.fn(),
+          downloadBuildArtifact: jest.fn(),
+          getBuildStatistics: jest.fn(),
+          listChangesForBuild: jest.fn(),
+          listSnapshotDependencies: jest.fn(),
+          getBaseUrl: () => 'https://example.test',
+        }),
+      },
+    }));
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { getRequiredTool } = require('@/tools');
     const res = await getRequiredTool('get_build_status').handler({

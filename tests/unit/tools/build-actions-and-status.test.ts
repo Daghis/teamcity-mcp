@@ -111,7 +111,19 @@ describe('tools: build actions and status/basic info', () => {
               }
             },
           }));
-          jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance: () => ({}) } }));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                builds: {},
+                listBuildArtifacts: jest.fn(),
+                downloadBuildArtifact: jest.fn(),
+                getBuildStatistics: jest.fn(),
+                listChangesForBuild: jest.fn(),
+                listSnapshotDependencies: jest.fn(),
+                getBaseUrl: () => 'https://example.test',
+              }),
+            },
+          }));
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
           const res = await getRequiredTool('get_build_status').handler({ buildId: 'b9' });

@@ -2,6 +2,7 @@
  * TeamCity integration module
  * Main entry point for TeamCity API operations
  */
+import { TeamCityAPI } from '@/api-client';
 import { info, warn } from '@/utils/logger';
 
 import { TeamCityClient } from './client';
@@ -253,14 +254,6 @@ export async function getBuildTestResults(buildId: number): Promise<{
  * Get build log
  */
 export async function getBuildLog(buildId: number): Promise<string> {
-  const client = getTeamCityClient();
-  // Note: This is a simplified example. The actual API might require different approach
-  await client.builds.getBuild(
-    `id:${buildId}`, // buildLocator
-    'href' // fields
-  );
-
-  // Would need to fetch log from a different endpoint
-  // This is just a placeholder
-  return `Build log for ${buildId}`;
+  const api = TeamCityAPI.getInstance();
+  return api.getBuildLog(String(buildId));
 }

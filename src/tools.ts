@@ -1756,7 +1756,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         async (typed) => {
           const api = TeamCityAPI.getInstance();
           const build = await api.getBuild(typed.buildId);
-          const problems = await api.builds.getBuildProblems(typed.buildId);
+          const problems = await api.builds.getBuildProblems(`id:${typed.buildId}`);
           const failures = await api.listTestFailures(typed.buildId);
           return json({
             buildStatus: build.status,
