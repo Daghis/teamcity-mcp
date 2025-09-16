@@ -30,6 +30,13 @@ Tools must return standardized JSON payloads. Tests should assert:
 - Documented optional flags (e.g., `includeQueueTotals`) affecting response shape.
 - Avoid verifying how API clients are invoked.
 
+## Coverage expectations
+
+- `npm run test:coverage` now instruments the MCP tool registry (`src/tools.ts`) and the core TeamCity managers (build queue/results/status and configuration update). The suite must stay green with these files included.
+- Global thresholds are enforced in `jest.config.js` (lines/functions/statements ≥ 80%, branches ≥ 69%). Branch coverage is temporarily lower while we add more scenarios; prefer improving tests rather than lowering thresholds.
+- When adding new tools or manager logic, extend the closest unit test to keep coverage from regressing. For large gaps, add focused tests before relaxing thresholds.
+- Document any intentional exclusions in code comments or follow-up issues so future contributors can restore coverage.
+
 ### Examples (good)
 
 - “Calling list with `all=true` returns all items and correct pagination metadata.”
@@ -65,4 +72,3 @@ Tools must return standardized JSON payloads. Tests should assert:
 - Link issues/tickets; include logs or CLI output if relevant.
 - Ensure CI is green and `npm run check` passes locally.
 - Use **Squash and merge** so the merge commit inherits the PR’s conventional title.
-
