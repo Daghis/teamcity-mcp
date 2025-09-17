@@ -1,3 +1,6 @@
+import type { AxiosInstance, AxiosResponse, RawAxiosRequestConfig } from 'axios';
+
+import type { TeamCityAPIClientConfig } from '@/api-client';
 import { AgentApi } from '@/teamcity-client/api/agent-api';
 import { AgentPoolApi } from '@/teamcity-client/api/agent-pool-api';
 import { AgentTypeApi } from '@/teamcity-client/api/agent-type-api';
@@ -28,6 +31,7 @@ import { UserApi } from '@/teamcity-client/api/user-api';
 import { VcsRootApi } from '@/teamcity-client/api/vcs-root-api';
 import { VcsRootInstanceApi } from '@/teamcity-client/api/vcs-root-instance-api';
 import { VersionedSettingsApi } from '@/teamcity-client/api/versioned-settings-api';
+import type { TeamCityFullConfig } from '@/teamcity/config';
 
 export interface TeamCityApiSurface {
   agents: AgentApi;
@@ -63,3 +67,66 @@ export interface TeamCityApiSurface {
 }
 
 export type TeamCityApiModuleName = keyof TeamCityApiSurface;
+
+export interface TeamCityRequestContext {
+  axios: AxiosInstance;
+  baseUrl: string;
+  requestId?: string;
+}
+
+export interface TeamCityUnifiedClient {
+  /** Direct access to generated REST API modules. */
+  modules: Readonly<TeamCityApiSurface>;
+  /** Shared axios instance configured with retries/interceptors. */
+  http: AxiosInstance;
+  /** Execute a callback with request context information. */
+  request<T>(fn: (ctx: TeamCityRequestContext) => Promise<T>): Promise<T>;
+  /** Latest full configuration used to initialize the client. */
+  getConfig(): TeamCityFullConfig;
+  /** Normalized API client configuration used by the singleton. */
+  getApiConfig(): TeamCityAPIClientConfig;
+  /** Convenience accessor returning the shared axios instance. */
+  getAxios(): AxiosInstance;
+}
+
+export interface BuildApiLike {
+  getBuild: (
+    buildLocator: string,
+    fields?: string,
+    options?: RawAxiosRequestConfig
+  ) => Promise<AxiosResponse<unknown>>;
+  getMultipleBuilds: (
+    locator: string,
+    fields?: string,
+    options?: RawAxiosRequestConfig
+  ) => Promise<AxiosResponse<unknown>>;
+  getBuildProblems: (
+    buildLocator: string,
+    fields?: string,
+    options?: RawAxiosRequestConfig
+  ) => Promise<AxiosResponse<unknown>>;
+}
+
+export interface TeamCityClientAdapter extends TeamCityUnifiedClient {
+  /** Backwards-compatible helpers expected by existing managers. */
+  builds: BuildApiLike;
+  listBuildArtifacts: (
+    buildId: string,
+    options?: {
+      basePath?: string;
+      locator?: string;
+      fields?: string;
+      resolveParameters?: boolean;
+      logBuildUsage?: boolean;
+    }
+  ) => Promise<AxiosResponse<unknown>>;
+  downloadArtifactContent: (
+    buildId: string,
+    artifactPath: string
+  ) => Promise<AxiosResponse<ArrayBuffer>>;
+  getBuildStatistics: (buildId: string, fields?: string) => Promise<AxiosResponse<unknown>>;
+  listChangesForBuild: (buildId: string, fields?: string) => Promise<AxiosResponse<unknown>>;
+  listSnapshotDependencies: (buildId: string) => Promise<AxiosResponse<unknown>>;
+  /** Canonical base URL of the connected TeamCity server. */
+  baseUrl: string;
+}

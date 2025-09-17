@@ -1,6 +1,7 @@
 /**
  * Configuration module for TeamCity client
  */
+import type { TeamCityAPIClientConfig } from '@/api-client';
 import { getConfig, getTeamCityOptions } from '@/config';
 
 import type { TeamCityClientConfig } from './client';
@@ -136,6 +137,17 @@ export function mergeConfig(...configs: Array<Partial<TeamCityFullConfig>>): Tea
 
 /**
  * Convert full config to client config
+ */
+export function toApiClientConfig(config: TeamCityFullConfig): TeamCityAPIClientConfig {
+  return {
+    baseUrl: config.connection.baseUrl,
+    token: config.connection.token,
+    timeout: config.connection.timeout,
+  };
+}
+
+/**
+ * @deprecated Use toApiClientConfig instead.
  */
 export function toClientConfig(config: TeamCityFullConfig): TeamCityClientConfig {
   return {
