@@ -2,7 +2,7 @@
  * Lightweight adapter so managers can work with the unified TeamCityAPI
  * without depending on the legacy TeamCityClient implementation.
  */
-import type { AxiosInstance } from 'axios';
+import axios, { type AxiosInstance } from 'axios';
 
 import type { TeamCityAPI, TeamCityAPIClientConfig } from '@/api-client';
 import type { TeamCityFullConfig } from '@/teamcity/config';
@@ -72,10 +72,8 @@ export function createAdapterFromTeamCityAPI(
   options: AdapterOptions = {}
 ): TeamCityClientAdapter {
   const modules = resolveModules(api);
-  if (api.http == null) {
-    throw new Error('TeamCityAPI instance missing shared http client');
-  }
-  const httpInstance: AxiosInstance = api.http;
+  const httpInstance: AxiosInstance =
+    api.http ?? axios.create({ baseURL: api.getBaseUrl() });
   const resolvedApiConfig: TeamCityAPIClientConfig = {
     baseUrl: options.apiConfig?.baseUrl ?? api.getBaseUrl(),
     token: options.apiConfig?.token ?? '',
