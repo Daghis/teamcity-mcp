@@ -72,21 +72,23 @@ export function createAdapterFromTeamCityAPI(
   options: AdapterOptions = {}
 ): TeamCityClientAdapter {
   const modules = resolveModules(api);
-  const httpInstance = api.http ?? ({} as AxiosInstance);
+  if (api.http == null) {
+    throw new Error('TeamCityAPI instance missing shared http client');
+  }
+  const httpInstance: AxiosInstance = api.http;
   const resolvedApiConfig: TeamCityAPIClientConfig = {
     baseUrl: options.apiConfig?.baseUrl ?? api.getBaseUrl(),
     token: options.apiConfig?.token ?? '',
     timeout: options.apiConfig?.timeout ?? undefined,
   };
 
-  const resolvedFullConfig: TeamCityFullConfig =
-    options.fullConfig ?? {
-      connection: {
-        baseUrl: resolvedApiConfig.baseUrl,
-        token: resolvedApiConfig.token,
-        timeout: resolvedApiConfig.timeout,
-      },
-    };
+  const resolvedFullConfig: TeamCityFullConfig = options.fullConfig ?? {
+    connection: {
+      baseUrl: resolvedApiConfig.baseUrl,
+      token: resolvedApiConfig.token,
+      timeout: resolvedApiConfig.timeout,
+    },
+  };
 
   const request = async <T>(fn: (ctx: TeamCityRequestContext) => Promise<T>): Promise<T> =>
     fn({ axios: httpInstance, baseUrl: api.getBaseUrl(), requestId: undefined });

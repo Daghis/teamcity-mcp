@@ -5,6 +5,7 @@
 import { TeamCityAPI } from '@/api-client';
 import { info, warn } from '@/utils/logger';
 
+import { type TeamCityClientAdapter, createAdapterFromTeamCityAPI } from './client-adapter';
 import {
   type TeamCityFullConfig,
   loadTeamCityConfig,
@@ -12,7 +13,6 @@ import {
   toApiClientConfig,
   validateConfig,
 } from './config';
-import { createAdapterFromTeamCityAPI, type TeamCityClientAdapter } from './client-adapter';
 
 // Re-export all public types and utilities
 export * from './client';
@@ -140,8 +140,8 @@ export async function getProjectBuilds(projectId: string): Promise<BuildData[]> 
     undefined // fields
   );
   // Map Build[] to BuildData[]
-  const builds = response.data.build ?? [];
-  return builds.map(
+  const buildList = response.data.build ?? [];
+  return buildList.map(
     (build: {
       id?: string | number;
       number?: string | number;
@@ -243,14 +243,14 @@ export async function getBuildTestResults(buildId: number): Promise<{
   const { tests } = client.modules;
   const response = await tests.getAllTestOccurrences(`build:${buildId}`);
 
-  const tests = response.data.testOccurrence ?? [];
-  const failures = tests.filter((t: TestOccurrence) => t.status === 'FAILURE');
+  const occurrences = response.data.testOccurrence ?? [];
+  const failures = occurrences.filter((t: TestOccurrence) => t.status === 'FAILURE');
 
   return {
-    total: tests.length,
-    passed: tests.filter((t: TestOccurrence) => t.status === 'SUCCESS').length,
+    total: occurrences.length,
+    passed: occurrences.filter((t: TestOccurrence) => t.status === 'SUCCESS').length,
     failed: failures.length,
-    ignored: tests.filter((t: TestOccurrence) => t.ignored === true).length,
+    ignored: occurrences.filter((t: TestOccurrence) => t.ignored === true).length,
     failures,
   };
 }

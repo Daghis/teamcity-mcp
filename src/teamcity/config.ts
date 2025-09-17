@@ -1,9 +1,9 @@
 /**
  * Configuration module for TeamCity client
  */
+import type { TeamCityAPIClientConfig } from '@/api-client';
 import { getConfig, getTeamCityOptions } from '@/config';
 
-import type { TeamCityAPIClientConfig } from '@/api-client';
 import type { TeamCityClientConfig } from './client';
 
 export interface TeamCityConnectionConfig {

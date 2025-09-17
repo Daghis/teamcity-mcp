@@ -1,5 +1,8 @@
-import type { TeamCityFullConfig } from '@/teamcity/config';
-import { toApiClientConfig, toClientConfig } from '@/teamcity/config';
+import {
+  toApiClientConfig,
+  toClientConfig,
+  type TeamCityFullConfig,
+} from '@/teamcity/config';
 
 describe('teamcity config helpers', () => {
   const fullConfig: TeamCityFullConfig = {

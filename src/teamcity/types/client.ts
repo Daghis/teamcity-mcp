@@ -1,7 +1,6 @@
 import type { AxiosInstance, AxiosResponse, RawAxiosRequestConfig } from 'axios';
 
 import type { TeamCityAPIClientConfig } from '@/api-client';
-import type { TeamCityFullConfig } from '@/teamcity/config';
 import { AgentApi } from '@/teamcity-client/api/agent-api';
 import { AgentPoolApi } from '@/teamcity-client/api/agent-pool-api';
 import { AgentTypeApi } from '@/teamcity-client/api/agent-type-api';
@@ -32,6 +31,7 @@ import { UserApi } from '@/teamcity-client/api/user-api';
 import { VcsRootApi } from '@/teamcity-client/api/vcs-root-api';
 import { VcsRootInstanceApi } from '@/teamcity-client/api/vcs-root-instance-api';
 import { VersionedSettingsApi } from '@/teamcity-client/api/versioned-settings-api';
+import type { TeamCityFullConfig } from '@/teamcity/config';
 
 export interface TeamCityApiSurface {
   agents: AgentApi;
