@@ -5,17 +5,18 @@
 import { TeamCityAPI } from '@/api-client';
 import { info, warn } from '@/utils/logger';
 
-import { TeamCityClient } from './client';
 import {
   type TeamCityFullConfig,
   loadTeamCityConfig,
   mergeConfig,
-  toClientConfig,
+  toApiClientConfig,
   validateConfig,
 } from './config';
+import { createAdapterFromTeamCityAPI, type TeamCityClientAdapter } from './client-adapter';
 
 // Re-export all public types and utilities
 export * from './client';
+export * from './client-adapter';
 export * from './auth';
 export * from './errors';
 export * from './circuit-breaker';
@@ -28,41 +29,38 @@ export * from '@/teamcity-client/configuration';
 /**
  * Global TeamCity client instance
  */
-let globalClient: TeamCityClient | null = null;
+let globalClient: TeamCityClientAdapter | null = null;
 
 /**
  * Initialize global TeamCity client
  */
 export async function initializeTeamCity(
   config?: Partial<TeamCityFullConfig>
-): Promise<TeamCityClient> {
-  // Load configuration from environment
+): Promise<TeamCityClientAdapter> {
   const envConfig = loadTeamCityConfig();
-
-  // Merge with provided config
   const fullConfig = config ? mergeConfig(envConfig, config) : envConfig;
 
-  // Validate configuration
   const validation = validateConfig(fullConfig);
   if (!validation.isValid) {
     throw new Error(`Invalid TeamCity configuration: ${validation.errors.join(', ')}`);
   }
 
-  // Convert to client config
-  const clientConfig = toClientConfig(fullConfig);
+  const apiConfig = toApiClientConfig(fullConfig);
+  const api = TeamCityAPI.getInstance(apiConfig);
 
-  // Create client
-  globalClient = new TeamCityClient(clientConfig);
+  globalClient = createAdapterFromTeamCityAPI(api, {
+    fullConfig,
+    apiConfig,
+  });
 
-  // Test connection
-  const isConnected = await globalClient.testConnection();
+  const isConnected = await api.testConnection();
   if (!isConnected) {
     warn('Failed to connect to TeamCity server', {
-      baseUrl: clientConfig.baseUrl,
+      baseUrl: apiConfig.baseUrl,
     });
   } else {
     info('Successfully connected to TeamCity server', {
-      baseUrl: clientConfig.baseUrl,
+      baseUrl: apiConfig.baseUrl,
     });
   }
 
@@ -72,7 +70,7 @@ export async function initializeTeamCity(
 /**
  * Get global TeamCity client instance
  */
-export function getTeamCityClient(): TeamCityClient {
+export function getTeamCityClient(): TeamCityClientAdapter {
   if (!globalClient) {
     throw new Error('TeamCity client not initialized. Call initializeTeamCity() first.');
   }
@@ -82,7 +80,7 @@ export function getTeamCityClient(): TeamCityClient {
 /**
  * Create a new TeamCity client instance
  */
-export function createTeamCityClient(config?: Partial<TeamCityFullConfig>): TeamCityClient {
+export function createTeamCityClient(config?: Partial<TeamCityFullConfig>): TeamCityClientAdapter {
   const envConfig = loadTeamCityConfig();
   const fullConfig = config ? mergeConfig(envConfig, config) : envConfig;
 
@@ -91,8 +89,12 @@ export function createTeamCityClient(config?: Partial<TeamCityFullConfig>): Team
     throw new Error(`Invalid TeamCity configuration: ${validation.errors.join(', ')}`);
   }
 
-  const clientConfig = toClientConfig(fullConfig);
-  return new TeamCityClient(clientConfig);
+  const apiConfig = toApiClientConfig(fullConfig);
+  const api = TeamCityAPI.getInstance(apiConfig);
+  return createAdapterFromTeamCityAPI(api, {
+    fullConfig,
+    apiConfig,
+  });
 }
 
 /**
@@ -100,6 +102,7 @@ export function createTeamCityClient(config?: Partial<TeamCityFullConfig>): Team
  */
 export function resetTeamCityClient(): void {
   globalClient = null;
+  TeamCityAPI.reset();
 }
 
 /**
@@ -131,7 +134,8 @@ interface TestOccurrence {
  */
 export async function getProjectBuilds(projectId: string): Promise<BuildData[]> {
   const client = getTeamCityClient();
-  const response = await client.builds.getAllBuilds(
+  const { builds } = client.modules;
+  const response = await builds.getAllBuilds(
     `project:${projectId}`, // locator as string
     undefined // fields
   );
@@ -165,6 +169,7 @@ export async function triggerBuild(
   comment?: string
 ): Promise<BuildData> {
   const client = getTeamCityClient();
+  const { buildQueue } = client.modules;
   const buildRequest = {
     buildType: { id: buildTypeId },
     branchName,
@@ -172,7 +177,7 @@ export async function triggerBuild(
       comment !== undefined && comment !== null && comment !== '' ? { text: comment } : undefined,
   };
 
-  const response = await client.buildQueue.addBuildToQueue(
+  const response = await buildQueue.addBuildToQueue(
     undefined, // moveToTop
     buildRequest // body
   );
@@ -194,7 +199,8 @@ export async function triggerBuild(
  */
 export async function cancelBuild(buildId: number, comment?: string): Promise<void> {
   const client = getTeamCityClient();
-  await client.builds.cancelBuild(
+  const { builds } = client.modules;
+  await builds.cancelBuild(
     `id:${buildId}`, // buildLocator
     undefined, // fields
     { comment: comment ?? 'Cancelled via MCP' } // body
@@ -210,7 +216,8 @@ export async function getBuildStatus(buildId: number): Promise<{
   statusText: string;
 }> {
   const client = getTeamCityClient();
-  const response = await client.builds.getBuild(
+  const { builds } = client.modules;
+  const response = await builds.getBuild(
     `id:${buildId}`, // buildLocator
     'state,status,statusText' // fields
   );
@@ -233,10 +240,8 @@ export async function getBuildTestResults(buildId: number): Promise<{
   failures: TestOccurrence[];
 }> {
   const client = getTeamCityClient();
-  const response = await client.testOccurrences.getAllTestOccurrences(
-    `build:${buildId}`, // locator
-    undefined // fields
-  );
+  const { tests } = client.modules;
+  const response = await tests.getAllTestOccurrences(`build:${buildId}`);
 
   const tests = response.data.testOccurrence ?? [];
   const failures = tests.filter((t: TestOccurrence) => t.status === 'FAILURE');
