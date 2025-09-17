@@ -72,8 +72,7 @@ export function createAdapterFromTeamCityAPI(
   options: AdapterOptions = {}
 ): TeamCityClientAdapter {
   const modules = resolveModules(api);
-  const httpInstance: AxiosInstance =
-    api.http ?? axios.create({ baseURL: api.getBaseUrl() });
+  const httpInstance: AxiosInstance = api.http ?? axios.create({ baseURL: api.getBaseUrl() });
   const resolvedApiConfig: TeamCityAPIClientConfig = {
     baseUrl: options.apiConfig?.baseUrl ?? api.getBaseUrl(),
     token: options.apiConfig?.token ?? '',
