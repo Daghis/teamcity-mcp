@@ -259,6 +259,6 @@ export async function getBuildTestResults(buildId: number): Promise<{
  * Get build log
  */
 export async function getBuildLog(buildId: number): Promise<string> {
-  const api = TeamCityAPI.getInstance();
-  return api.getBuildLog(String(buildId));
+  const client = getTeamCityClient();
+  return client.getBuildLog(String(buildId));
 }

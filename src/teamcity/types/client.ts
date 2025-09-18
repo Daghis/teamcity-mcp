@@ -74,6 +74,13 @@ export interface TeamCityRequestContext {
   requestId?: string;
 }
 
+export interface TeamCityBuildLogChunk {
+  lines: string[];
+  startLine: number;
+  nextStartLine?: number;
+  totalLines?: number;
+}
+
 export interface TeamCityUnifiedClient {
   /** Direct access to generated REST API modules. */
   modules: Readonly<TeamCityApiSurface>;
@@ -108,6 +115,22 @@ export interface BuildApiLike {
 }
 
 export interface TeamCityClientAdapter extends TeamCityUnifiedClient {
+  /** Health check helper to verify connectivity. */
+  testConnection(): Promise<boolean>;
+  /** Convenience helpers mirroring TeamCityAPI methods. */
+  listProjects(locator?: string): Promise<unknown>;
+  getProject(projectId: string): Promise<unknown>;
+  listBuilds(locator?: string): Promise<unknown>;
+  getBuild(buildId: string): Promise<unknown>;
+  triggerBuild(buildTypeId: string, branchName?: string, comment?: string): Promise<unknown>;
+  getBuildLog(buildId: string): Promise<string>;
+  getBuildLogChunk(
+    buildId: string,
+    options?: { startLine?: number; lineCount?: number }
+  ): Promise<TeamCityBuildLogChunk>;
+  listBuildTypes(projectId?: string): Promise<unknown>;
+  getBuildType(buildTypeId: string): Promise<unknown>;
+  listTestFailures(buildId: string): Promise<unknown>;
   /** Backwards-compatible helpers expected by existing managers. */
   builds: BuildApiLike;
   listBuildArtifacts: (
@@ -127,6 +150,9 @@ export interface TeamCityClientAdapter extends TeamCityUnifiedClient {
   getBuildStatistics: (buildId: string, fields?: string) => Promise<AxiosResponse<unknown>>;
   listChangesForBuild: (buildId: string, fields?: string) => Promise<AxiosResponse<unknown>>;
   listSnapshotDependencies: (buildId: string) => Promise<AxiosResponse<unknown>>;
+  listVcsRoots: (projectId?: string) => Promise<unknown>;
+  listAgents: () => Promise<unknown>;
+  listAgentPools: () => Promise<unknown>;
   /** Canonical base URL of the connected TeamCity server. */
   baseUrl: string;
 }

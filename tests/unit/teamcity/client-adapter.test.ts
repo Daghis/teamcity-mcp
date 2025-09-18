@@ -16,11 +16,25 @@ describe('createAdapterFromTeamCityAPI', () => {
   let apiConfig: TeamCityAPIClientConfig;
   let fullConfig: TeamCityFullConfig;
   let apiMock: TeamCityAPI;
+  const testConnection = jest.fn();
+  const listProjects = jest.fn();
+  const getProject = jest.fn();
+  const listBuilds = jest.fn();
+  const getBuild = jest.fn();
+  const triggerBuild = jest.fn();
+  const getBuildLog = jest.fn();
+  const getBuildLogChunk = jest.fn();
   const listBuildArtifacts = jest.fn();
   const downloadBuildArtifact = jest.fn();
   const getBuildStatistics = jest.fn();
   const listChangesForBuild = jest.fn();
   const listSnapshotDependencies = jest.fn();
+  const listBuildTypes = jest.fn();
+  const getBuildType = jest.fn();
+  const listTestFailures = jest.fn();
+  const listVcsRoots = jest.fn();
+  const listAgents = jest.fn();
+  const listAgentPools = jest.fn();
 
   beforeEach(() => {
     http = axios.create();
@@ -81,12 +95,46 @@ describe('createAdapterFromTeamCityAPI', () => {
       modules,
       http,
       getBaseUrl: () => baseUrl,
+      testConnection,
+      listProjects,
+      getProject,
+      listBuilds,
+      getBuild,
+      triggerBuild,
+      getBuildLog,
+      getBuildLogChunk,
+      listBuildTypes,
+      getBuildType,
+      listTestFailures,
       listBuildArtifacts,
       downloadBuildArtifact,
       getBuildStatistics,
       listChangesForBuild,
       listSnapshotDependencies,
+      listVcsRoots,
+      listAgents,
+      listAgentPools,
     } as unknown as TeamCityAPI;
+
+    testConnection.mockReset().mockResolvedValue(true);
+    listProjects.mockReset().mockResolvedValue({ projects: [] });
+    getProject.mockReset().mockResolvedValue({ project: {} });
+    listBuilds.mockReset().mockResolvedValue({ build: [] });
+    getBuild.mockReset().mockResolvedValue({ build: {} });
+    triggerBuild.mockReset().mockResolvedValue({ build: 'queued' });
+    getBuildLog.mockReset().mockResolvedValue('log');
+    getBuildLogChunk.mockReset().mockResolvedValue({ lines: [], startLine: 0 });
+    listBuildTypes.mockReset().mockResolvedValue({ buildType: [] });
+    getBuildType.mockReset().mockResolvedValue({ buildType: {} });
+    listTestFailures.mockReset().mockResolvedValue({ testOccurrence: [] });
+    listBuildArtifacts.mockReset();
+    downloadBuildArtifact.mockReset();
+    getBuildStatistics.mockReset();
+    listChangesForBuild.mockReset();
+    listSnapshotDependencies.mockReset();
+    listVcsRoots.mockReset().mockResolvedValue({ vcsRoot: [] });
+    listAgents.mockReset().mockResolvedValue({ agent: [] });
+    listAgentPools.mockReset().mockResolvedValue({ agentPool: [] });
   });
 
   it('exposes unified surface and configuration helpers', () => {
@@ -118,6 +166,53 @@ describe('createAdapterFromTeamCityAPI', () => {
 
     await adapter.listSnapshotDependencies('42');
     expect(listSnapshotDependencies).toHaveBeenCalledWith('42');
+  });
+
+  it('delegates extended helper methods to the underlying API', async () => {
+    const adapter = createAdapterFromTeamCityAPI(apiMock, { apiConfig, fullConfig });
+
+    await adapter.testConnection();
+    expect(testConnection).toHaveBeenCalledTimes(1);
+
+    await adapter.listProjects('locator');
+    expect(listProjects).toHaveBeenCalledWith('locator');
+
+    await adapter.getProject('PROJECT_ID');
+    expect(getProject).toHaveBeenCalledWith('PROJECT_ID');
+
+    await adapter.listBuilds('buildLocator');
+    expect(listBuilds).toHaveBeenCalledWith('buildLocator');
+
+    await adapter.getBuild('buildId');
+    expect(getBuild).toHaveBeenCalledWith('buildId');
+
+    await adapter.triggerBuild('bt2', 'refs/heads/main', 'comment');
+    expect(triggerBuild).toHaveBeenCalledWith('bt2', 'refs/heads/main', 'comment');
+
+    await adapter.getBuildLog('99');
+    expect(getBuildLog).toHaveBeenCalledWith('99');
+
+    const chunkOptions = { startLine: 10, lineCount: 5 } as const;
+    await adapter.getBuildLogChunk('100', chunkOptions);
+    expect(getBuildLogChunk).toHaveBeenCalledWith('100', chunkOptions);
+
+    await adapter.listBuildTypes('proj');
+    expect(listBuildTypes).toHaveBeenCalledWith('proj');
+
+    await adapter.getBuildType('bt3');
+    expect(getBuildType).toHaveBeenCalledWith('bt3');
+
+    await adapter.listTestFailures('101');
+    expect(listTestFailures).toHaveBeenCalledWith('101');
+
+    await adapter.listVcsRoots('proj');
+    expect(listVcsRoots).toHaveBeenCalledWith('proj');
+
+    await adapter.listAgents();
+    expect(listAgents).toHaveBeenCalledWith();
+
+    await adapter.listAgentPools();
+    expect(listAgentPools).toHaveBeenCalledWith();
   });
 
   it('provides request helper with axios context', async () => {

@@ -72,9 +72,10 @@ export function createAdapterFromTeamCityAPI(
   options: AdapterOptions = {}
 ): TeamCityClientAdapter {
   const modules = resolveModules(api);
-  const httpInstance: AxiosInstance = api.http ?? axios.create({ baseURL: api.getBaseUrl() });
+  const baseUrl = api.getBaseUrl();
+  const httpInstance: AxiosInstance = api.http ?? axios.create({ baseURL: baseUrl });
   const resolvedApiConfig: TeamCityAPIClientConfig = {
-    baseUrl: options.apiConfig?.baseUrl ?? api.getBaseUrl(),
+    baseUrl: options.apiConfig?.baseUrl ?? baseUrl,
     token: options.apiConfig?.token ?? '',
     timeout: options.apiConfig?.timeout ?? undefined,
   };
@@ -88,7 +89,7 @@ export function createAdapterFromTeamCityAPI(
   };
 
   const request = async <T>(fn: (ctx: TeamCityRequestContext) => Promise<T>): Promise<T> =>
-    fn({ axios: httpInstance, baseUrl: api.getBaseUrl(), requestId: undefined });
+    fn({ axios: httpInstance, baseUrl, requestId: undefined });
 
   const buildApi = modules.builds as unknown as BuildApiLike;
 
@@ -99,6 +100,18 @@ export function createAdapterFromTeamCityAPI(
     getConfig: () => resolvedFullConfig,
     getApiConfig: () => resolvedApiConfig,
     getAxios: () => httpInstance,
+    testConnection: () => api.testConnection(),
+    listProjects: (locator) => api.listProjects(locator),
+    getProject: (projectId) => api.getProject(projectId),
+    listBuilds: (locator) => api.listBuilds(locator),
+    getBuild: (buildId) => api.getBuild(buildId),
+    triggerBuild: (buildTypeId, branchName, comment) =>
+      api.triggerBuild(buildTypeId, branchName, comment),
+    getBuildLog: (buildId) => api.getBuildLog(buildId),
+    getBuildLogChunk: (buildId, options) => api.getBuildLogChunk(buildId, options),
+    listBuildTypes: (projectId) => api.listBuildTypes(projectId),
+    getBuildType: (buildTypeId) => api.getBuildType(buildTypeId),
+    listTestFailures: (buildId) => api.listTestFailures(buildId),
     builds: buildApi,
     listBuildArtifacts: (buildId, options) => api.listBuildArtifacts(buildId, options),
     downloadArtifactContent: (buildId, artifactPath) =>
@@ -106,6 +119,9 @@ export function createAdapterFromTeamCityAPI(
     getBuildStatistics: (buildId, fields) => api.getBuildStatistics(buildId, fields),
     listChangesForBuild: (buildId, fields) => api.listChangesForBuild(buildId, fields),
     listSnapshotDependencies: (buildId) => api.listSnapshotDependencies(buildId),
-    baseUrl: api.getBaseUrl(),
+    listVcsRoots: (projectId) => api.listVcsRoots(projectId),
+    listAgents: () => api.listAgents(),
+    listAgentPools: () => api.listAgentPools(),
+    baseUrl,
   };
 }
