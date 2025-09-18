@@ -426,9 +426,7 @@ export class BuildResultsManager {
    */
   private async fetchChanges(buildId: string): Promise<BuildResult['changes']> {
     try {
-      const response = await this.client.modules.changes.getAllChanges(
-        `build:(id:${buildId})`
-      );
+      const response = await this.client.modules.changes.getAllChanges(`build:(id:${buildId})`);
       const changePayload = response.data as { change?: TeamCityChange[] };
       const changes = changePayload.change ?? [];
 
@@ -501,7 +499,10 @@ export class BuildResultsManager {
     return buildId.includes(':') ? buildId : `id:${buildId}`;
   }
 
-  private async downloadArtifactContent(buildId: string, artifactPath: string): Promise<ArrayBuffer> {
+  private async downloadArtifactContent(
+    buildId: string,
+    artifactPath: string
+  ): Promise<ArrayBuffer> {
     const normalizedPath = artifactPath
       .split('/')
       .map((segment) => encodeURIComponent(segment))

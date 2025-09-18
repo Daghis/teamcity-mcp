@@ -37,8 +37,9 @@ const createStubClient = (): StubbedClient => {
     get: jest.fn(),
   } as { get: jest.Mock };
 
-  const request = jest.fn(async (fn: (ctx: { axios: typeof http; baseUrl: string }) => Promise<unknown>) =>
-    fn({ axios: http, baseUrl: BASE_URL })
+  const request = jest.fn(
+    async (fn: (ctx: { axios: typeof http; baseUrl: string }) => Promise<unknown>) =>
+      fn({ axios: http, baseUrl: BASE_URL })
   ) as jest.Mock;
 
   const client = {
@@ -142,7 +143,10 @@ describe('BuildResultsManager', () => {
         },
       });
 
-      const statistics = (await managerInternals.fetchStatistics('12345')) as Record<string, unknown>;
+      const statistics = (await managerInternals.fetchStatistics('12345')) as Record<
+        string,
+        unknown
+      >;
 
       expect(stub.modules.builds.getBuildStatisticValues).toHaveBeenCalledWith('id:12345');
       expect(statistics).toMatchObject({
@@ -166,10 +170,7 @@ describe('BuildResultsManager', () => {
               date: '20250829T120000+0000',
               comment: 'Fix bug',
               files: {
-                file: [
-                  { name: 'src/app.ts', changeType: 'EDITED' },
-                  { name: 'README.md' },
-                ],
+                file: [{ name: 'src/app.ts', changeType: 'EDITED' }, { name: 'README.md' }],
               },
             },
           ],

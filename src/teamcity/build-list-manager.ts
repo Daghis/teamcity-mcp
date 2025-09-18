@@ -1,7 +1,6 @@
 /**
  * BuildListManager - Manages build list queries with pagination and caching
  */
-
 import { errorLogger } from '@/utils/error-logger';
 
 import { BuildQueryBuilder, type BuildStatus } from './build-query-builder';

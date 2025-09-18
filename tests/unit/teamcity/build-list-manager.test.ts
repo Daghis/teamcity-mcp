@@ -24,8 +24,9 @@ const createStubClient = (): StubClient => {
     get: jest.fn(),
   } as { get: jest.Mock };
 
-  const request = jest.fn(async (fn: (ctx: { axios: typeof http; baseUrl: string }) => Promise<unknown>) =>
-    fn({ axios: http, baseUrl: BASE_URL })
+  const request = jest.fn(
+    async (fn: (ctx: { axios: typeof http; baseUrl: string }) => Promise<unknown>) =>
+      fn({ axios: http, baseUrl: BASE_URL })
   ) as jest.Mock;
 
   const client = {
