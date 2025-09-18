@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/Daghis/teamcity-mcp/compare/v1.3.1...v1.3.2) (2025-09-18)
+
+
+### Bug Fixes
+
+* **teamcity:** expose unified adapter surface ([#129](https://github.com/Daghis/teamcity-mcp/issues/129)) ([b0b15e8](https://github.com/Daghis/teamcity-mcp/commit/b0b15e8597d5a79c064388be38c3ffe9c0e1fc09)), closes [#114](https://github.com/Daghis/teamcity-mcp/issues/114)
+
 ## [1.3.1](https://github.com/Daghis/teamcity-mcp/compare/v1.3.0...v1.3.1) (2025-09-16)
 
 
