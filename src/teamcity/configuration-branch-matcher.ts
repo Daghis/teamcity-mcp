@@ -9,7 +9,7 @@ import type { Logger } from 'winston';
 import type { BuildType } from '@/teamcity-client';
 
 import { type BranchSpec, BranchSpecificationParser } from './branch-specification-parser';
-import type { TeamCityClient } from './client';
+import type { TeamCityUnifiedClient } from './types/client';
 
 /**
  * VCS Root information extracted from build configuration
@@ -48,7 +48,7 @@ export class ConfigurationBranchMatcher {
   private parser: BranchSpecificationParser;
 
   constructor(
-    private readonly client: TeamCityClient,
+    private readonly client: TeamCityUnifiedClient,
     private readonly logger: Logger,
     parser?: BranchSpecificationParser
   ) {
@@ -66,7 +66,7 @@ export class ConfigurationBranchMatcher {
       this.logger.debug('Finding configurations for branch', { projectId, branchName });
 
       // Get all build configurations in the project
-      const buildTypesResponse = await this.client.buildTypes.getAllBuildTypes(
+      const buildTypesResponse = await this.client.modules.buildTypes.getAllBuildTypes(
         `project:(id:${projectId})`
       );
 
@@ -85,7 +85,9 @@ export class ConfigurationBranchMatcher {
           }
           // Intentional per-config fetch to evaluate branch specs and VCS roots
           // eslint-disable-next-line no-await-in-loop
-          const fullBuildTypeResponse = await this.client.buildTypes.getBuildType(buildType.id);
+          const fullBuildTypeResponse = await this.client.modules.buildTypes.getBuildType(
+            buildType.id
+          );
           const fullBuildType = fullBuildTypeResponse.data;
 
           // Extract branch specification
@@ -179,7 +181,7 @@ export class ConfigurationBranchMatcher {
       this.logger.debug('Getting branches for configuration', { configId });
 
       // Get full build type details
-      const buildTypeResponse = await this.client.buildTypes.getBuildType(configId);
+      const buildTypeResponse = await this.client.modules.buildTypes.getBuildType(configId);
       const buildType = buildTypeResponse.data;
 
       // Extract branch specification and VCS roots

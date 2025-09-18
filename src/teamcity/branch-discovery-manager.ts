@@ -4,7 +4,7 @@
 import type { VcsRoot } from '@/teamcity-client/models';
 import { debug, error as logError } from '@/utils/logger';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityUnifiedClient } from './types/client';
 
 export interface BranchInfo {
   name: string;
@@ -36,7 +36,7 @@ export interface DiscoveryOptions {
 }
 
 export class BranchDiscoveryManager {
-  constructor(private readonly client: TeamCityClient) {}
+  constructor(private readonly client: TeamCityUnifiedClient) {}
 
   /**
    * Discover branches from build history for a specific build configuration
@@ -79,7 +79,7 @@ export class BranchDiscoveryManager {
       debug(`Discovering branches for buildType: ${buildTypeId} with locator: ${locator}`);
 
       // Query builds from TeamCity
-      const response = await this.client.builds.getMultipleBuilds(locator, fields);
+      const response = await this.client.modules.builds.getMultipleBuilds(locator, fields);
 
       const buildsResponse = response.data;
       const builds = buildsResponse.build ?? [];
@@ -200,7 +200,7 @@ export class BranchDiscoveryManager {
       const locator = `buildType:(id:${buildTypeId}),branch:(name:${branch.name}),count:1`;
       const fields = 'build(id,number,status,startDate,finishDate,webUrl)';
 
-      const response = await this.client.builds.getMultipleBuilds(locator, fields);
+      const response = await this.client.modules.builds.getMultipleBuilds(locator, fields);
 
       const buildsResponse = response.data;
       const builds = buildsResponse.build ?? [];

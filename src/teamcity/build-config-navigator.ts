@@ -4,7 +4,6 @@
  */
 import { debug, error as logError } from '@/utils/logger';
 
-import type { TeamCityClient } from './client';
 import {
   type BuildTypeProperty,
   type BuildTypeVcsRootEntry,
@@ -13,6 +12,7 @@ import {
   isBuildTypesResponse,
   isProjectData,
 } from './types/api-responses';
+import type { TeamCityUnifiedClient } from './types/client';
 
 export interface BuildConfigNavigatorParams {
   projectId?: string;
@@ -90,12 +90,12 @@ interface CacheEntry {
 }
 
 export class BuildConfigNavigator {
-  private client: TeamCityClient;
+  private client: TeamCityUnifiedClient;
   private cache: Map<string, CacheEntry> = new Map();
   private readonly cacheTtlMs = 120000; // 120 seconds
   private readonly maxCacheSize = 100;
 
-  constructor(client: TeamCityClient) {
+  constructor(client: TeamCityUnifiedClient) {
     this.client = client;
   }
 
@@ -120,7 +120,7 @@ export class BuildConfigNavigator {
 
       debug('Fetching build configurations', { locator });
 
-      const response = await this.client.buildTypes.getAllBuildTypes(locator, fields);
+      const response = await this.client.modules.buildTypes.getAllBuildTypes(locator, fields);
 
       if (response.data == null || !isBuildTypesResponse(response.data)) {
         throw new Error('Invalid API response from TeamCity');
@@ -458,7 +458,7 @@ export class BuildConfigNavigator {
    */
   private async extractProjectHierarchy(projectId: string): Promise<ProjectInfo[]> {
     try {
-      const response = await this.client.projects.getProject(
+      const response = await this.client.modules.projects.getProject(
         projectId,
         '$short,parentProject($short)'
       );

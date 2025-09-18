@@ -13,7 +13,11 @@ import {
   type PersonalBuildOptions,
   RequiredParameterError,
 } from '@/teamcity/build-parameters-manager';
-import type { TeamCityClient } from '@/teamcity/client';
+
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
 
 // Mock logger
 const mockLogger: Partial<Logger> = {
@@ -24,15 +28,7 @@ const mockLogger: Partial<Logger> = {
 };
 
 // Mock TeamCity client
-const mockTeamCityClient = {
-  vcsRoots: {
-    getVcsRootBranches: jest.fn(),
-    getVcsRoot: jest.fn(),
-  },
-  builds: {
-    getLatestBuild: jest.fn(),
-  },
-};
+const mockTeamCityClient: MockTeamCityClient = createMockTeamCityClient();
 
 // Helper to wrap response in Axios format
 const wrapResponse = <T>(data: T) => ({ data });
@@ -42,8 +38,9 @@ describe('BuildParametersManager', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTeamCityClient.resetAllMocks();
     manager = new BuildParametersManager({
-      client: mockTeamCityClient as unknown as TeamCityClient,
+      client: mockTeamCityClient,
       logger: mockLogger as unknown as Logger,
     });
   });

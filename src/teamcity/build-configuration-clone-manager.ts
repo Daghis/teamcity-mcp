@@ -5,7 +5,6 @@ import { getTeamCityUrl } from '@/config';
 import type { BuildType } from '@/teamcity-client/models/build-type';
 import { debug, info, error as logError } from '@/utils/logger';
 
-import type { TeamCityClient } from './client';
 import {
   type BuildTypeData,
   type BuildTypeDependency,
@@ -17,6 +16,7 @@ import {
   isBuildTypeData,
   isVcsRootsResponse,
 } from './types/api-responses';
+import type { TeamCityUnifiedClient } from './types/client';
 
 export interface CloneOptions {
   name: string;
@@ -46,9 +46,9 @@ export interface BuildConfiguration {
 }
 
 export class BuildConfigurationCloneManager {
-  private client: TeamCityClient;
+  private client: TeamCityUnifiedClient;
 
-  constructor(client: TeamCityClient) {
+  constructor(client: TeamCityUnifiedClient) {
     this.client = client;
   }
 
@@ -57,7 +57,7 @@ export class BuildConfigurationCloneManager {
    */
   async retrieveConfiguration(configId: string): Promise<BuildConfiguration | null> {
     try {
-      const response = await this.client.buildTypes.getBuildType(
+      const response = await this.client.modules.buildTypes.getBuildType(
         configId,
         '$long,steps($long),triggers($long),features($long),artifact-dependencies($long),snapshot-dependencies($long),parameters($long),vcs-root-entries($long)'
       );
@@ -134,7 +134,7 @@ export class BuildConfigurationCloneManager {
    */
   async validateTargetProject(projectId: string): Promise<{ id: string; name: string } | null> {
     try {
-      const response = await this.client.projects.getProject(projectId, '$short');
+      const response = await this.client.modules.projects.getProject(projectId, '$short');
 
       const id = response.data?.id;
       const name = response.data?.name;
@@ -172,7 +172,7 @@ export class BuildConfigurationCloneManager {
     // Clone the VCS root
     try {
       // Get VCS root details
-      const vcsRootsResponse = await this.client.vcsRoots.getAllVcsRoots(
+      const vcsRootsResponse = await this.client.modules.vcsRoots.getAllVcsRoots(
         `id:${vcsRootId}`,
         '$long,vcsRoot($long,properties($long))'
       );
@@ -202,7 +202,7 @@ export class BuildConfigurationCloneManager {
         properties: sourceVcsRoot.properties,
       };
 
-      const createResponse = await this.client.vcsRoots.addVcsRoot(
+      const createResponse = await this.client.modules.vcsRoots.addVcsRoot(
         undefined,
         clonedVcsRoot as VcsRootData
       );
@@ -361,7 +361,7 @@ export class BuildConfigurationCloneManager {
     }
 
     try {
-      const response = await this.client.buildTypes.createBuildType(
+      const response = await this.client.modules.buildTypes.createBuildType(
         undefined,
         configPayload as unknown as BuildType
       );

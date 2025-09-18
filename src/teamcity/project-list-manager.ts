@@ -3,15 +3,15 @@
  */
 import type { Project } from '@/teamcity-client/models/project';
 import type { Projects } from '@/teamcity-client/models/projects';
-import type { TeamCityClient } from '@/teamcity/client';
+import type { TeamCityUnifiedClient } from '@/teamcity/types/client';
 import type { ProjectInfo, ProjectListParams, ProjectListResult } from '@/types/project';
 
 export type { ProjectListParams, ProjectInfo };
 
 export class ProjectListManager {
-  private client: TeamCityClient;
+  private client: TeamCityUnifiedClient;
 
-  constructor(client: TeamCityClient) {
+  constructor(client: TeamCityUnifiedClient) {
     this.client = client;
   }
 
@@ -39,7 +39,7 @@ export class ProjectListManager {
 
     try {
       // Call TeamCity API
-      const response = await this.client.projects.getAllProjects(
+      const response = await this.client.modules.projects.getAllProjects(
         locator,
         this.buildFieldsString(includeHierarchy)
       );

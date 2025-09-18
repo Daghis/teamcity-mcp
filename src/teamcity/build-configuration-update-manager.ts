@@ -3,7 +3,7 @@
  */
 import { debug, info, error as logError } from '@/utils/logger';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityUnifiedClient } from './types/client';
 
 export interface UpdateOptions {
   name?: string;
@@ -62,9 +62,9 @@ export interface ChangeLog {
 }
 
 export class BuildConfigurationUpdateManager {
-  private client: TeamCityClient;
+  private client: TeamCityUnifiedClient;
 
-  constructor(client: TeamCityClient) {
+  constructor(client: TeamCityUnifiedClient) {
     this.client = client;
   }
 
@@ -73,7 +73,7 @@ export class BuildConfigurationUpdateManager {
    */
   async retrieveConfiguration(configId: string): Promise<BuildConfiguration | null> {
     try {
-      const response = await this.client.buildTypes.getBuildType(
+      const response = await this.client.modules.buildTypes.getBuildType(
         configId,
         '$long,parameters($long),settings($long),agent-requirements($long)'
       );
@@ -342,10 +342,14 @@ export class BuildConfigurationUpdateManager {
       // Update basic fields
       if (updates.name !== undefined || updates.description !== undefined) {
         if (updates.name) {
-          await this.client.buildTypes.setBuildTypeField(currentConfig.id, 'name', updates.name);
+          await this.client.modules.buildTypes.setBuildTypeField(
+            currentConfig.id,
+            'name',
+            updates.name
+          );
         }
         if (updates.description !== undefined) {
-          await this.client.buildTypes.setBuildTypeField(
+          await this.client.modules.buildTypes.setBuildTypeField(
             currentConfig.id,
             'description',
             updates.description ?? ''
@@ -358,7 +362,7 @@ export class BuildConfigurationUpdateManager {
         // Intentional sequential updates: TeamCity API expects ordered single-field updates
         /* eslint-disable no-await-in-loop */
         for (const setting of settings) {
-          await this.client.buildTypes.setBuildTypeField(
+          await this.client.modules.buildTypes.setBuildTypeField(
             currentConfig.id,
             `settings/${setting.name}`,
             setting.value
@@ -373,7 +377,7 @@ export class BuildConfigurationUpdateManager {
         /* eslint-disable no-await-in-loop */
         for (const paramName of updates.removeParameters) {
           try {
-            await this.client.buildTypes.deleteBuildParameterOfBuildType_2(
+            await this.client.modules.buildTypes.deleteBuildParameterOfBuildType_2(
               paramName,
               currentConfig.id
             );
@@ -388,7 +392,7 @@ export class BuildConfigurationUpdateManager {
         // Intentional sequential updates to maintain deterministic order
         /* eslint-disable no-await-in-loop */
         for (const [name, value] of Object.entries(updates.parameters)) {
-          await this.client.buildTypes.setBuildTypeField(
+          await this.client.modules.buildTypes.setBuildTypeField(
             currentConfig.id,
             `parameters/${name}`,
             value

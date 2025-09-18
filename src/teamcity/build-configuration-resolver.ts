@@ -8,7 +8,7 @@ import type { Logger } from 'winston';
 
 import type { BuildType } from '@/teamcity-client';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityUnifiedClient } from './types/client';
 
 /**
  * Resolved build configuration with normalized data
@@ -164,13 +164,13 @@ export class BuildConfigurationCache {
  * Main resolver class
  */
 export class BuildConfigurationResolver {
-  private client: TeamCityClient;
+  private client: TeamCityUnifiedClient;
   private logger: Logger;
   private cache: BuildConfigurationCache;
   private fuzzyMatchThreshold: number;
 
   constructor(config: {
-    client: TeamCityClient;
+    client: TeamCityUnifiedClient;
     logger: Logger;
     cache?: BuildConfigurationCache;
     options?: ResolverOptions;
@@ -197,7 +197,7 @@ export class BuildConfigurationResolver {
     }
 
     try {
-      const response = await this.client.buildTypes.getBuildType(
+      const response = await this.client.modules.buildTypes.getBuildType(
         configurationId,
         'id,name,projectId,projectName,webUrl,description,paused,templateFlag,settings,parameters,vcs-root-entries'
       );
@@ -589,7 +589,7 @@ export class BuildConfigurationResolver {
       // in the current implementation. Skip cache for now.
     }
 
-    const response = await this.client.buildTypes.getAllBuildTypes(
+    const response = await this.client.modules.buildTypes.getAllBuildTypes(
       undefined,
       'buildType(id,name,projectId,projectName,webUrl,description,paused,templateFlag,settings,parameters,vcs-root-entries)'
     );

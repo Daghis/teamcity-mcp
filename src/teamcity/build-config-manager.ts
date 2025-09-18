@@ -8,7 +8,7 @@ import type { Logger } from 'winston';
 
 import type { BuildType, BuildTypes } from '@/teamcity-client';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityUnifiedClient } from './types/client';
 
 /**
  * Build configuration with normalized fields
@@ -83,7 +83,7 @@ export interface PaginatedBuildConfigurations {
  */
 export class BuildConfigManager {
   constructor(
-    private readonly client: TeamCityClient,
+    private readonly client: TeamCityUnifiedClient,
     private readonly logger: Logger
   ) {}
 
@@ -109,7 +109,7 @@ export class BuildConfigManager {
       const locator = this.buildLocator(filters);
 
       // Fetch build types from TeamCity
-      const response = await this.client.buildTypes.getAllBuildTypes(
+      const response = await this.client.modules.buildTypes.getAllBuildTypes(
         locator,
         this.buildFieldsSpec(options.includeDetails)
       );
@@ -174,7 +174,7 @@ export class BuildConfigManager {
   }> {
     try {
       // Get the template itself
-      const templateResponse = await this.client.buildTypes.getBuildType(
+      const templateResponse = await this.client.modules.buildTypes.getBuildType(
         templateId,
         this.buildFieldsSpec(true)
       );
@@ -441,7 +441,7 @@ export class BuildConfigManager {
    */
   private async getSubprojectIds(projectId: string): Promise<string[]> {
     try {
-      const response = await this.client.projects.getAllSubprojectsOrdered(
+      const response = await this.client.modules.projects.getAllSubprojectsOrdered(
         projectId,
         'id,parentProjectId'
       );

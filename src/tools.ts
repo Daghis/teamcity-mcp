@@ -8,7 +8,6 @@ import { getMCPMode as getMCPModeFromConfig } from '@/config';
 import { type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import { BuildConfigurationUpdateManager } from '@/teamcity/build-configuration-update-manager';
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
-import type { TeamCityClient } from '@/teamcity/client';
 import { createAdapterFromTeamCityAPI } from '@/teamcity/client-adapter';
 import { createPaginatedFetcher, fetchAllPages } from '@/teamcity/pagination';
 import { debug } from '@/utils/logger';
@@ -2687,8 +2686,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       // Prefer the richer BuildConfigurationUpdateManager for settings + metadata.
       // Fallback to direct field updates if retrieval is unavailable (e.g., in tests with shallow mocks).
       try {
-        const clientLike = { buildTypes: api.buildTypes } as unknown as TeamCityClient;
-        const manager = new BuildConfigurationUpdateManager(clientLike);
+        const adapter = createAdapterFromTeamCityAPI(api);
+        const manager = new BuildConfigurationUpdateManager(adapter);
 
         const current = await manager.retrieveConfiguration(typedArgs.buildTypeId);
         if (current) {

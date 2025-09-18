@@ -13,6 +13,11 @@ import {
   BuildConfigurationResolver,
 } from '@/teamcity/build-configuration-resolver';
 
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
+
 // Mock logger
 const mockLogger: Partial<Logger> = {
   info: jest.fn(),
@@ -25,20 +30,7 @@ const mockLogger: Partial<Logger> = {
 const wrapResponse = <T>(data: T) => ({ data });
 
 // Mock TeamCity client
-const mockTeamCityClient = {
-  buildTypes: {
-    getAllBuildTypes: jest.fn(),
-    getBuildType: jest.fn(),
-  },
-  projects: {
-    getAllProjects: jest.fn(),
-    getProject: jest.fn(),
-  },
-  vcsRoots: {
-    getAllVcsRoots: jest.fn(),
-    getVcsRoot: jest.fn(),
-  },
-};
+const mockTeamCityClient: MockTeamCityClient = createMockTeamCityClient();
 
 describe('BuildConfigurationResolver', () => {
   let resolver: BuildConfigurationResolver;
@@ -46,9 +38,10 @@ describe('BuildConfigurationResolver', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTeamCityClient.resetAllMocks();
     cache = new BuildConfigurationCache({ ttl: 60000 }); // 1 minute for tests
     resolver = new BuildConfigurationResolver({
-      client: mockTeamCityClient as unknown as import('@/teamcity/client').TeamCityClient,
+      client: mockTeamCityClient,
       logger: mockLogger as unknown as Logger,
       cache,
       options: {
@@ -437,25 +430,13 @@ describe('BuildConfigurationResolver', () => {
   describe('Caching', () => {
     it('should cache successful resolutions', async () => {
       // Create a completely fresh client mock to avoid cross-test contamination
-      const freshMockClient = {
-        buildTypes: {
-          getAllBuildTypes: jest.fn(),
-          getBuildType: jest.fn(),
-        },
-        projects: {
-          getAllProjects: jest.fn(),
-          getProject: jest.fn(),
-        },
-        vcsRoots: {
-          getAllVcsRoots: jest.fn(),
-          getVcsRoot: jest.fn(),
-        },
-      };
+      const freshMockClient = createMockTeamCityClient();
+      freshMockClient.resetAllMocks();
 
       // Create a completely fresh resolver to avoid cross-test contamination
       const testCache = new BuildConfigurationCache({ ttl: 60000 });
       const testResolver = new BuildConfigurationResolver({
-        client: freshMockClient as unknown as import('@/teamcity/client').TeamCityClient,
+        client: freshMockClient,
         logger: mockLogger as unknown as Logger,
         cache: testCache,
         options: {
@@ -516,7 +497,7 @@ describe('BuildConfigurationResolver', () => {
       });
 
       const smallResolver = new BuildConfigurationResolver({
-        client: mockTeamCityClient as unknown as import('@/teamcity/client').TeamCityClient,
+        client: mockTeamCityClient,
         logger: mockLogger as unknown as Logger,
         cache: smallCache,
       });
