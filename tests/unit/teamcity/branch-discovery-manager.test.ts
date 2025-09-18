@@ -4,34 +4,23 @@
 import type { Build } from '@/teamcity-client/models';
 import { BranchDiscoveryManager, type BranchInfo } from '@/teamcity/branch-discovery-manager';
 
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
+
 describe('BranchDiscoveryManager', () => {
   let manager: BranchDiscoveryManager;
-  type MockClient = {
-    builds: { getMultipleBuilds: jest.Mock };
-    buildTypes: { getBuildType: jest.Mock };
-    vcsRoots: { getVcsRoot: jest.Mock };
-  };
-  let mockClient: MockClient;
+  let mockClient: MockTeamCityClient;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
     // Create mock TeamCity client
-    mockClient = {
-      builds: {
-        getMultipleBuilds: jest.fn(),
-      },
-      buildTypes: {
-        getBuildType: jest.fn(),
-      },
-      vcsRoots: {
-        getVcsRoot: jest.fn(),
-      },
-    };
+    mockClient = createMockTeamCityClient();
+    mockClient.resetAllMocks();
 
-    manager = new BranchDiscoveryManager(
-      mockClient as unknown as import('@/teamcity/client').TeamCityClient
-    );
+    manager = new BranchDiscoveryManager(mockClient);
   });
 
   describe('discoverBranchesFromHistory', () => {

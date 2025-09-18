@@ -8,7 +8,7 @@ import type { Logger } from 'winston';
 
 import type { Project, Projects } from '@/teamcity-client';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityUnifiedClient } from './types/client';
 
 /**
  * Managed project with normalized fields
@@ -85,7 +85,7 @@ export class ProjectManager {
   private projectCache: Map<string, ManagedProject> = new Map();
 
   constructor(
-    private readonly client: TeamCityClient,
+    private readonly client: TeamCityUnifiedClient,
     private readonly logger: Logger
   ) {}
 
@@ -112,7 +112,7 @@ export class ProjectManager {
       const locator = this.buildLocator(filters);
 
       // Fetch projects
-      const response = await this.client.projects.getAllProjects(
+      const response = await this.client.modules.projects.getAllProjects(
         locator,
         this.buildFieldsSpec(includeStatistics)
       );
@@ -207,7 +207,10 @@ export class ProjectManager {
     }
 
     try {
-      const response = await this.client.projects.getProject(projectId, this.buildFieldsSpec(true));
+      const response = await this.client.modules.projects.getProject(
+        projectId,
+        this.buildFieldsSpec(true)
+      );
 
       const project = this.normalizeProject(response.data);
       this.projectCache.set(projectId, project);
@@ -250,7 +253,7 @@ export class ProjectManager {
 
     if (level < maxDepth) {
       // Get subprojects
-      const subprojectsResponse = await this.client.projects.getAllSubprojectsOrdered(
+      const subprojectsResponse = await this.client.modules.projects.getAllSubprojectsOrdered(
         projectId,
         'id,name'
       );
@@ -292,7 +295,7 @@ export class ProjectManager {
 
     visited.add(projectId);
 
-    const subprojectsResponse = await this.client.projects.getAllSubprojectsOrdered(
+    const subprojectsResponse = await this.client.modules.projects.getAllSubprojectsOrdered(
       projectId,
       this.buildFieldsSpec(false)
     );

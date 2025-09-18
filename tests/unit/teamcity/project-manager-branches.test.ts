@@ -3,6 +3,11 @@ import type { Logger } from 'winston';
 import type { Project } from '@/teamcity-client/models';
 import { type ManagedProject, ProjectManager } from '@/teamcity/project-manager';
 
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
+
 const logger: Logger = { error: jest.fn() } as unknown as Logger;
 
 const makeClient = (
@@ -17,17 +22,31 @@ const makeClient = (
       fields?: string
     ) => Promise<{ data: { project: Project[] } }>;
   }>
-) => {
-  return {
-    projects: {
-      getAllProjects: impl.getAllProjects ?? (async () => ({ data: { project: [] } })),
-      getProject:
-        impl.getProject ??
-        (async (id: string) => ({ data: { id, name: id } as unknown as Project })),
-      getAllSubprojectsOrdered:
-        impl.getAllSubprojectsOrdered ?? (async () => ({ data: { project: [] } })),
-    },
-  } as unknown as import('@/teamcity/client').TeamCityClient;
+): MockTeamCityClient => {
+  const client = createMockTeamCityClient();
+  client.resetAllMocks();
+
+  if (impl.getAllProjects) {
+    client.projects.getAllProjects.mockImplementation(impl.getAllProjects);
+  } else {
+    client.projects.getAllProjects.mockResolvedValue({ data: { project: [] } });
+  }
+
+  if (impl.getProject) {
+    client.projects.getProject.mockImplementation(impl.getProject);
+  } else {
+    client.projects.getProject.mockImplementation(async (id: string) => ({
+      data: { id, name: id } as unknown as Project,
+    }));
+  }
+
+  if (impl.getAllSubprojectsOrdered) {
+    client.projects.getAllSubprojectsOrdered.mockImplementation(impl.getAllSubprojectsOrdered);
+  } else {
+    client.projects.getAllSubprojectsOrdered.mockResolvedValue({ data: { project: [] } });
+  }
+
+  return client;
 };
 
 describe('ProjectManager branch coverage boosters', () => {

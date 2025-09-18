@@ -7,7 +7,7 @@
 import type { Logger } from 'winston';
 
 import type { ResolvedBuildConfiguration } from './build-configuration-resolver';
-import type { TeamCityClient } from './client';
+import type { TeamCityUnifiedClient } from './types/client';
 
 /**
  * Parameter types in TeamCity
@@ -213,10 +213,10 @@ export class ParameterSet {
  * Main manager class
  */
 export class BuildParametersManager {
-  private client: TeamCityClient;
+  private client: TeamCityUnifiedClient;
   private logger: Logger;
 
-  constructor(config: { client: TeamCityClient; logger: Logger }) {
+  constructor(config: { client: TeamCityUnifiedClient; logger: Logger }) {
     this.client = config.client;
     this.logger = config.logger;
   }

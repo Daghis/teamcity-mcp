@@ -2,17 +2,15 @@ import {
   type BuildConfiguration,
   BuildConfigurationUpdateManager,
 } from '@/teamcity/build-configuration-update-manager';
-import type { TeamCityClient } from '@/teamcity/client';
+
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
 
 describe('BuildConfigurationUpdateManager', () => {
   let manager: BuildConfigurationUpdateManager;
-  let mockClient: {
-    buildTypes: {
-      getBuildType: jest.Mock;
-      setBuildTypeField: jest.Mock;
-      deleteBuildParameterOfBuildType_2: jest.Mock;
-    };
-  };
+  let mockClient: MockTeamCityClient;
 
   const baseConfig: BuildConfiguration = {
     id: 'cfg1',
@@ -38,17 +36,13 @@ describe('BuildConfigurationUpdateManager', () => {
     },
   };
 
-  const createManager = () =>
-    new BuildConfigurationUpdateManager(mockClient as unknown as TeamCityClient);
+  const createManager = () => new BuildConfigurationUpdateManager(mockClient);
 
   beforeEach(() => {
-    mockClient = {
-      buildTypes: {
-        getBuildType: jest.fn(),
-        setBuildTypeField: jest.fn().mockResolvedValue(undefined),
-        deleteBuildParameterOfBuildType_2: jest.fn().mockResolvedValue(undefined),
-      },
-    };
+    mockClient = createMockTeamCityClient();
+    mockClient.resetAllMocks();
+    mockClient.buildTypes.setBuildTypeField.mockResolvedValue(undefined);
+    mockClient.buildTypes.deleteBuildParameterOfBuildType_2.mockResolvedValue(undefined);
 
     manager = createManager();
   });

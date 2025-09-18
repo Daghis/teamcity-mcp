@@ -4,19 +4,15 @@ import {
   BuildConfigManager,
   type ManagedBuildConfiguration,
 } from '@/teamcity/build-config-manager';
-import type { TeamCityClient } from '@/teamcity/client';
+
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
 
 describe('BuildConfigManager', () => {
   let manager: BuildConfigManager;
-  let mockClient: {
-    buildTypes: {
-      getAllBuildTypes: jest.Mock;
-      getBuildType: jest.Mock;
-    };
-    projects: {
-      getAllSubprojectsOrdered: jest.Mock;
-    };
-  };
+  let mockClient: MockTeamCityClient;
   let logger: Logger;
 
   const createBuildType = (overrides: Record<string, unknown> = {}) => ({
@@ -50,15 +46,8 @@ describe('BuildConfigManager', () => {
   });
 
   beforeEach(() => {
-    mockClient = {
-      buildTypes: {
-        getAllBuildTypes: jest.fn(),
-        getBuildType: jest.fn(),
-      },
-      projects: {
-        getAllSubprojectsOrdered: jest.fn(),
-      },
-    };
+    mockClient = createMockTeamCityClient();
+    mockClient.resetAllMocks();
 
     logger = {
       error: jest.fn(),
@@ -81,7 +70,7 @@ describe('BuildConfigManager', () => {
       query: jest.fn(),
     } as unknown as Logger;
 
-    manager = new BuildConfigManager(mockClient as unknown as TeamCityClient, logger);
+    manager = new BuildConfigManager(mockClient, logger);
   });
 
   it('lists configurations with filtering, sorting, and pagination', async () => {

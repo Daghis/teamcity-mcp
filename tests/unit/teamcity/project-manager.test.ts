@@ -3,6 +3,11 @@ import type { Logger } from 'winston';
 import type { Project, Projects } from '@/teamcity-client/models';
 import { ProjectManager } from '@/teamcity/project-manager';
 
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
+
 describe('ProjectManager', () => {
   const logger: Logger = { error: jest.fn() } as unknown as Logger;
 
@@ -12,18 +17,33 @@ describe('ProjectManager', () => {
       getProject: (id: string, fields?: string) => Promise<{ data: Project }>;
       getAllSubprojectsOrdered: (id: string, fields?: string) => Promise<{ data: Projects }>;
     }>
-  ) => {
-    return {
-      projects: {
-        getAllProjects:
-          impl.getAllProjects ?? (async () => ({ data: { project: [] } as Projects })),
-        getProject:
-          impl.getProject ??
-          (async (id: string) => ({ data: { id, name: id } as unknown as Project })),
-        getAllSubprojectsOrdered:
-          impl.getAllSubprojectsOrdered ?? (async () => ({ data: { project: [] } as Projects })),
-      },
-    } as unknown as import('@/teamcity/client').TeamCityClient;
+  ): MockTeamCityClient => {
+    const client = createMockTeamCityClient();
+    client.resetAllMocks();
+
+    if (impl.getAllProjects) {
+      client.projects.getAllProjects.mockImplementation(impl.getAllProjects);
+    } else {
+      client.projects.getAllProjects.mockResolvedValue({ data: { project: [] } as Projects });
+    }
+
+    if (impl.getProject) {
+      client.projects.getProject.mockImplementation(impl.getProject);
+    } else {
+      client.projects.getProject.mockImplementation(async (id: string) => ({
+        data: { id, name: id } as unknown as Project,
+      }));
+    }
+
+    if (impl.getAllSubprojectsOrdered) {
+      client.projects.getAllSubprojectsOrdered.mockImplementation(impl.getAllSubprojectsOrdered);
+    } else {
+      client.projects.getAllSubprojectsOrdered.mockResolvedValue({
+        data: { project: [] } as Projects,
+      });
+    }
+
+    return client;
   };
 
   it('lists, filters, sorts and paginates projects', async () => {
