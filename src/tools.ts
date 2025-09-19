@@ -7,6 +7,7 @@ import { z } from 'zod';
 
 import { getMCPMode as getMCPModeFromConfig } from '@/config';
 import { type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
+import type { Step } from '@/teamcity-client/models/step';
 import { BuildConfigurationUpdateManager } from '@/teamcity/build-configuration-update-manager';
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
 import { createAdapterFromTeamCityAPI } from '@/teamcity/client-adapter';
@@ -3179,17 +3180,49 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
               error: 'Step ID is required for update action',
             });
           }
-          const props = Object.entries(typedArgs.properties ?? {});
-          for (const [k, v] of props) {
-            // eslint-disable-next-line no-await-in-loop
-            await adapter.modules.buildTypes.setBuildStepParameter(
-              typedArgs.buildTypeId,
-              typedArgs.stepId,
-              k,
-              String(v),
-              { headers: { 'Content-Type': 'text/plain', Accept: 'application/json' } }
-            );
+
+          const updatePayload: Record<string, unknown> = {};
+
+          if (typedArgs.name != null) {
+            updatePayload['name'] = typedArgs.name;
           }
+
+          if (typedArgs.type != null) {
+            updatePayload['type'] = typedArgs.type;
+          }
+
+          const rawProps = typedArgs.properties ?? {};
+          const stepProps: Record<string, string> = Object.fromEntries(
+            Object.entries(rawProps).map(([k, v]) => [k, String(v)])
+          );
+
+          if (stepProps['script.content']) {
+            // Ensure simple runners keep custom script flags when updating script content
+            stepProps['use.custom.script'] = stepProps['use.custom.script'] ?? 'true';
+            stepProps['script.type'] = stepProps['script.type'] ?? 'customScript';
+          }
+
+          if (Object.keys(stepProps).length > 0) {
+            updatePayload['properties'] = {
+              property: Object.entries(stepProps).map(([name, value]) => ({ name, value })),
+            };
+          }
+
+          if (Object.keys(updatePayload).length === 0) {
+            return json({
+              success: false,
+              action: 'update_build_step',
+              error: 'No update fields provided',
+            });
+          }
+
+          await adapter.modules.buildTypes.replaceBuildStep(
+            typedArgs.buildTypeId,
+            typedArgs.stepId,
+            undefined,
+            updatePayload as Step
+          );
+
           return json({
             success: true,
             action: 'update_build_step',

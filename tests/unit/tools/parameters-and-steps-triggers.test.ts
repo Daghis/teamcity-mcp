@@ -74,12 +74,12 @@ describe('tools: parameters, steps, triggers', () => {
       jest.isolateModules(() => {
         (async () => {
           const addBuildStepToBuildType = jest.fn(async () => ({}));
-          const setBuildStepParameter = jest.fn(async () => ({}));
+          const replaceBuildStep = jest.fn(async () => ({}));
           const deleteBuildStep = jest.fn(async () => ({}));
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: {
               getInstance: () => ({
-                buildTypes: { addBuildStepToBuildType, setBuildStepParameter, deleteBuildStep },
+                buildTypes: { addBuildStepToBuildType, replaceBuildStep, deleteBuildStep },
               }),
             },
           }));
@@ -112,6 +112,43 @@ describe('tools: parameters, steps, triggers', () => {
             buildTypeId: 'bt',
             stepId: 'S1',
           });
+          expect(replaceBuildStep).toHaveBeenCalledWith(
+            'bt',
+            'S1',
+            undefined,
+            expect.objectContaining({
+              properties: {
+                property: expect.arrayContaining([
+                  { name: 'a', value: '1' },
+                  { name: 'b', value: '2' },
+                ]),
+              },
+            })
+          );
+
+          replaceBuildStep.mockClear();
+
+          await getRequiredTool('manage_build_steps').handler({
+            buildTypeId: 'bt',
+            action: 'update',
+            stepId: 'S2',
+            properties: { 'script.content': 'echo hi' },
+          });
+
+          expect(replaceBuildStep).toHaveBeenCalledWith(
+            'bt',
+            'S2',
+            undefined,
+            expect.objectContaining({
+              properties: {
+                property: expect.arrayContaining([
+                  { name: 'script.content', value: 'echo hi' },
+                  { name: 'use.custom.script', value: 'true' },
+                  { name: 'script.type', value: 'customScript' },
+                ]),
+              },
+            })
+          );
 
           res = await getRequiredTool('manage_build_steps').handler({
             buildTypeId: 'bt',
