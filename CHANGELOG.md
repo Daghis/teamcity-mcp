@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.4](https://github.com/Daghis/teamcity-mcp/compare/v1.3.3...v1.3.4) (2025-09-19)
+
+
+### Bug Fixes
+
+* **tools:** migrate MCP handlers to unified client ([#141](https://github.com/Daghis/teamcity-mcp/issues/141)) ([bc3a909](https://github.com/Daghis/teamcity-mcp/commit/bc3a909f6eb8c30798865c8b48604aca5405efc8))
+
 ## [1.3.3](https://github.com/Daghis/teamcity-mcp/compare/v1.3.2...v1.3.3) (2025-09-19)
 
 
