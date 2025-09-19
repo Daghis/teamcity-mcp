@@ -12,6 +12,19 @@ import { randomUUID } from 'crypto';
 import { TeamCityAPIError } from '@/teamcity/errors';
 import { info, error as logError } from '@/utils/logger';
 
+interface TimingMetaContainer {
+  _tcMeta?: {
+    start: number;
+  };
+}
+
+const asTimingMetaContainer = (value: unknown): TimingMetaContainer | null => {
+  if (typeof value === 'object' && value !== null) {
+    return value as TimingMetaContainer;
+  }
+  return null;
+};
+
 /**
  * Generate a unique request ID for tracing
  */
@@ -33,7 +46,10 @@ export function addRequestId(config: InternalAxiosRequestConfig): InternalAxiosR
   configWithId.requestId = requestId;
 
   // Attach timing metadata
-  (config as unknown as { _tcMeta?: { start: number } })._tcMeta = { start: Date.now() };
+  const metaContainer = asTimingMetaContainer(config);
+  if (metaContainer) {
+    metaContainer._tcMeta = { start: Date.now() };
+  }
 
   // Log the request with ID
   info('Starting TeamCity API request', {
@@ -106,7 +122,7 @@ export function extractErrorDetails(error: AxiosError): TeamCityAPIErrorData {
  */
 export function logResponse(response: AxiosResponse): AxiosResponse {
   const requestId = (response.config as AxiosRequestConfig & { requestId?: string })?.requestId;
-  const meta = (response.config as unknown as { _tcMeta?: { start: number } })._tcMeta;
+  const meta = asTimingMetaContainer(response.config)?._tcMeta;
   // Prefer server-provided response time header when available
   const headers = response.headers as Record<string, string | undefined> | undefined;
   const headerDuration = headers?.['x-response-time'] ?? headers?.['x-response-duration'];
@@ -131,7 +147,7 @@ export function logAndTransformError(error: AxiosError): Promise<never> {
   // see an Error subclass (not a plain object)
   const requestId = (error.config as AxiosRequestConfig & { requestId?: string })?.requestId;
   const tcError = TeamCityAPIError.fromAxiosError(error, requestId);
-  const meta = (error.config as unknown as { _tcMeta?: { start: number } })?._tcMeta;
+  const meta = asTimingMetaContainer(error.config)?._tcMeta;
   const duration = meta?.start ? Date.now() - meta.start : undefined;
 
   // Basic redaction/sanitization for logs

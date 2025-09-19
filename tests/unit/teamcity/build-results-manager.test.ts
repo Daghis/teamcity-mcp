@@ -9,6 +9,7 @@ type StubbedModules = {
     getFilesListOfBuild: jest.Mock;
     getBuildStatisticValues: jest.Mock;
     getAllBuilds: jest.Mock;
+    downloadFileOfBuild: jest.Mock;
   };
   changes: {
     getAllChanges: jest.Mock;
@@ -29,6 +30,7 @@ const createStubClient = (): StubbedClient => {
       getFilesListOfBuild: jest.fn(),
       getBuildStatisticValues: jest.fn(),
       getAllBuilds: jest.fn(),
+      downloadFileOfBuild: jest.fn(),
     },
     changes: {
       getAllChanges: jest.fn(),
@@ -128,6 +130,39 @@ describe('BuildResultsManager', () => {
       expect(stub.modules.builds.getFilesListOfBuild).toHaveBeenCalledWith('id:12345');
       expect(artifacts).toHaveLength(2);
       expect(artifacts?.[0]?.downloadUrl).toContain('/artifacts/content/target/app.jar');
+    });
+
+    it('downloads artifact contents when requested and within size limits', async () => {
+      const arrayBuffer = new Uint8Array([0xde, 0xad, 0xbe, 0xef]).buffer;
+
+      stub.modules.builds.getFilesListOfBuild.mockResolvedValue({
+        data: {
+          file: [
+            {
+              name: 'log.txt',
+              fullName: 'logs/log.txt',
+              size: 4,
+              modificationTime: '20250829T121400+0000',
+            },
+          ],
+        },
+      });
+
+      stub.modules.builds.downloadFileOfBuild.mockResolvedValue({ data: arrayBuffer });
+
+      const artifacts = (await managerInternals.fetchArtifacts('12345', {
+        downloadArtifacts: ['log.txt'],
+        maxArtifactSize: 10,
+      })) as Array<{ content?: string }>;
+
+      expect(stub.modules.builds.downloadFileOfBuild).toHaveBeenCalledWith(
+        'content/logs/log.txt',
+        'id:12345',
+        undefined,
+        undefined,
+        { responseType: 'arraybuffer' }
+      );
+      expect(artifacts?.[0]?.content).toBe(Buffer.from(arrayBuffer).toString('base64'));
     });
   });
 

@@ -279,8 +279,208 @@ export interface TeamCityErrorResponse {
 /**
  * Type guards for safe type checking
  */
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const isOptionalString = (value: unknown): value is string | undefined => {
+  return value === undefined || typeof value === 'string';
+};
+
 export const isTeamCityErrorResponse = (response: unknown): response is TeamCityErrorResponse => {
-  return typeof response === 'object' && response !== null && 'message' in response;
+  return isRecord(response) && 'message' in response;
+};
+
+export const isTeamCityProperty = (value: unknown): value is TeamCityProperty => {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const {
+    name,
+    value: propertyValue,
+    inherited,
+    type,
+  } = value as {
+    name?: unknown;
+    value?: unknown;
+    inherited?: unknown;
+    type?: unknown;
+  };
+
+  if (typeof name !== 'string' || typeof propertyValue !== 'string') {
+    return false;
+  }
+
+  if (inherited !== undefined && typeof inherited !== 'boolean') {
+    return false;
+  }
+
+  if (type !== undefined && !isRecord(type)) {
+    return false;
+  }
+
+  return true;
+};
+
+export const isTeamCityProperties = (value: unknown): value is TeamCityProperties => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const { count, property } = value as { count?: unknown; property?: unknown };
+
+  if (count !== undefined && typeof count !== 'number') {
+    return false;
+  }
+
+  if (property === undefined) {
+    return true;
+  }
+
+  if (Array.isArray(property)) {
+    return property.every(isTeamCityProperty);
+  }
+
+  return isTeamCityProperty(property);
+};
+
+export const isTeamCityTriggerResponse = (value: unknown): value is TeamCityTriggerResponse => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const { id, type, disabled, inherited, properties } = value as {
+    id?: unknown;
+    type?: unknown;
+    disabled?: unknown;
+    inherited?: unknown;
+    properties?: unknown;
+  };
+
+  if (!isOptionalString(id) || !isOptionalString(type)) {
+    return false;
+  }
+
+  if (typeof type !== 'string') {
+    return false;
+  }
+
+  if (disabled !== undefined && typeof disabled !== 'boolean') {
+    return false;
+  }
+
+  if (inherited !== undefined && typeof inherited !== 'boolean') {
+    return false;
+  }
+
+  if (properties !== undefined && !isTeamCityProperties(properties)) {
+    return false;
+  }
+
+  return true;
+};
+
+export const isTeamCityTriggersResponse = (value: unknown): value is TeamCityTriggersResponse => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const { count, trigger } = value as { count?: unknown; trigger?: unknown };
+
+  if (count !== undefined && typeof count !== 'number') {
+    return false;
+  }
+
+  if (trigger === undefined) {
+    return true;
+  }
+
+  if (Array.isArray(trigger)) {
+    return trigger.every(isTeamCityTriggerResponse);
+  }
+
+  return isTeamCityTriggerResponse(trigger);
+};
+
+const isTeamCityVcsRoot = (value: unknown): value is TeamCityVcsRootEntry['vcs-root'] => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const { id, name, properties } = value as { id?: unknown; name?: unknown; properties?: unknown };
+
+  if (!isOptionalString(id) || !isOptionalString(name)) {
+    return false;
+  }
+
+  if (properties !== undefined && !isTeamCityProperties(properties)) {
+    return false;
+  }
+
+  return true;
+};
+
+export const isTeamCityVcsRootEntry = (value: unknown): value is TeamCityVcsRootEntry => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const {
+    id,
+    inherited,
+    'checkout-rules': checkoutRules,
+    'vcs-root': vcsRoot,
+  } = value as {
+    id?: unknown;
+    inherited?: unknown;
+    'checkout-rules'?: unknown;
+    'vcs-root'?: unknown;
+  };
+
+  if (!isOptionalString(id)) {
+    return false;
+  }
+
+  if (inherited !== undefined && typeof inherited !== 'boolean') {
+    return false;
+  }
+
+  if (!isOptionalString(checkoutRules)) {
+    return false;
+  }
+
+  if (vcsRoot !== undefined && !isTeamCityVcsRoot(vcsRoot)) {
+    return false;
+  }
+
+  return true;
+};
+
+export const isTeamCityVcsRootEntriesResponse = (
+  value: unknown
+): value is TeamCityVcsRootEntriesResponse => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const { count, 'vcs-root-entry': entries } = value as {
+    count?: unknown;
+    'vcs-root-entry'?: unknown;
+  };
+
+  if (count !== undefined && typeof count !== 'number') {
+    return false;
+  }
+
+  if (entries === undefined) {
+    return true;
+  }
+
+  if (Array.isArray(entries)) {
+    return entries.every(isTeamCityVcsRootEntry);
+  }
+
+  return isTeamCityVcsRootEntry(entries);
 };
 
 export const isPropertyArray = (

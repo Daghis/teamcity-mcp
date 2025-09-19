@@ -7,7 +7,9 @@ import {
   type TeamCityErrorResponse,
   type TeamCityTriggerResponse,
   type TeamCityTriggersResponse,
-  type TeamCityVcsRootEntriesResponse,
+  isTeamCityTriggerResponse,
+  isTeamCityTriggersResponse,
+  isTeamCityVcsRootEntriesResponse,
   normalizeProperties,
   normalizeTriggers,
   normalizeVcsRootEntries,
@@ -169,7 +171,18 @@ export class BuildTriggerManager {
 
       const response = await this.client.modules.buildTypes.getAllTriggers(configId, fields);
 
-      const triggers = this.parseTriggerList(response.data as unknown as TeamCityTriggersResponse);
+      if (!isTeamCityTriggersResponse(response.data)) {
+        throw new TeamCityAPIError(
+          'Unexpected triggers response shape',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            configId,
+          }
+        );
+      }
+
+      const triggers = this.parseTriggerList(response.data);
 
       return {
         success: true,
@@ -232,7 +245,19 @@ export class BuildTriggerManager {
         triggerData
       );
 
-      const trigger = this.parseTrigger(response.data as unknown as TeamCityTriggerResponse);
+      if (!isTeamCityTriggerResponse(response.data)) {
+        throw new TeamCityAPIError(
+          'Unexpected trigger response shape',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            configId,
+            type,
+          }
+        );
+      }
+
+      const trigger = this.parseTrigger(response.data);
 
       return {
         success: true,
@@ -265,9 +290,20 @@ export class BuildTriggerManager {
       // Get existing trigger first
       const existingResponse = await this.client.modules.buildTypes.getTrigger(configId, triggerId);
 
-      const existingTrigger = this.parseTrigger(
-        existingResponse.data as unknown as TeamCityTriggerResponse
-      );
+      if (!isTeamCityTriggerResponse(existingResponse.data)) {
+        throw new TeamCityAPIError(
+          'Unexpected trigger response shape',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            configId,
+            triggerId,
+            context: 'update-existing',
+          }
+        );
+      }
+
+      const existingTrigger = this.parseTrigger(existingResponse.data);
 
       // Merge properties
       const mergedProperties = properties
@@ -298,7 +334,20 @@ export class BuildTriggerManager {
         triggerData
       );
 
-      const trigger = this.parseTrigger(response.data as unknown as TeamCityTriggerResponse);
+      if (!isTeamCityTriggerResponse(response.data)) {
+        throw new TeamCityAPIError(
+          'Unexpected trigger response shape',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            configId,
+            triggerId,
+            context: 'update-result',
+          }
+        );
+      }
+
+      const trigger = this.parseTrigger(response.data);
 
       return {
         success: true,
@@ -520,7 +569,19 @@ export class BuildTriggerManager {
         'vcs-root(id)'
       );
 
-      const rootEntries = normalizeVcsRootEntries(response.data as TeamCityVcsRootEntriesResponse);
+      if (!isTeamCityVcsRootEntriesResponse(response.data)) {
+        throw new TeamCityAPIError(
+          'Unexpected VCS root response shape',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            configId,
+            vcsRootId,
+          }
+        );
+      }
+
+      const rootEntries = normalizeVcsRootEntries(response.data);
       const hasVcsRoot = rootEntries.some((entry) => entry['vcs-root']?.id === vcsRootId);
 
       if (!hasVcsRoot) {
@@ -546,7 +607,19 @@ export class BuildTriggerManager {
     try {
       const response = await this.client.modules.buildTypes.getAllTriggers(targetConfig);
 
-      const triggers = this.parseTriggerList(response.data as unknown as TeamCityTriggersResponse);
+      if (!isTeamCityTriggersResponse(response.data)) {
+        throw new TeamCityAPIError(
+          'Unexpected triggers response shape',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            configId: targetConfig,
+            context: 'circular-dependency-check',
+          }
+        );
+      }
+
+      const triggers = this.parseTriggerList(response.data);
 
       // Check if target already depends on source
       const hasCycle = triggers.some(

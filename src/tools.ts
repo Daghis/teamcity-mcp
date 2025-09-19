@@ -725,9 +725,11 @@ const DEV_TOOLS: ToolDefinition[] = [
           const maxAttempts = typed.tail ? 5 : 3;
           for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
             try {
+              // eslint-disable-next-line no-await-in-loop -- sequential retry attempts require awaiting inside loop
               return await attemptFetch();
             } catch (error) {
               if (shouldRetry(error) && attempt < maxAttempts - 1) {
+                // eslint-disable-next-line no-await-in-loop -- intentional backoff between sequential retries
                 await wait(500 * (attempt + 1));
                 continue;
               }

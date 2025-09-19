@@ -152,7 +152,7 @@ describe('createAdapterFromTeamCityAPI', () => {
     warnMock.mockReset();
   });
 
-  it('exposes unified surface and configuration helpers', () => {
+  it('exposes unified surface and configuration helpers', async () => {
     const adapter = createAdapterFromTeamCityAPI(apiMock, { apiConfig, fullConfig });
 
     expect(adapter.modules).toBe(modules);
@@ -161,7 +161,12 @@ describe('createAdapterFromTeamCityAPI', () => {
     expect(adapter.getConfig()).toBe(fullConfig);
     expect(adapter.getApiConfig()).toEqual(apiConfig);
     expect(adapter.baseUrl).toBe(baseUrl);
-    expect(adapter.builds).toBe(modules.builds);
+
+    const buildsMock = modules.builds.getAllBuilds as jest.Mock;
+    buildsMock.mockClear();
+    expect(typeof adapter.builds.getAllBuilds).toBe('function');
+    await adapter.builds.getAllBuilds('locator');
+    expect(buildsMock).toHaveBeenCalledWith('locator', undefined, undefined);
   });
 
   it('delegates helper methods to the underlying API', async () => {
