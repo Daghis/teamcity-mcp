@@ -455,8 +455,9 @@ export class TeamCityAPI {
       'snapshot-dependencies'
     );
 
-    const dependencies =
-      (response.data as { 'snapshot-dependencies'?: unknown })['snapshot-dependencies'];
+    const dependencies = (response.data as { 'snapshot-dependencies'?: unknown })[
+      'snapshot-dependencies'
+    ];
 
     if (dependencies == null) {
       return response;

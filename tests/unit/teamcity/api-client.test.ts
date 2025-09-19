@@ -1,7 +1,8 @@
+import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+
 import { TeamCityAPI, TeamCityAPIClientConfig } from '@/api-client';
 import type { Build } from '@/teamcity-client/models/build';
 import type { Changes } from '@/teamcity-client/models/changes';
-import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 const baseConfig: TeamCityAPIClientConfig = {
   baseUrl: 'https://teamcity.example.com',
