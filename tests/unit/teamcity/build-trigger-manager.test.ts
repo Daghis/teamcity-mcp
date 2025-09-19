@@ -458,8 +458,7 @@ describe('BuildTriggerManager', () => {
                 expect.objectContaining({ name: 'timezone', value: 'Europe/London' }),
               ]),
             }),
-          }),
-          expect.any(Object)
+          })
         );
       });
 
@@ -528,8 +527,7 @@ describe('BuildTriggerManager', () => {
                 }),
               ]),
             }),
-          }),
-          expect.any(Object)
+          })
         );
       });
 

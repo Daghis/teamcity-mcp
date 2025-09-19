@@ -320,7 +320,7 @@ describe('TestProblemReporter', () => {
 
       // Mock test statistics
       http.get.mockImplementation((path: string) => {
-        if (path.includes('/testOccurrences?locator=status:FAILURE')) {
+        if (path.includes(`/testOccurrences?locator=build:(id:${buildId}),status:FAILURE`)) {
           return Promise.resolve({
             data: {
               testOccurrence: [
@@ -445,7 +445,7 @@ describe('TestProblemReporter', () => {
       const buildId = '12357';
 
       http.get.mockImplementation((path: string) => {
-        if (path.includes('/testOccurrences?locator=status:FAILURE')) {
+        if (path.includes(`/testOccurrences?locator=build:(id:${buildId}),status:FAILURE`)) {
           return Promise.resolve({
             data: {
               testOccurrence: [
@@ -512,7 +512,7 @@ describe('TestProblemReporter', () => {
       }));
 
       http.get.mockImplementation((path: string) => {
-        if (path.includes('/testOccurrences?locator=status:FAILURE')) {
+        if (path.includes(`/testOccurrences?locator=build:(id:${buildId}),status:FAILURE`)) {
           return Promise.resolve({
             data: { testOccurrence: tests },
           });

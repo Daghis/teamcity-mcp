@@ -10,6 +10,7 @@ type StubClient = {
   client: TeamCityUnifiedClient;
   builds: {
     getMultipleBuilds: jest.Mock;
+    getAllBuilds: jest.Mock;
   };
   http: { get: jest.Mock };
   request: jest.Mock;
@@ -18,6 +19,7 @@ type StubClient = {
 const createStubClient = (): StubClient => {
   const builds = {
     getMultipleBuilds: jest.fn(),
+    getAllBuilds: jest.fn(),
   };
 
   const http = {
@@ -155,15 +157,11 @@ describe('BuildListManager', () => {
         },
       });
 
-      stub.http.get.mockResolvedValueOnce({ data: '42' });
+      stub.builds.getAllBuilds.mockResolvedValueOnce({ data: { count: 42 } });
 
       const result = await manager.listBuilds({ includeTotalCount: true });
 
-      expect(stub.request).toHaveBeenCalledWith(expect.any(Function));
-      expect(stub.http.get).toHaveBeenCalledWith(
-        `${BASE_URL}/app/rest/builds/count`,
-        expect.objectContaining({ headers: expect.any(Object) })
-      );
+      expect(stub.builds.getAllBuilds).toHaveBeenCalledWith(undefined, 'count');
       expect(result.metadata.totalCount).toBe(42);
     });
 
@@ -175,7 +173,7 @@ describe('BuildListManager', () => {
         },
       });
 
-      stub.http.get.mockRejectedValueOnce(new Error('count failed'));
+      stub.builds.getAllBuilds.mockRejectedValueOnce(new Error('count failed'));
 
       const result = await manager.listBuilds({ includeTotalCount: true });
       expect(result.metadata.totalCount).toBe(0);
