@@ -37,7 +37,14 @@ describe('createAdapterFromTeamCityAPI', () => {
   const listAgentPools = jest.fn();
 
   beforeEach(() => {
-    http = axios.create();
+    const token = 'token-123';
+    const timeout = 4200;
+
+    http = axios.create({
+      baseURL: baseUrl,
+      timeout,
+      headers: { Authorization: `Bearer ${token}` },
+    });
     const buildsMock: BuildApiLike = {
       getAllBuilds: jest.fn(),
       getBuild: jest.fn(),
@@ -80,8 +87,8 @@ describe('createAdapterFromTeamCityAPI', () => {
 
     apiConfig = {
       baseUrl,
-      token: 'token-123',
-      timeout: 4200,
+      token,
+      timeout,
     };
 
     fullConfig = {
@@ -229,7 +236,17 @@ describe('createAdapterFromTeamCityAPI', () => {
   it('falls back to minimal config when options omitted', () => {
     const adapter = createAdapterFromTeamCityAPI(apiMock);
 
-    expect(adapter.getConfig().connection.baseUrl).toBe(baseUrl);
-    expect(adapter.getApiConfig().baseUrl).toBe(baseUrl);
+    expect(adapter.getApiConfig()).toEqual({
+      baseUrl,
+      token: apiConfig.token,
+      timeout: apiConfig.timeout,
+    });
+    expect(adapter.getConfig()).toEqual({
+      connection: {
+        baseUrl,
+        token: apiConfig.token,
+        timeout: apiConfig.timeout,
+      },
+    });
   });
 });
