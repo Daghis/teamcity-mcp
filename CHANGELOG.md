@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.3](https://github.com/Daghis/teamcity-mcp/compare/v1.3.2...v1.3.3) (2025-09-19)
+
+
+### Bug Fixes
+
+* **teamcity:** retain adapter api credentials ([#138](https://github.com/Daghis/teamcity-mcp/issues/138)) ([3ad31ed](https://github.com/Daghis/teamcity-mcp/commit/3ad31edf227eac904eee84ec3a80d16455ae37fc)), closes [#135](https://github.com/Daghis/teamcity-mcp/issues/135)
+
 ## [1.3.2](https://github.com/Daghis/teamcity-mcp/compare/v1.3.1...v1.3.2) (2025-09-18)
 
 
