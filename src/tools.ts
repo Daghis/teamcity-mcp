@@ -169,7 +169,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_projects',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const baseParts: string[] = [];
           if (typed.locator) baseParts.push(typed.locator);
           if (typed.parentProjectId) baseParts.push(`parent:(id:${typed.parentProjectId})`);
@@ -181,7 +181,10 @@ const DEV_TOOLS: ToolDefinition[] = [
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
-            return api.projects.getAllProjects(locator as string | undefined, typed.fields);
+            return adapter.modules.projects.getAllProjects(
+              locator as string | undefined,
+              typed.fields
+            );
           };
 
           const fetcher = createPaginatedFetcher(
@@ -225,8 +228,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_project',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const project = await api.getProject(typed.projectId);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const project = await adapter.getProject(typed.projectId);
           return json(project);
         },
         args
@@ -276,7 +279,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_builds',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           // Build shared filter parts
           const baseParts: string[] = [];
           if (typed.locator) baseParts.push(typed.locator);
@@ -292,7 +295,7 @@ const DEV_TOOLS: ToolDefinition[] = [
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
             // Use the generated client directly to retain nextHref/prevHref in response.data
-            return api.builds.getAllBuilds(locator as string | undefined, typed.fields);
+            return adapter.modules.builds.getAllBuilds(locator as string | undefined, typed.fields);
           };
 
           const fetcher = createPaginatedFetcher(
@@ -340,8 +343,11 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_build',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const build = await api.getBuild(typed.buildId);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const build = (await adapter.getBuild(typed.buildId)) as {
+            status?: string;
+            statusText?: string;
+          };
           return json(build);
         },
         args
@@ -372,13 +378,13 @@ const DEV_TOOLS: ToolDefinition[] = [
         'trigger_build',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           try {
-            const build = await api.triggerBuild(
+            const build = (await adapter.triggerBuild(
               typed.buildTypeId,
               typed.branchName,
               typed.comment
-            );
+            )) as { id?: number | string; state?: string; status?: string };
             return json({
               success: true,
               action: 'trigger_build',
@@ -395,9 +401,13 @@ const DEV_TOOLS: ToolDefinition[] = [
               ? `<comment><text>${typed.comment.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text></comment>`
               : '';
             const xml = `<?xml version="1.0" encoding="UTF-8"?><build><buildType id="${typed.buildTypeId}"/>${branchPart}${commentPart}</build>`;
-            const response = await api.buildQueue.addBuildToQueue(false, xml as unknown as never, {
-              headers: { 'Content-Type': 'application/xml', Accept: 'application/json' },
-            });
+            const response = await adapter.modules.buildQueue.addBuildToQueue(
+              false,
+              xml as unknown as never,
+              {
+                headers: { 'Content-Type': 'application/xml', Accept: 'application/json' },
+              }
+            );
             const build = response.data as { id?: number; state?: string; status?: string };
             return json({
               success: true,
@@ -429,8 +439,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'cancel_queued_build',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          await api.buildQueue.deleteQueuedBuild(typed.buildId);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          await adapter.modules.buildQueue.deleteQueuedBuild(typed.buildId);
           return json({ success: true, action: 'cancel_queued_build', buildId: typed.buildId });
         },
         args
@@ -471,10 +481,10 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_build_status',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const statusManager = new (
             await import('@/teamcity/build-status-manager')
-          ).BuildStatusManager(createAdapterFromTeamCityAPI(api));
+          ).BuildStatusManager(adapter);
           const result = await statusManager.getBuildStatus({
             buildId: typed.buildId,
             includeTests: typed.includeTests,
@@ -491,7 +501,10 @@ const DEV_TOOLS: ToolDefinition[] = [
 
             if (typed.includeQueueTotals) {
               try {
-                const countResp = await api.buildQueue.getAllQueuedBuilds(undefined, 'count');
+                const countResp = await adapter.modules.buildQueue.getAllQueuedBuilds(
+                  undefined,
+                  'count'
+                );
                 enrich.totalQueued = (countResp.data as { count?: number }).count;
               } catch {
                 /* ignore */
@@ -499,7 +512,7 @@ const DEV_TOOLS: ToolDefinition[] = [
             }
             if (typed.includeQueueReason) {
               try {
-                const qb = await api.buildQueue.getQueuedBuild(typed.buildId);
+                const qb = await adapter.modules.buildQueue.getQueuedBuild(typed.buildId);
                 enrich.waitReason = (qb.data as { waitReason?: string }).waitReason;
               } catch {
                 /* ignore */
@@ -559,7 +572,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'fetch_build_log',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
 
           // Resolve effective buildId from buildId or buildNumber (+ optional buildTypeId)
           let effectiveBuildId: string | undefined;
@@ -575,14 +588,14 @@ const DEV_TOOLS: ToolDefinition[] = [
             // Limit result set to avoid huge payloads
             baseLocatorParts.push('count:10');
             const locator = baseLocatorParts.join(',');
-            const resp = (await api.listBuilds(locator)) as {
+            const resp = (await adapter.listBuilds(locator)) as {
               build?: Array<{ id?: number; buildTypeId?: string }>;
             };
             const builds = Array.isArray(resp.build) ? resp.build : [];
             if (builds.length === 0) {
               // Fallback: if buildTypeId is provided, fetch recent builds for that configuration and match by number
               if (typed.buildTypeId) {
-                const recent = (await api.listBuilds(
+                const recent = (await adapter.listBuilds(
                   `buildType:(id:${typed.buildTypeId}),branch:default:any,count:100`
                 )) as { build?: Array<{ id?: number; number?: string }> };
                 const items = Array.isArray(recent.build) ? recent.build : [];
@@ -650,7 +663,7 @@ const DEV_TOOLS: ToolDefinition[] = [
           const attemptFetch = async () => {
             if (typed.tail) {
               const count = typed.lineCount ?? typed.pageSize ?? 500;
-              const full = await api.getBuildLog(effectiveBuildId);
+              const full = await adapter.getBuildLog(effectiveBuildId);
               const allLines = full.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
               if (allLines.length > 0 && allLines[allLines.length - 1] === '') allLines.pop();
               const total = allLines.length;
@@ -681,7 +694,7 @@ const DEV_TOOLS: ToolDefinition[] = [
                 ? typed.startLine
                 : ((typed.page ?? 1) - 1) * effectivePageSize;
 
-            const chunk = await api.getBuildLogChunk(effectiveBuildId, {
+            const chunk = await adapter.getBuildLogChunk(effectiveBuildId, {
               startLine,
               lineCount: effectivePageSize,
             });
@@ -759,7 +772,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_build_configs',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const baseParts: string[] = [];
           if (typed.locator) baseParts.push(typed.locator);
           if (typed.projectId) baseParts.push(`affectedProject:(id:${typed.projectId})`);
@@ -771,7 +784,10 @@ const DEV_TOOLS: ToolDefinition[] = [
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
-            return api.buildTypes.getAllBuildTypes(locator as string | undefined, typed.fields);
+            return adapter.modules.buildTypes.getAllBuildTypes(
+              locator as string | undefined,
+              typed.fields
+            );
           };
 
           const fetcher = createPaginatedFetcher(
@@ -815,8 +831,10 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_build_config',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const buildType = await api.getBuildType(typed.buildTypeId);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const buildType = (await adapter.getBuildType(typed.buildTypeId)) as {
+            parameters?: { property?: Array<{ name?: string; value?: string }> };
+          };
           return json(buildType);
         },
         args
@@ -854,14 +872,14 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_test_failures',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const pageSize = typed.pageSize ?? 100;
           const baseFetch = async ({ count, start }: { count?: number; start?: number }) => {
             const parts: string[] = [`build:(id:${typed.buildId})`, 'status:FAILURE'];
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.join(',');
-            return api.tests.getAllTestOccurrences(locator as string, typed.fields);
+            return adapter.modules.tests.getAllTestOccurrences(locator as string, typed.fields);
           };
 
           const fetcher = createPaginatedFetcher(
@@ -918,7 +936,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_vcs_roots',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const baseParts: string[] = [];
           if (typed.projectId) baseParts.push(`affectedProject:(id:${typed.projectId})`);
 
@@ -928,7 +946,10 @@ const DEV_TOOLS: ToolDefinition[] = [
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
-            return api.vcsRoots.getAllVcsRoots(locator as string | undefined, typed.fields);
+            return adapter.modules.vcsRoots.getAllVcsRoots(
+              locator as string | undefined,
+              typed.fields
+            );
           };
 
           const fetcher = createPaginatedFetcher(
@@ -972,12 +993,12 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_vcs_root',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const listing = await api.vcsRoots.getAllVcsRoots(`id:${typed.id}`);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const listing = await adapter.modules.vcsRoots.getAllVcsRoots(`id:${typed.id}`);
           const rootEntry = (listing.data as { vcsRoot?: unknown[] }).vcsRoot?.[0] as
             | { id?: string; name?: string; href?: string }
             | undefined;
-          const props = await api.vcsRoots.getAllVcsRootProperties(typed.id);
+          const props = await adapter.modules.vcsRoots.getAllVcsRootProperties(typed.id);
           return json({
             id: rootEntry?.id ?? typed.id,
             name: rootEntry?.name,
@@ -1012,8 +1033,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'set_vcs_root_property',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          await api.vcsRoots.setVcsRootProperty(typed.id, typed.name, typed.value, {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          await adapter.modules.vcsRoots.setVcsRootProperty(typed.id, typed.name, typed.value, {
             headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' },
           });
           return json({
@@ -1046,8 +1067,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'delete_vcs_root_property',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          await api.vcsRoots.deleteVcsRootProperty(typed.id, typed.name);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          await adapter.modules.vcsRoots.deleteVcsRootProperty(typed.id, typed.name);
           return json({
             success: true,
             action: 'delete_vcs_root_property',
@@ -1092,7 +1113,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'update_vcs_root_properties',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
 
           const properties: { name: string; value: string }[] = [];
           if (typeof typed.url === 'string') properties.push({ name: 'url', value: typed.url });
@@ -1116,7 +1137,7 @@ const DEV_TOOLS: ToolDefinition[] = [
             });
           }
 
-          await api.vcsRoots.setVcsRootProperties(
+          await adapter.modules.vcsRoots.setVcsRootProperties(
             typed.id,
             undefined,
             { property: properties },
@@ -1167,7 +1188,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_queued_builds',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const baseParts: string[] = [];
           if (typed.locator) baseParts.push(typed.locator);
           const pageSize = typed.pageSize ?? 100;
@@ -1177,7 +1198,10 @@ const DEV_TOOLS: ToolDefinition[] = [
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
-            return api.buildQueue.getAllQueuedBuilds(locator as string | undefined, typed.fields);
+            return adapter.modules.buildQueue.getAllQueuedBuilds(
+              locator as string | undefined,
+              typed.fields
+            );
           };
 
           const fetcher = createPaginatedFetcher(
@@ -1215,8 +1239,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_server_metrics',
         null,
         async () => {
-          const api = TeamCityAPI.getInstance();
-          const metrics = await api.server.getAllMetrics();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const metrics = await adapter.modules.server.getAllMetrics();
           return json(metrics.data);
         },
         {}
@@ -1233,8 +1257,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_server_info',
         null,
         async () => {
-          const api = TeamCityAPI.getInstance();
-          const info = await api.server.getServerInfo();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const info = await adapter.modules.server.getServerInfo();
           return json(info.data);
         },
         {}
@@ -1260,7 +1284,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_server_health_items',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           // Normalize locator: treat empty/whitespace-only as undefined (fetch all)
           // and adjust known-safe patterns (e.g., category:(ERROR) -> category:ERROR)
           const normalized = (() => {
@@ -1270,7 +1294,7 @@ const DEV_TOOLS: ToolDefinition[] = [
             return raw.replace(/category:\s*\((ERROR|WARNING|INFO)\)/g, 'category:$1');
           })();
           try {
-            const response = await api.health.getHealthItems(normalized);
+            const response = await adapter.modules.health.getHealthItems(normalized);
             return json(response.data);
           } catch (err) {
             // Some TeamCity versions reject locator filters for /app/rest/health (HTTP 400).
@@ -1281,7 +1305,7 @@ const DEV_TOOLS: ToolDefinition[] = [
               (err as { code?: string })?.code === 'VALIDATION_ERROR';
             if (!isHttp400) throw err;
 
-            const all = await api.health.getHealthItems();
+            const all = await adapter.modules.health.getHealthItems();
             const rawItems = (all.data?.healthItem ?? []) as Array<Record<string, unknown>>;
 
             // Basic filter parser: key:value pairs separated by commas.
@@ -1337,8 +1361,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_server_health_item',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const response = await api.health.getSingleHealthItem(typed.locator);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const response = await adapter.modules.health.getSingleHealthItem(typed.locator);
           return json(response.data);
         },
         args
@@ -1367,8 +1391,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'check_availability_guard',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const resp = await api.health.getHealthItems();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const resp = await adapter.modules.health.getHealthItems();
           const items = (resp.data?.healthItem ?? []) as Array<{
             severity?: 'ERROR' | 'WARNING' | 'INFO' | string;
             id?: string;
@@ -1402,8 +1426,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_compatible_build_types_for_agent',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const resp = await api.agents.getCompatibleBuildTypes(typed.agentId);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const resp = await adapter.modules.agents.getCompatibleBuildTypes(typed.agentId);
           return json(resp.data);
         },
         args
@@ -1424,8 +1448,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_incompatible_build_types_for_agent',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const resp = await api.agents.getIncompatibleBuildTypes(typed.agentId);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const resp = await adapter.modules.agents.getIncompatibleBuildTypes(typed.agentId);
           return json(resp.data);
         },
         args
@@ -1446,8 +1470,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_agent_enabled_info',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const resp = await api.agents.getEnabledInfo(typed.agentId);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const resp = await adapter.modules.agents.getEnabledInfo(typed.agentId);
           return json(resp.data);
         },
         args
@@ -1477,11 +1501,11 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_compatible_agents_for_build_type',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const filters = [`compatible:(buildType:${typed.buildTypeId})`];
           if (!typed.includeDisabled) filters.push('enabled:true');
           const locator = filters.join(',');
-          const resp = await api.agents.getAllAgents(locator);
+          const resp = await adapter.modules.agents.getAllAgents(locator);
           return json(resp.data);
         },
         args
@@ -1511,11 +1535,11 @@ const DEV_TOOLS: ToolDefinition[] = [
         'count_compatible_agents_for_build_type',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const parts = [`compatible:(buildType:${typed.buildTypeId})`];
           if (!typed.includeDisabled) parts.push('enabled:true');
           const locator = parts.join(',');
-          const resp = await api.agents.getAllAgents(locator, 'count');
+          const resp = await adapter.modules.agents.getAllAgents(locator, 'count');
           const count = (resp.data as { count?: number }).count ?? 0;
           return json({ count });
         },
@@ -1547,14 +1571,14 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_compatible_agents_for_queued_build',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const build = await api.getBuild(typed.buildId);
-          const buildTypeId = (build as { buildTypeId?: string }).buildTypeId;
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const build = (await adapter.getBuild(typed.buildId)) as { buildTypeId?: string };
+          const buildTypeId = build.buildTypeId;
           if (!buildTypeId) return json({ items: [], count: 0, note: 'Build type ID not found' });
           const parts = [`compatible:(buildType:${buildTypeId})`];
           if (!typed.includeDisabled) parts.push('enabled:true');
           const locator = parts.join(',');
-          const resp = await api.agents.getAllAgents(locator);
+          const resp = await adapter.modules.agents.getAllAgents(locator);
           return json(resp.data);
         },
         args
@@ -1566,7 +1590,8 @@ const DEV_TOOLS: ToolDefinition[] = [
     description: 'Check connectivity to TeamCity server and basic readiness',
     inputSchema: { type: 'object', properties: {} },
     handler: async (_args: unknown) => {
-      const ok = await TeamCityAPI.getInstance().testConnection();
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      const ok = await adapter.testConnection();
       return json({ ok });
     },
   },
@@ -1600,7 +1625,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_agents',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const pageSize = typed.pageSize ?? 100;
           const baseFetch = async ({ count, start }: { count?: number; start?: number }) => {
             const parts: string[] = [];
@@ -1608,7 +1633,7 @@ const DEV_TOOLS: ToolDefinition[] = [
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
-            return api.agents.getAllAgents(locator as string | undefined, typed.fields);
+            return adapter.modules.agents.getAllAgents(locator as string | undefined, typed.fields);
           };
 
           const fetcher = createPaginatedFetcher(
@@ -1662,14 +1687,17 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_agent_pools',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const pageSize = typed.pageSize ?? 100;
           const baseFetch = async ({ count, start }: { count?: number; start?: number }) => {
             const parts: string[] = [];
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
-            return api.agentPools.getAllAgentPools(locator as string | undefined, typed.fields);
+            return adapter.modules.agentPools.getAllAgentPools(
+              locator as string | undefined,
+              typed.fields
+            );
           };
 
           const fetcher = createPaginatedFetcher(
@@ -1739,8 +1767,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         schema,
         async (typed) => {
           // Use the manager for rich results via the unified TeamCityAPI adapter.
-          const api = TeamCityAPI.getInstance();
-          const manager = new BuildResultsManager(createAdapterFromTeamCityAPI(api));
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const manager = new BuildResultsManager(adapter);
           const result = await manager.getBuildResults(typed.buildId, {
             includeArtifacts: typed.includeArtifacts,
             includeStatistics: typed.includeStatistics,
@@ -1776,10 +1804,10 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_test_details',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           let locator = `build:(id:${typed.buildId})`;
           if (typed.testNameId) locator += `,test:(id:${typed.testNameId})`;
-          const response = await api.tests.getAllTestOccurrences(locator);
+          const response = await adapter.modules.tests.getAllTestOccurrences(locator);
           return json(response.data);
         },
         args
@@ -1803,10 +1831,13 @@ const DEV_TOOLS: ToolDefinition[] = [
         'analyze_build_problems',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const build = await api.getBuild(typed.buildId);
-          const problems = await api.builds.getBuildProblems(`id:${typed.buildId}`);
-          const failures = await api.listTestFailures(typed.buildId);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const build = (await adapter.getBuild(typed.buildId)) as {
+            status?: string;
+            statusText?: string;
+          };
+          const problems = await adapter.modules.builds.getBuildProblems(`id:${typed.buildId}`);
+          const failures = await adapter.listTestFailures(typed.buildId);
           return json({
             buildStatus: build.status,
             statusText: build.statusText,
@@ -1852,7 +1883,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_changes',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const baseParts: string[] = [];
           if (typed.locator) baseParts.push(typed.locator);
           if (typed.projectId) baseParts.push(`project:(id:${typed.projectId})`);
@@ -1864,7 +1895,10 @@ const DEV_TOOLS: ToolDefinition[] = [
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
-            return api.changes.getAllChanges(locator as string | undefined, typed.fields);
+            return adapter.modules.changes.getAllChanges(
+              locator as string | undefined,
+              typed.fields
+            );
           };
 
           const fetcher = createPaginatedFetcher(
@@ -1924,7 +1958,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_problems',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const baseParts: string[] = [];
           if (typed.locator) baseParts.push(typed.locator);
           if (typed.projectId) baseParts.push(`project:(id:${typed.projectId})`);
@@ -1936,7 +1970,10 @@ const DEV_TOOLS: ToolDefinition[] = [
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
-            return api.problems.getAllBuildProblems(locator as string | undefined, typed.fields);
+            return adapter.modules.problems.getAllBuildProblems(
+              locator as string | undefined,
+              typed.fields
+            );
           };
 
           const fetcher = createPaginatedFetcher(
@@ -2002,7 +2039,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_problem_occurrences',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const baseParts: string[] = [];
           if (typed.locator) baseParts.push(typed.locator);
           if (typed.buildId) baseParts.push(`build:(id:${typed.buildId})`);
@@ -2014,7 +2051,7 @@ const DEV_TOOLS: ToolDefinition[] = [
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
-            return api.problemOccurrences.getAllBuildProblemOccurrences(
+            return adapter.modules.problemOccurrences.getAllBuildProblemOccurrences(
               locator as string | undefined,
               typed.fields
             );
@@ -2090,7 +2127,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_investigations',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const baseParts: string[] = [];
           if (typed.locator) baseParts.push(typed.locator);
           if (typed.projectId) baseParts.push(`project:(id:${typed.projectId})`);
@@ -2104,7 +2141,7 @@ const DEV_TOOLS: ToolDefinition[] = [
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
-            return api.investigations.getAllInvestigations(
+            return adapter.modules.investigations.getAllInvestigations(
               locator as string | undefined,
               typed.fields
             );
@@ -2172,7 +2209,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_muted_tests',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const baseParts: string[] = [];
           if (typed.locator) baseParts.push(typed.locator);
           if (typed.projectId) baseParts.push(`project:(id:${typed.projectId})`);
@@ -2185,7 +2222,10 @@ const DEV_TOOLS: ToolDefinition[] = [
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
-            return api.mutes.getAllMutedTests(locator as string | undefined, typed.fields);
+            return adapter.modules.mutes.getAllMutedTests(
+              locator as string | undefined,
+              typed.fields
+            );
           };
 
           const fetcher = createPaginatedFetcher(
@@ -2239,8 +2279,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'get_versioned_settings_status',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const response = await api.versionedSettings.getVersionedSettingsStatus(
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const response = await adapter.modules.versionedSettings.getVersionedSettingsStatus(
             typed.locator,
             typed.fields
           );
@@ -2281,7 +2321,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_users',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const baseParts: string[] = [];
           if (typed.locator) baseParts.push(typed.locator);
           if (typed.groupId) baseParts.push(`group:(id:${typed.groupId})`);
@@ -2292,7 +2332,7 @@ const DEV_TOOLS: ToolDefinition[] = [
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
-            return api.users.getAllUsers(locator as string | undefined, typed.fields);
+            return adapter.modules.users.getAllUsers(locator as string | undefined, typed.fields);
           };
 
           const fetcher = createPaginatedFetcher(
@@ -2338,8 +2378,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_roles',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const response = await api.roles.getRoles(typed.fields);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const response = await adapter.modules.roles.getRoles(typed.fields);
           const roles = (response.data?.role ?? []) as unknown[];
           return json({ items: roles, count: roles.length });
         },
@@ -2372,12 +2412,12 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_branches',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const locator = typed.buildTypeId
             ? `buildType:(id:${typed.buildTypeId})`
             : `project:(id:${typed.projectId})`;
 
-          const builds = (await api.listBuilds(`${locator},count:100}`)) as {
+          const builds = (await adapter.listBuilds(`${locator},count:100}`)) as {
             build?: Array<{ branchName?: string | null }>; // minimal shape used
           };
           const items = Array.isArray(builds.build) ? builds.build : [];
@@ -2408,8 +2448,10 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_parameters',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const buildType = await api.getBuildType(typed.buildTypeId);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const buildType = (await adapter.getBuildType(typed.buildTypeId)) as {
+            parameters?: { property?: Array<{ name?: string; value?: string }> };
+          };
           return json({
             parameters: buildType.parameters?.property ?? [],
             count: buildType.parameters?.property?.length ?? 0,
@@ -2435,7 +2477,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         'list_project_hierarchy',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const rootId = typed.rootProjectId ?? '_Root';
 
           type ApiProject = {
@@ -2454,7 +2496,7 @@ const DEV_TOOLS: ToolDefinition[] = [
             parentId?: string;
             children: Array<{ id: string; name?: string }>;
           }> {
-            const response = await api.projects.getProject(projectId);
+            const response = await adapter.modules.projects.getProject(projectId);
             const project = response.data as ApiProject;
             const children: Array<{ id: string; name?: string }> = [];
 
@@ -2518,14 +2560,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'create_project',
         schema,
         async (typedArgs) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const project = {
             name: typedArgs.name,
             id: typedArgs.id,
             parentProject: { id: typedArgs.parentProjectId ?? '_Root' },
             description: typedArgs.description,
           };
-          const response = await api.projects.addProject(project, {
+          const response = await adapter.modules.projects.addProject(project, {
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           });
           return json({ success: true, action: 'create_project', id: response.data.id });
@@ -2549,8 +2591,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const typedArgs = args as DeleteProjectArgs;
 
-      const api = TeamCityAPI.getInstance();
-      await api.projects.deleteProject(typedArgs.projectId);
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      await adapter.modules.projects.deleteProject(typedArgs.projectId);
       return json({ success: true, action: 'delete_project', id: typedArgs.projectId });
     },
     mode: 'full',
@@ -2581,7 +2623,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'update_project_settings',
         schema,
         async (typedArgs) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
 
           // Emit debug info about requested changes (avoid logging secrets)
           debug('update_project_settings invoked', {
@@ -2600,7 +2642,11 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
               field: 'name',
               valuePreview: typedArgs.name,
             });
-            await api.projects.setProjectField(typedArgs.projectId, 'name', typedArgs.name);
+            await adapter.modules.projects.setProjectField(
+              typedArgs.projectId,
+              'name',
+              typedArgs.name
+            );
           }
           if (typedArgs.description !== undefined) {
             debug('Setting project field', {
@@ -2608,7 +2654,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
               field: 'description',
               valuePreview: typedArgs.description,
             });
-            await api.projects.setProjectField(
+            await adapter.modules.projects.setProjectField(
               typedArgs.projectId,
               'description',
               typedArgs.description
@@ -2620,7 +2666,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
               field: 'archived',
               valuePreview: String(typedArgs.archived),
             });
-            await api.projects.setProjectField(
+            await adapter.modules.projects.setProjectField(
               typedArgs.projectId,
               'archived',
               String(typedArgs.archived)
@@ -2665,14 +2711,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const typedArgs = args as CreateBuildConfigArgs;
 
-      const api = TeamCityAPI.getInstance();
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
       const buildType = {
         name: typedArgs.name,
         id: typedArgs.id,
         project: { id: typedArgs.projectId },
         description: typedArgs.description,
       };
-      const response = await api.buildTypes.createBuildType(undefined, buildType, {
+      const response = await adapter.modules.buildTypes.createBuildType(undefined, buildType, {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       });
       return json({ success: true, action: 'create_build_config', id: response.data.id });
@@ -2696,9 +2742,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const typedArgs = args as CloneBuildConfigArgs;
 
-      const api = TeamCityAPI.getInstance();
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
       // Get source build type
-      const source = await api.getBuildType(typedArgs.sourceBuildTypeId);
+      const source = (await adapter.getBuildType(typedArgs.sourceBuildTypeId)) as Record<
+        string,
+        unknown
+      > & {
+        project?: { id?: string };
+      };
 
       // Create new build type based on source
       const buildType = {
@@ -2708,7 +2759,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         project: { id: typedArgs.projectId ?? source.project?.id ?? '_Root' },
       };
 
-      const response = await api.buildTypes.createBuildType(undefined, buildType);
+      const response = await adapter.modules.buildTypes.createBuildType(undefined, buildType);
       return json({ success: true, action: 'clone_build_config', id: response.data.id });
     },
     mode: 'full',
@@ -2731,12 +2782,11 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const typedArgs = args as UpdateBuildConfigArgs;
 
-      const api = TeamCityAPI.getInstance();
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
 
       // Prefer the richer BuildConfigurationUpdateManager for settings + metadata.
       // Fallback to direct field updates if retrieval is unavailable (e.g., in tests with shallow mocks).
       try {
-        const adapter = createAdapterFromTeamCityAPI(api);
         const manager = new BuildConfigurationUpdateManager(adapter);
 
         const current = await manager.retrieveConfiguration(typedArgs.buildTypeId);
@@ -2754,17 +2804,21 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         } else {
           // No current config available; fall back to direct field updates
           if (typedArgs.name != null && typedArgs.name !== '') {
-            await api.buildTypes.setBuildTypeField(typedArgs.buildTypeId, 'name', typedArgs.name);
+            await adapter.modules.buildTypes.setBuildTypeField(
+              typedArgs.buildTypeId,
+              'name',
+              typedArgs.name
+            );
           }
           if (typedArgs.description !== undefined) {
-            await api.buildTypes.setBuildTypeField(
+            await adapter.modules.buildTypes.setBuildTypeField(
               typedArgs.buildTypeId,
               'description',
               typedArgs.description
             );
           }
           if (typedArgs.artifactRules !== undefined) {
-            await api.buildTypes.setBuildTypeField(
+            await adapter.modules.buildTypes.setBuildTypeField(
               typedArgs.buildTypeId,
               'settings/artifactRules',
               typedArgs.artifactRules
@@ -2774,17 +2828,21 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       } catch {
         // Fallback path if manager cannot be used (e.g., getBuildType not mocked)
         if (typedArgs.name != null && typedArgs.name !== '') {
-          await api.buildTypes.setBuildTypeField(typedArgs.buildTypeId, 'name', typedArgs.name);
+          await adapter.modules.buildTypes.setBuildTypeField(
+            typedArgs.buildTypeId,
+            'name',
+            typedArgs.name
+          );
         }
         if (typedArgs.description !== undefined) {
-          await api.buildTypes.setBuildTypeField(
+          await adapter.modules.buildTypes.setBuildTypeField(
             typedArgs.buildTypeId,
             'description',
             typedArgs.description
           );
         }
         if (typedArgs.artifactRules !== undefined) {
-          await api.buildTypes.setBuildTypeField(
+          await adapter.modules.buildTypes.setBuildTypeField(
             typedArgs.buildTypeId,
             'settings/artifactRules',
             typedArgs.artifactRules
@@ -2794,7 +2852,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
       // Handle paused separately (not part of UpdateManager options)
       if (typedArgs.paused !== undefined) {
-        await api.buildTypes.setBuildTypeField(
+        await adapter.modules.buildTypes.setBuildTypeField(
           typedArgs.buildTypeId,
           'paused',
           String(typedArgs.paused)
@@ -2829,14 +2887,19 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'add_vcs_root_to_build',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const body = {
             'vcs-root': { id: typed.vcsRootId },
             'checkout-rules': typed.checkoutRules,
           } as Record<string, unknown>;
-          await api.buildTypes.addVcsRootToBuildType(typed.buildTypeId, undefined, body, {
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          });
+          await adapter.modules.buildTypes.addVcsRootToBuildType(
+            typed.buildTypeId,
+            undefined,
+            body,
+            {
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            }
+          );
           return json({
             success: true,
             action: 'add_vcs_root_to_build',
@@ -2866,12 +2929,12 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const typedArgs = args as AddParameterArgs;
 
-      const api = TeamCityAPI.getInstance();
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
       const parameter = {
         name: typedArgs.name,
         value: typedArgs.value,
       };
-      await api.buildTypes.createBuildParameterOfBuildType(
+      await adapter.modules.buildTypes.createBuildParameterOfBuildType(
         typedArgs.buildTypeId,
         undefined,
         parameter,
@@ -2902,8 +2965,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const typedArgs = args as UpdateParameterArgs;
 
-      const api = TeamCityAPI.getInstance();
-      await api.buildTypes.updateBuildParameterOfBuildType(
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      await adapter.modules.buildTypes.updateBuildParameterOfBuildType(
         typedArgs.name,
         typedArgs.buildTypeId,
         undefined,
@@ -2937,8 +3000,11 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const typedArgs = args as DeleteParameterArgs;
 
-      const api = TeamCityAPI.getInstance();
-      await api.buildTypes.deleteBuildParameterOfBuildType_2(typedArgs.name, typedArgs.buildTypeId);
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      await adapter.modules.buildTypes.deleteBuildParameterOfBuildType_2(
+        typedArgs.name,
+        typedArgs.buildTypeId
+      );
       return json({
         success: true,
         action: 'delete_parameter',
@@ -2968,7 +3034,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const typedArgs = args as CreateVCSRootArgs;
 
-      const api = TeamCityAPI.getInstance();
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
       const vcsRoot = {
         name: typedArgs.name,
         id: typedArgs.id,
@@ -2981,7 +3047,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           ],
         },
       };
-      const response = await api.vcsRoots.addVcsRoot(undefined, vcsRoot, {
+      const response = await adapter.modules.vcsRoots.addVcsRoot(undefined, vcsRoot, {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       });
       return json({ success: true, action: 'create_vcs_root', id: response.data.id });
@@ -3004,8 +3070,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const typedArgs = args as AuthorizeAgentArgs;
 
-      const api = TeamCityAPI.getInstance();
-      await api.agents.setAuthorizedInfo(
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      await adapter.modules.agents.setAuthorizedInfo(
         typedArgs.agentId,
         undefined,
         { status: Boolean(typedArgs.authorize) },
@@ -3035,8 +3101,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const typedArgs = args as AssignAgentToPoolArgs;
 
-      const api = TeamCityAPI.getInstance();
-      await api.agents.setAgentPool(typedArgs.agentId, undefined, {
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      await adapter.modules.agents.setAgentPool(typedArgs.agentId, undefined, {
         id: parseInt(typedArgs.poolId),
       });
       return json({
@@ -3072,7 +3138,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const typedArgs = args as ManageBuildStepsArgs;
 
-      const api = TeamCityAPI.getInstance();
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
 
       switch (typedArgs.action) {
         case 'add': {
@@ -3090,9 +3156,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
               property: Object.entries(stepProps).map(([k, v]) => ({ name: k, value: v })),
             },
           };
-          await api.buildTypes.addBuildStepToBuildType(typedArgs.buildTypeId, undefined, step, {
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          });
+          await adapter.modules.buildTypes.addBuildStepToBuildType(
+            typedArgs.buildTypeId,
+            undefined,
+            step,
+            {
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            }
+          );
           return json({
             success: true,
             action: 'add_build_step',
@@ -3111,7 +3182,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           const props = Object.entries(typedArgs.properties ?? {});
           for (const [k, v] of props) {
             // eslint-disable-next-line no-await-in-loop
-            await api.buildTypes.setBuildStepParameter(
+            await adapter.modules.buildTypes.setBuildStepParameter(
               typedArgs.buildTypeId,
               typedArgs.stepId,
               k,
@@ -3135,7 +3206,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
               error: 'Step ID is required for delete action',
             });
           }
-          await api.buildTypes.deleteBuildStep(typedArgs.buildTypeId, typedArgs.stepId);
+          await adapter.modules.buildTypes.deleteBuildStep(typedArgs.buildTypeId, typedArgs.stepId);
           return json({
             success: true,
             action: 'delete_build_step',
@@ -3168,7 +3239,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const typedArgs = args as ManageBuildTriggersArgs;
 
-      const api = TeamCityAPI.getInstance();
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
 
       switch (typedArgs.action) {
         case 'add': {
@@ -3181,9 +3252,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
               })),
             },
           };
-          await api.buildTypes.addTriggerToBuildType(typedArgs.buildTypeId, undefined, trigger, {
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          });
+          await adapter.modules.buildTypes.addTriggerToBuildType(
+            typedArgs.buildTypeId,
+            undefined,
+            trigger,
+            {
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            }
+          );
           return json({
             success: true,
             action: 'add_build_trigger',
@@ -3199,7 +3275,10 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
               error: 'Trigger ID is required for delete action',
             });
           }
-          await api.buildTypes.deleteTrigger(typedArgs.buildTypeId, typedArgs.triggerId);
+          await adapter.modules.buildTypes.deleteTrigger(
+            typedArgs.buildTypeId,
+            typedArgs.triggerId
+          );
           return json({
             success: true,
             action: 'delete_build_trigger',
@@ -3241,16 +3320,16 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'set_build_configs_paused',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           let updated = 0;
           for (const id of typed.buildTypeIds) {
             // eslint-disable-next-line no-await-in-loop
-            await api.buildTypes.setBuildTypeField(id, 'paused', String(typed.paused));
+            await adapter.modules.buildTypes.setBuildTypeField(id, 'paused', String(typed.paused));
             updated += 1;
           }
           let canceled = 0;
           if (typed.cancelQueued) {
-            const queue = await api.buildQueue.getAllQueuedBuilds();
+            const queue = await adapter.modules.buildQueue.getAllQueuedBuilds();
             const builds = (queue.data?.build ?? []) as Array<{
               id?: number;
               buildTypeId?: string;
@@ -3260,7 +3339,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             for (const b of toCancel) {
               if (b.id == null) continue;
               // eslint-disable-next-line no-await-in-loop
-              await api.buildQueue.deleteQueuedBuild(String(b.id));
+              await adapter.modules.buildQueue.deleteQueuedBuild(String(b.id));
               canceled += 1;
             }
           }
@@ -3330,7 +3409,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'mute_tests',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           let scope: { buildType?: { id: string }; project?: { id: string } };
           if (typed.buildTypeId) {
             scope = { buildType: { id: typed.buildTypeId } };
@@ -3357,7 +3436,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             ],
           };
 
-          const response = await api.mutes.muteMultipleTests(typed.fields, payload, {
+          const response = await adapter.modules.mutes.muteMultipleTests(typed.fields, payload, {
             headers: {
               'Content-Type': 'application/json',
               Accept: 'application/json',
@@ -3394,8 +3473,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'move_queued_build_to_top',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          await api.buildQueue.setQueuedBuildsOrder(undefined, {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          await adapter.modules.buildQueue.setQueuedBuildsOrder(undefined, {
             build: [{ id: parseInt(typed.buildId) }],
           });
           return json({
@@ -3423,8 +3502,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'reorder_queued_builds',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          await api.buildQueue.setQueuedBuildsOrder(undefined, {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          await adapter.modules.buildQueue.setQueuedBuildsOrder(undefined, {
             build: typed.buildIds.map((id) => ({ id: parseInt(id) })),
           });
           return json({
@@ -3452,15 +3531,15 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'cancel_queued_builds_for_build_type',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const queue = await api.buildQueue.getAllQueuedBuilds();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const queue = await adapter.modules.buildQueue.getAllQueuedBuilds();
           const builds = (queue.data?.build ?? []) as Array<{ id?: number; buildTypeId?: string }>;
           const toCancel = builds.filter((b) => b.buildTypeId === typed.buildTypeId);
           let canceled = 0;
           for (const b of toCancel) {
             if (b.id == null) continue;
             // eslint-disable-next-line no-await-in-loop
-            await api.buildQueue.deleteQueuedBuild(String(b.id));
+            await adapter.modules.buildQueue.deleteQueuedBuild(String(b.id));
             canceled += 1;
           }
           return json({
@@ -3489,14 +3568,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'cancel_queued_builds_by_locator',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const queue = await api.buildQueue.getAllQueuedBuilds(typed.locator);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const queue = await adapter.modules.buildQueue.getAllQueuedBuilds(typed.locator);
           const builds = (queue.data?.build ?? []) as Array<{ id?: number }>;
           let canceled = 0;
           for (const b of builds) {
             if (b.id == null) continue;
             // eslint-disable-next-line no-await-in-loop
-            await api.buildQueue.deleteQueuedBuild(String(b.id));
+            await adapter.modules.buildQueue.deleteQueuedBuild(String(b.id));
             canceled += 1;
           }
           return json({
@@ -3541,9 +3620,11 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'pause_queue_for_pool',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           // Disable all agents in pool
-          const agentsResp = await api.agents.getAllAgents(`agentPool:(id:${typed.poolId})`);
+          const agentsResp = await adapter.modules.agents.getAllAgents(
+            `agentPool:(id:${typed.poolId})`
+          );
           const agents = (agentsResp.data?.agent ?? []) as Array<{ id?: string }>;
           const body: { status: boolean; comment?: { text?: string }; statusSwitchTime?: string } =
             {
@@ -3556,7 +3637,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             const id = a.id;
             if (!id) continue;
             // eslint-disable-next-line no-await-in-loop
-            await api.agents.setEnabledInfo(id, undefined, body, {
+            await adapter.modules.agents.setEnabledInfo(id, undefined, body, {
               headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
             });
             disabled += 1;
@@ -3565,7 +3646,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           // Optionally cancel queued builds for provided buildTypeId
           let canceled = 0;
           if (typed.cancelQueuedForBuildTypeId) {
-            const queue = await api.buildQueue.getAllQueuedBuilds();
+            const queue = await adapter.modules.buildQueue.getAllQueuedBuilds();
             const builds = (queue.data?.build ?? []) as Array<{
               id?: number;
               buildTypeId?: string;
@@ -3576,7 +3657,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             for (const b of toCancel) {
               if (b.id == null) continue;
               // eslint-disable-next-line no-await-in-loop
-              await api.buildQueue.deleteQueuedBuild(String(b.id));
+              await adapter.modules.buildQueue.deleteQueuedBuild(String(b.id));
               canceled += 1;
             }
           }
@@ -3608,15 +3689,17 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'resume_queue_for_pool',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
-          const agentsResp = await api.agents.getAllAgents(`agentPool:(id:${typed.poolId})`);
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const agentsResp = await adapter.modules.agents.getAllAgents(
+            `agentPool:(id:${typed.poolId})`
+          );
           const agents = (agentsResp.data?.agent ?? []) as Array<{ id?: string }>;
           let enabled = 0;
           for (const a of agents) {
             const id = a.id;
             if (!id) continue;
             // eslint-disable-next-line no-await-in-loop
-            await api.agents.setEnabledInfo(
+            await adapter.modules.agents.setEnabledInfo(
               id,
               undefined,
               { status: true },
@@ -3664,7 +3747,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'set_agent_enabled',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const body: {
             status: boolean;
             comment?: { text?: string };
@@ -3672,7 +3755,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           } = { status: typed.enabled };
           if (typed.comment) body.comment = { text: typed.comment };
           if (typed.until) body.statusSwitchTime = typed.until;
-          const resp = await api.agents.setEnabledInfo(typed.agentId, undefined, body, {
+          const resp = await adapter.modules.agents.setEnabledInfo(typed.agentId, undefined, body, {
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           });
           return json({
@@ -3731,14 +3814,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         'bulk_set_agents_enabled',
         schema,
         async (typed) => {
-          const api = TeamCityAPI.getInstance();
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const filters: string[] = [];
           if (typed.poolId) filters.push(`agentPool:(id:${typed.poolId})`);
           if (typed.locator) filters.push(typed.locator);
           if (typed.includeDisabled === false) filters.push('enabled:true');
           const locator = filters.join(',');
 
-          const list = await api.agents.getAllAgents(locator);
+          const list = await adapter.modules.agents.getAllAgents(locator);
           const agents = (list.data?.agent ?? []) as Array<{ id?: string; name?: string }>;
           const body: {
             status: boolean;
@@ -3754,7 +3837,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             if (!id) continue;
             try {
               // eslint-disable-next-line no-await-in-loop
-              await api.agents.setEnabledInfo(id, undefined, body, {
+              await adapter.modules.agents.setEnabledInfo(id, undefined, body, {
                 headers: {
                   'Content-Type': 'application/json',
                   Accept: 'application/json',

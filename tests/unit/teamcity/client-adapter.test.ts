@@ -8,6 +8,11 @@ import type {
   TeamCityApiSurface,
   TeamCityRequestContext,
 } from '@/teamcity/types/client';
+import { warn } from '@/utils/logger';
+
+jest.mock('@/utils/logger', () => ({
+  warn: jest.fn(),
+}));
 
 describe('createAdapterFromTeamCityAPI', () => {
   const baseUrl = 'https://teamcity.example.com';
@@ -35,6 +40,7 @@ describe('createAdapterFromTeamCityAPI', () => {
   const listVcsRoots = jest.fn();
   const listAgents = jest.fn();
   const listAgentPools = jest.fn();
+  const warnMock = warn as jest.MockedFunction<typeof warn>;
 
   beforeEach(() => {
     const token = 'token-123';
@@ -143,6 +149,7 @@ describe('createAdapterFromTeamCityAPI', () => {
     listVcsRoots.mockReset().mockResolvedValue({ vcsRoot: [] });
     listAgents.mockReset().mockResolvedValue({ agent: [] });
     listAgentPools.mockReset().mockResolvedValue({ agentPool: [] });
+    warnMock.mockReset();
   });
 
   it('exposes unified surface and configuration helpers', () => {
@@ -248,5 +255,110 @@ describe('createAdapterFromTeamCityAPI', () => {
         timeout: apiConfig.timeout,
       },
     });
+  });
+
+  it('uses apiConfig baseUrl when TeamCityAPI lacks getBaseUrl', () => {
+    const minimalApi = {
+      modules,
+      listProjects,
+      getProject,
+      listBuilds,
+      getBuild,
+      triggerBuild,
+      getBuildLog,
+      getBuildLogChunk,
+      listBuildTypes,
+      getBuildType,
+      listTestFailures,
+      listBuildArtifacts,
+      downloadBuildArtifact,
+      getBuildStatistics,
+      listChangesForBuild,
+      listSnapshotDependencies,
+      listVcsRoots,
+      listAgents,
+      listAgentPools,
+    } as unknown as TeamCityAPI;
+
+    const adapter = createAdapterFromTeamCityAPI(minimalApi, {
+      apiConfig: { baseUrl: 'https://from-options', token: 'opt-token', timeout: 1111 },
+    });
+
+    expect(adapter.baseUrl).toBe('https://from-options');
+    expect(warnMock).not.toHaveBeenCalled();
+  });
+
+  it('uses axios defaults when baseUrl is provided on the HTTP client', () => {
+    const httpOnly = axios.create({ baseURL: 'https://from-http' });
+    const minimalApi = {
+      modules,
+      http: httpOnly,
+      listProjects,
+      getProject,
+      listBuilds,
+      getBuild,
+      triggerBuild,
+      getBuildLog,
+      getBuildLogChunk,
+      listBuildTypes,
+      getBuildType,
+      listTestFailures,
+      listBuildArtifacts,
+      downloadBuildArtifact,
+      getBuildStatistics,
+      listChangesForBuild,
+      listSnapshotDependencies,
+      listVcsRoots,
+      listAgents,
+      listAgentPools,
+    } as unknown as TeamCityAPI;
+
+    const adapter = createAdapterFromTeamCityAPI(minimalApi);
+
+    expect(adapter.baseUrl).toBe('https://from-http');
+    expect(warnMock).not.toHaveBeenCalled();
+  });
+
+  it('warns and uses the placeholder baseUrl when no sources are available', async () => {
+    const projects = { getAllProjects: jest.fn().mockResolvedValue({}) };
+    const builds: BuildApiLike = {
+      getAllBuilds: jest.fn(),
+      getBuild: jest.fn(),
+      getMultipleBuilds: jest.fn(),
+      getBuildProblems: jest.fn(),
+    };
+    const minimalApi = {
+      projects,
+      builds,
+      listProjects,
+      getProject,
+      listBuilds,
+      getBuild,
+      triggerBuild,
+      getBuildLog,
+      getBuildLogChunk,
+      listBuildTypes,
+      getBuildType,
+      listTestFailures,
+      listBuildArtifacts,
+      downloadBuildArtifact,
+      getBuildStatistics,
+      listChangesForBuild,
+      listSnapshotDependencies,
+      listVcsRoots,
+      listAgents,
+      listAgentPools,
+    } as unknown as TeamCityAPI;
+
+    const adapter = createAdapterFromTeamCityAPI(minimalApi);
+
+    expect(adapter.baseUrl).toBe('http://not-configured');
+    expect(warnMock).toHaveBeenCalledWith(
+      'TeamCity adapter using fallback baseUrl placeholder',
+      expect.objectContaining({ reason: 'missing_base_url' })
+    );
+
+    await adapter.modules.projects.getAllProjects?.('foo');
+    expect(projects.getAllProjects).toHaveBeenCalledWith('foo');
   });
 });

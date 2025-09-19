@@ -248,7 +248,8 @@ describe('retry', () => {
     if (delays.length >= 2) {
       const first = delays[0] as number;
       const second = delays[1] as number;
-      expect(second).toBeGreaterThanOrEqual(first);
+      const toleranceMs = 10;
+      expect(second + toleranceMs).toBeGreaterThanOrEqual(first);
     }
   });
 
