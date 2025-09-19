@@ -3,7 +3,7 @@
  */
 import { warn } from '@/utils/logger';
 
-import type { TeamCityClientAdapter } from './client-adapter';
+import type { TeamCityUnifiedClient } from './types/client';
 
 export interface BuildResultsOptions {
   includeArtifacts?: boolean;
@@ -100,14 +100,14 @@ interface TeamCityChange {
 }
 
 export class BuildResultsManager {
-  private client: TeamCityClientAdapter;
+  private client: TeamCityUnifiedClient;
   private cache: Map<string, CacheEntry> = new Map();
   private static readonly cacheTtlMs = 10 * 60 * 1000; // 10 minutes
   private static readonly defaultMaxArtifactSize = 1024 * 1024; // 1MB
   private static readonly fields =
     'id,number,status,state,buildTypeId,projectId,branchName,startDate,finishDate,queuedDate,statusText,href,webUrl,triggered';
 
-  constructor(client: TeamCityClientAdapter) {
+  constructor(client: TeamCityUnifiedClient) {
     this.client = client;
   }
 
@@ -215,7 +215,10 @@ export class BuildResultsManager {
    * Fetch build summary data
    */
   private async fetchBuildSummary(buildId: string): Promise<unknown> {
-    const response = await this.client.builds.getBuild(`id:${buildId}`, BuildResultsManager.fields);
+    const response = await this.client.modules.builds.getBuild(
+      this.toBuildLocator(buildId),
+      BuildResultsManager.fields
+    );
     return response.data;
   }
 
@@ -299,7 +302,9 @@ export class BuildResultsManager {
     options: BuildResultsOptions
   ): Promise<BuildResult['artifacts']> {
     try {
-      const response = await this.client.listBuildArtifacts(buildId);
+      const response = await this.client.modules.builds.getFilesListOfBuild(
+        this.toBuildLocator(buildId)
+      );
       const artifactListing = response.data as { file?: TeamCityArtifact[] };
       let artifacts = artifactListing.file ?? [];
 
@@ -335,13 +340,10 @@ export class BuildResultsManager {
             const maxSize = options.maxArtifactSize ?? BuildResultsManager.defaultMaxArtifactSize;
             if ((artifact.size ?? 0) <= maxSize) {
               try {
-                const contentResponse = await this.client.downloadArtifactContent(
-                  buildId,
-                  artifactPath
-                );
+                const contentResponse = await this.downloadArtifactContent(buildId, artifactPath);
 
                 // Convert to base64
-                artifactData.content = Buffer.from(contentResponse.data).toString('base64');
+                artifactData.content = Buffer.from(contentResponse).toString('base64');
               } catch (err) {
                 // Ignore download errors
               }
@@ -376,7 +378,9 @@ export class BuildResultsManager {
    */
   private async fetchStatistics(buildId: string): Promise<BuildResult['statistics']> {
     try {
-      const response = await this.client.getBuildStatistics(buildId);
+      const response = await this.client.modules.builds.getBuildStatisticValues(
+        this.toBuildLocator(buildId)
+      );
       const payload = response.data as { property?: Array<{ name: string; value: string }> };
       const properties = payload.property ?? [];
       const stats: BuildResult['statistics'] = {};
@@ -422,7 +426,7 @@ export class BuildResultsManager {
    */
   private async fetchChanges(buildId: string): Promise<BuildResult['changes']> {
     try {
-      const response = await this.client.listChangesForBuild(buildId);
+      const response = await this.client.modules.changes.getAllChanges(`build:(id:${buildId})`);
       const changePayload = response.data as { change?: TeamCityChange[] };
       const changes = changePayload.change ?? [];
 
@@ -447,7 +451,9 @@ export class BuildResultsManager {
    */
   private async fetchDependencies(buildId: string): Promise<BuildResult['dependencies']> {
     try {
-      const response = await this.client.listSnapshotDependencies(buildId);
+      const response = await this.client.request((ctx) =>
+        ctx.axios.get(`${ctx.baseUrl}/app/rest/builds/id:${buildId}/snapshot-dependencies`)
+      );
       const depsData = response.data as {
         build?: Array<{
           id: number;
@@ -477,10 +483,41 @@ export class BuildResultsManager {
     if (/^https?:/i.test(path)) {
       return path;
     }
+    const baseUrl = this.getBaseUrl();
     if (path.startsWith('/')) {
-      return `${this.client.baseUrl}${path}`;
+      return `${baseUrl}${path}`;
     }
-    return `${this.client.baseUrl}/${path}`;
+    return `${baseUrl}/${path}`;
+  }
+
+  private getBaseUrl(): string {
+    const baseUrl = this.client.getApiConfig().baseUrl;
+    return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  }
+
+  private toBuildLocator(buildId: string): string {
+    return buildId.includes(':') ? buildId : `id:${buildId}`;
+  }
+
+  private async downloadArtifactContent(
+    buildId: string,
+    artifactPath: string
+  ): Promise<ArrayBuffer> {
+    const normalizedPath = artifactPath
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+
+    const response = await this.client.request((ctx) =>
+      ctx.axios.get<ArrayBuffer>(
+        `${ctx.baseUrl}/app/rest/builds/id:${buildId}/artifacts/content/${normalizedPath}`,
+        {
+          responseType: 'arraybuffer',
+        }
+      )
+    );
+
+    return response.data;
   }
 
   /**
