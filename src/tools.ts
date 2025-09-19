@@ -2,6 +2,7 @@
  * Static Tool Definitions for TeamCity MCP Server
  * Simple, direct tool implementations without complex abstractions
  */
+import { isAxiosError } from 'axios';
 import { z } from 'zod';
 
 import { getMCPMode as getMCPModeFromConfig } from '@/config';
@@ -9,6 +10,7 @@ import { type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import { BuildConfigurationUpdateManager } from '@/teamcity/build-configuration-update-manager';
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
 import { createAdapterFromTeamCityAPI } from '@/teamcity/client-adapter';
+import { TeamCityAPIError, isRetryableError } from '@/teamcity/errors';
 import { createPaginatedFetcher, fetchAllPages } from '@/teamcity/pagination';
 import { debug } from '@/utils/logger';
 import { json, runTool } from '@/utils/mcp';
@@ -615,63 +617,111 @@ const DEV_TOOLS: ToolDefinition[] = [
             throw new Error('Failed to resolve buildId from inputs');
           }
 
-          // Tail mode: return last N lines regardless of provided paging params
-          if (typed.tail) {
-            const count = typed.lineCount ?? typed.pageSize ?? 500;
-            const full = await api.getBuildLog(effectiveBuildId);
-            const allLines = full.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-            if (allLines.length > 0 && allLines[allLines.length - 1] === '') allLines.pop();
-            const total = allLines.length;
-            const start = Math.max(0, total - count);
-            const lines = allLines.slice(start);
+          const shouldRetry = (error: unknown): boolean => {
+            if (error instanceof TeamCityAPIError) {
+              if (error.code === 'HTTP_404') {
+                return true;
+              }
+              return isRetryableError(error);
+            }
+
+            if (isAxiosError(error)) {
+              const status = error.response?.status;
+              if (status === 404) {
+                return true;
+              }
+              if (status != null && status >= 500 && status < 600) {
+                return true;
+              }
+              if (!status) {
+                // Network-level failure (timeout, connection reset, etc.)
+                return true;
+              }
+            }
+
+            return false;
+          };
+
+          const wait = (ms: number) =>
+            new Promise((resolve) => {
+              setTimeout(resolve, ms);
+            });
+
+          const attemptFetch = async () => {
+            if (typed.tail) {
+              const count = typed.lineCount ?? typed.pageSize ?? 500;
+              const full = await api.getBuildLog(effectiveBuildId);
+              const allLines = full.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+              if (allLines.length > 0 && allLines[allLines.length - 1] === '') allLines.pop();
+              const total = allLines.length;
+              const start = Math.max(0, total - count);
+              const lines = allLines.slice(start);
+
+              return json({
+                lines,
+                meta: {
+                  buildId: effectiveBuildId,
+                  buildNumber:
+                    typeof typed.buildNumber !== 'undefined'
+                      ? String(typed.buildNumber)
+                      : undefined,
+                  buildTypeId: typed.buildTypeId,
+                  mode: 'tail',
+                  pageSize: count,
+                  startLine: start,
+                  hasMore: start > 0,
+                  totalLines: total,
+                },
+              });
+            }
+
+            const effectivePageSize = typed.lineCount ?? typed.pageSize ?? 500;
+            const startLine =
+              typeof typed.startLine === 'number'
+                ? typed.startLine
+                : ((typed.page ?? 1) - 1) * effectivePageSize;
+
+            const chunk = await api.getBuildLogChunk(effectiveBuildId, {
+              startLine,
+              lineCount: effectivePageSize,
+            });
+
+            const page = Math.floor(startLine / effectivePageSize) + 1;
+            const hasMore = chunk.nextStartLine !== undefined;
 
             return json({
-              lines,
+              lines: chunk.lines,
               meta: {
                 buildId: effectiveBuildId,
                 buildNumber:
                   typeof typed.buildNumber !== 'undefined' ? String(typed.buildNumber) : undefined,
                 buildTypeId: typed.buildTypeId,
-                mode: 'tail',
-                pageSize: count,
-                startLine: start,
-                hasMore: start > 0,
-                totalLines: total,
+                page,
+                pageSize: effectivePageSize,
+                startLine: chunk.startLine,
+                nextPage: hasMore ? page + 1 : undefined,
+                prevPage: page > 1 ? page - 1 : undefined,
+                hasMore,
+                totalLines: chunk.totalLines,
+                nextStartLine: chunk.nextStartLine,
               },
             });
+          };
+
+          const maxAttempts = typed.tail ? 5 : 3;
+          for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+            try {
+              return await attemptFetch();
+            } catch (error) {
+              if (shouldRetry(error) && attempt < maxAttempts - 1) {
+                await wait(500 * (attempt + 1));
+                continue;
+              }
+              throw error;
+            }
           }
 
-          const effectivePageSize = typed.lineCount ?? typed.pageSize ?? 500;
-          const startLine =
-            typeof typed.startLine === 'number'
-              ? typed.startLine
-              : ((typed.page ?? 1) - 1) * effectivePageSize;
-
-          const chunk = await api.getBuildLogChunk(effectiveBuildId, {
-            startLine,
-            lineCount: effectivePageSize,
-          });
-
-          const page = Math.floor(startLine / effectivePageSize) + 1;
-          const hasMore = chunk.nextStartLine !== undefined;
-
-          return json({
-            lines: chunk.lines,
-            meta: {
-              buildId: effectiveBuildId,
-              buildNumber:
-                typeof typed.buildNumber !== 'undefined' ? String(typed.buildNumber) : undefined,
-              buildTypeId: typed.buildTypeId,
-              page,
-              pageSize: effectivePageSize,
-              startLine: chunk.startLine,
-              nextPage: hasMore ? page + 1 : undefined,
-              prevPage: page > 1 ? page - 1 : undefined,
-              hasMore,
-              totalLines: chunk.totalLines,
-              nextStartLine: chunk.nextStartLine,
-            },
-          });
+          throw new Error('Unable to fetch build log after retries');
         },
         args
       );

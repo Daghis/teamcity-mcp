@@ -4,13 +4,19 @@ import type { Build } from '@/teamcity-client/models/build';
 
 import type { ResolvedBuildConfiguration } from './build-configuration-resolver';
 import type { ParameterSet } from './build-parameters-manager';
-import type { TeamCityClient } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
 
 // Extended Build type for queue-specific properties
 interface QueuedBuildData extends Build {
   estimatedStartTime?: string;
   estimatedDuration?: number;
   properties?: { property?: Array<{ name: string; value: string }> };
+}
+
+type QueueEntry = Partial<QueuedBuildData>;
+
+interface QueueResponse {
+  build?: QueueEntry[];
 }
 
 export interface QueueBuildOptions {
@@ -83,14 +89,14 @@ export interface QueueLimitations {
 }
 
 export class BuildQueueManager extends EventEmitter {
-  private client: TeamCityClient;
+  private client: TeamCityClientAdapter;
   private maxRetries: number;
   private retryDelay: number;
   private pollingInterval: number;
   private activeMonitors: Map<string, NodeJS.Timeout>;
 
   constructor(
-    client: TeamCityClient,
+    client: TeamCityClientAdapter,
     options?: {
       maxRetries?: number;
       retryDelay?: number;
@@ -162,7 +168,7 @@ export class BuildQueueManager extends EventEmitter {
 
       // Queue the build with retry logic
       const response = await this.retryOperation(async () => {
-        return await this.client.buildQueue.addBuildToQueue(
+        return await this.client.modules.buildQueue.addBuildToQueue(
           options.moveToTop,
           buildRequest as Build
         );
@@ -220,14 +226,16 @@ export class BuildQueueManager extends EventEmitter {
 
   async getQueuePosition(buildId: string): Promise<QueuePosition> {
     try {
-      const response = await this.client.buildQueue.getAllQueuedBuilds();
-      const queue = response.data?.build ?? [];
+      const response = await this.client.modules.buildQueue.getAllQueuedBuilds();
+      const queueResponse = (response.data ?? {}) as QueueResponse;
+      const queue = queueResponse.build ?? [];
 
-      const buildIndex = queue.findIndex((b) => (b as { id?: string }).id === buildId);
+      const buildIndex = queue.findIndex((entry) => String(entry?.id ?? '') === buildId);
       if (buildIndex === -1) {
         // Check if build is already running
-        const build = await this.client.builds.getBuild(buildId);
-        if (build.data.state === 'running' || build.data.state === 'finished') {
+        const buildResponse = await this.client.builds.getBuild(buildId);
+        const build = (buildResponse.data ?? {}) as Partial<Build>;
+        if (build.state === 'running' || build.state === 'finished') {
           return {
             buildId,
             position: 0,
@@ -238,19 +246,17 @@ export class BuildQueueManager extends EventEmitter {
       }
 
       const position = buildIndex + 1;
-      const blockedBy = this.findBlockingBuilds(queue as Build[], buildId);
+      const blockedBy = this.findBlockingBuilds(queue, buildId);
 
       return {
         buildId,
         position,
-        estimatedStartTime:
-          queue[buildIndex] != null &&
-          (queue[buildIndex] as { estimatedStartTime?: string }).estimatedStartTime != null
-            ? new Date((queue[buildIndex] as { estimatedStartTime: string }).estimatedStartTime)
-            : undefined,
+        estimatedStartTime: (() => {
+          const raw = queue[buildIndex]?.estimatedStartTime;
+          return raw ? new Date(raw) : undefined;
+        })(),
         estimatedWaitTime:
-          queue[buildIndex] != null &&
-          (queue[buildIndex] as { waitReason?: string }).waitReason?.includes('agent') === true
+          queue[buildIndex]?.waitReason?.includes('agent') === true
             ? this.estimateWaitTime(queue, buildIndex)
             : undefined,
         canMoveToTop: position > 1 && blockedBy.length === 0,
@@ -277,7 +283,7 @@ export class BuildQueueManager extends EventEmitter {
       }
 
       // Move build to top via API
-      await this.client.buildQueue.setQueuedBuildsOrder(undefined, {
+      await this.client.modules.buildQueue.setQueuedBuildsOrder(undefined, {
         build: [{ id: parseInt(buildId) }],
       });
 
@@ -304,7 +310,7 @@ export class BuildQueueManager extends EventEmitter {
       }
 
       // Reorder queue
-      await this.client.buildQueue.setQueuedBuildsOrder(undefined, {
+      await this.client.modules.buildQueue.setQueuedBuildsOrder(undefined, {
         build: buildIds.map((id) => ({ id: parseInt(id) })),
       });
 
@@ -319,7 +325,20 @@ export class BuildQueueManager extends EventEmitter {
   async getBuildStatus(buildId: string): Promise<BuildStatus> {
     try {
       const response = await this.client.builds.getBuild(buildId);
-      const build = response.data;
+      const build = (response.data ?? {}) as Partial<Build> & {
+        artifacts?: { count?: number; href?: string };
+        testOccurrences?: {
+          count?: number;
+          passed?: number;
+          failed?: number;
+          ignored?: number;
+        };
+        ['running-info']?: {
+          currentStageText?: string;
+          elapsedSeconds?: number;
+          estimatedTotalSeconds?: number;
+        };
+      };
 
       const status: BuildStatus = {
         buildId: String(build.id ?? ''),
@@ -437,7 +456,7 @@ export class BuildQueueManager extends EventEmitter {
 
   async cancelBuild(buildId: string, comment?: string): Promise<void> {
     try {
-      await this.client.buildQueue.cancelQueuedBuild(buildId);
+      await this.client.modules.buildQueue.cancelQueuedBuild(buildId);
       this.emit('build:canceled', { buildId, comment });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -448,37 +467,44 @@ export class BuildQueueManager extends EventEmitter {
   async getQueueLimitations(buildTypeId: string): Promise<QueueLimitations> {
     try {
       // Get build type details
-      const buildType = await this.client.buildTypes.getBuildType(buildTypeId);
+      const buildTypeResponse = await this.client.modules.buildTypes.getBuildType(buildTypeId);
+      const buildType = (buildTypeResponse.data ?? {}) as {
+        settings?: {
+          property?: Array<{ name?: string; value?: string }>;
+        };
+      };
 
       // Get queue info
-      const queue = await this.client.buildQueue.getAllQueuedBuilds();
-      const queuedBuilds =
-        queue.data?.build?.filter(
-          (b) => (b as { buildTypeId?: string }).buildTypeId === buildTypeId
-        ).length ?? 0;
+      const queueResponse = await this.client.modules.buildQueue.getAllQueuedBuilds();
+      const queueData = (queueResponse.data ?? {}) as QueueResponse;
+      const queuedBuilds = (queueData.build ?? []).filter(
+        (entry) => String(entry?.buildTypeId ?? '') === buildTypeId
+      ).length;
 
       // Get running builds count
-      const runningBuilds = await this.client.builds.getAllBuilds(
+      const runningBuildsResponse = await this.client.builds.getAllBuilds(
         `buildType:${buildTypeId},state:running`,
         'count'
       );
+      const runningBuilds = (runningBuildsResponse.data ?? {}) as { count?: number };
 
       // Get agent pool info
-      const agents = await this.client.agents.getAllAgents(
+      const agentsResponse = await this.client.modules.agents.getAllAgents(
         `compatible:(buildType:${buildTypeId}),enabled:true`,
         'count'
       );
+      const agents = (agentsResponse.data ?? {}) as { count?: number };
 
       return {
         maxConcurrentBuilds: (() => {
-          const prop = buildType.data?.settings?.property?.find(
-            (p) => (p as { name?: string }).name === 'maximumConcurrentBuilds'
+          const prop = buildType.settings?.property?.find(
+            (p) => p?.name === 'maximumConcurrentBuilds'
           );
-          return prop?.value ? parseInt(prop.value) : undefined;
+          return prop?.value ? parseInt(prop.value, 10) : undefined;
         })(),
-        currentlyRunning: runningBuilds.data?.count ?? 0,
+        currentlyRunning: runningBuilds.count ?? 0,
         queuedBuilds,
-        availableAgents: agents.data?.count ?? 0,
+        availableAgents: agents.count ?? 0,
       };
     } catch (error: unknown) {
       // Return basic info if detailed info fails
@@ -590,21 +616,23 @@ export class BuildQueueManager extends EventEmitter {
     }
   }
 
-  private findBlockingBuilds(queue: Build[], buildId: string): string[] {
+  private findBlockingBuilds(queue: QueueEntry[], buildId: string): string[] {
     const blocking: string[] = [];
-    const build = queue.find((b) => String(b.id) === buildId);
+    const build = queue.find((entry) => String(entry?.id ?? '') === buildId);
 
     if (!build) {
       return blocking;
     }
 
     // Check for snapshot dependencies
-    const deps = (build as { 'snapshot-dependencies'?: { build?: Array<{ id: string }> } })[
-      'snapshot-dependencies'
-    ];
+    const deps = (
+      build as {
+        'snapshot-dependencies'?: { build?: Array<{ id?: string }> };
+      }
+    )['snapshot-dependencies'];
     if (deps?.build != null) {
       for (const dep of deps.build) {
-        if (queue.some((b) => String(b.id) === dep.id)) {
+        if (dep?.id != null && queue.some((entry) => String(entry?.id ?? '') === dep.id)) {
           blocking.push(dep.id);
         }
       }
@@ -613,7 +641,7 @@ export class BuildQueueManager extends EventEmitter {
     return blocking;
   }
 
-  private estimateWaitTime(_queue: unknown[], buildIndex: number): number {
+  private estimateWaitTime(_queue: QueueEntry[], buildIndex: number): number {
     // Simple estimation based on position and average build time
     // In reality, this would need more sophisticated calculation
     const averageBuildTime = 5 * 60 * 1000; // 5 minutes default

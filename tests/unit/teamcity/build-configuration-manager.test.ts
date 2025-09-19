@@ -2,6 +2,7 @@
  * Tests for BuildConfigurationManager
  */
 import { BuildConfigurationManager } from '@/teamcity/build-configuration-manager';
+
 import {
   type MockTeamCityClient,
   createMockTeamCityClient,
