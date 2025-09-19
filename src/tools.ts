@@ -2,12 +2,20 @@
  * Static Tool Definitions for TeamCity MCP Server
  * Simple, direct tool implementations without complex abstractions
  */
+import { randomUUID } from 'node:crypto';
+import { createWriteStream, promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, dirname, extname, join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+
 import { isAxiosError } from 'axios';
 import { z } from 'zod';
 
 import { getMCPMode as getMCPModeFromConfig } from '@/config';
 import { type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import type { Step } from '@/teamcity-client/models/step';
+import { ArtifactManager } from '@/teamcity/artifact-manager';
 import { BuildConfigurationUpdateManager } from '@/teamcity/build-configuration-update-manager';
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
 import { createAdapterFromTeamCityAPI } from '@/teamcity/client-adapter';
@@ -1781,6 +1789,109 @@ const DEV_TOOLS: ToolDefinition[] = [
             maxArtifactSize: typed.maxArtifactSize,
           });
           return json(result);
+        },
+        args
+      );
+    },
+  },
+
+  {
+    name: 'download_build_artifact',
+    description: 'Download a single artifact with optional streaming output',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildId: { type: 'string', description: 'Build ID' },
+        artifactPath: { type: 'string', description: 'Artifact path or name' },
+        encoding: {
+          type: 'string',
+          description: "Response encoding: 'base64' (default), 'text', or 'stream'",
+          enum: ['base64', 'text', 'stream'],
+          default: 'base64',
+        },
+        maxSize: {
+          type: 'number',
+          description: 'Maximum artifact size (bytes) allowed before aborting',
+        },
+        outputPath: {
+          type: 'string',
+          description:
+            'Optional absolute path to write streamed content; defaults to a temp file when streaming',
+        },
+      },
+      required: ['buildId', 'artifactPath'],
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({
+        buildId: z.string().min(1),
+        artifactPath: z.string().min(1),
+        encoding: z.enum(['base64', 'text', 'stream']).default('base64'),
+        maxSize: z.number().int().positive().optional(),
+        outputPath: z.string().min(1).optional(),
+      });
+
+      const isReadableStream = (value: unknown): value is Readable =>
+        typeof value === 'object' &&
+        value !== null &&
+        typeof (value as Readable).pipe === 'function';
+
+      const toTempFilePath = (artifactName: string): string => {
+        const base = basename(artifactName || 'artifact');
+        const safeStem = base.replace(/[^a-zA-Z0-9._-]/g, '_') || 'artifact';
+        const ext = extname(safeStem);
+        const stemWithoutExt = ext ? safeStem.slice(0, -ext.length) : safeStem;
+        const finalStem = stemWithoutExt || 'artifact';
+        const fileName = `${finalStem}-${randomUUID()}${ext}`;
+        return join(tmpdir(), fileName);
+      };
+
+      return runTool(
+        'download_build_artifact',
+        schema,
+        async (typed) => {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const manager = new ArtifactManager(adapter);
+
+          const artifact = await manager.downloadArtifact(typed.buildId, typed.artifactPath, {
+            encoding: typed.encoding,
+            maxSize: typed.maxSize,
+          });
+
+          if (typed.encoding === 'stream') {
+            const stream = artifact.content;
+            if (!isReadableStream(stream)) {
+              throw new Error('Streaming download did not return a readable stream');
+            }
+
+            const targetPath = typed.outputPath ?? toTempFilePath(artifact.name);
+            await fs.mkdir(dirname(targetPath), { recursive: true });
+            await pipeline(stream, createWriteStream(targetPath));
+            const stats = await fs.stat(targetPath);
+
+            return json({
+              name: artifact.name,
+              path: artifact.path,
+              size: artifact.size,
+              mimeType: artifact.mimeType,
+              encoding: 'stream',
+              outputPath: targetPath,
+              bytesWritten: stats.size,
+            });
+          }
+
+          const payloadContent = artifact.content;
+          if (typeof payloadContent !== 'string') {
+            throw new Error(`Expected ${typed.encoding} artifact content as string`);
+          }
+
+          return json({
+            name: artifact.name,
+            path: artifact.path,
+            size: artifact.size,
+            mimeType: artifact.mimeType,
+            encoding: typed.encoding,
+            content: payloadContent,
+          });
         },
         args
       );

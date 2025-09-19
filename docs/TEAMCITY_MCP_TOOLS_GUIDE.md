@@ -56,6 +56,7 @@ Complete infrastructure management including creation, modification, and deletio
 | `get_build_status`           | Get detailed build status and progress          |  ✅  |  ✅  |
 | `list_builds`                | Search and list builds with filtering           |  ✅  |  ✅  |
 | `get_build_results`          | Get detailed build results                |  ✅  |  ✅  |
+| `download_build_artifact`    | Download artifact content (base64/text/stream)  |  ✅  |  ✅  |
 | `fetch_build_log`            | Retrieve build logs                       |  ✅  |  ✅  |
 | `get_build_config`           | Get build configuration details                 |  ✅  |  ✅  |
 | `list_build_configs`         | List build configurations in project            |  ✅  |  ✅  |
@@ -181,6 +182,29 @@ Complete infrastructure management including creation, modification, and deletio
 - `includeTests`: Include test details
 - `includeProblems`: Include problems
 - `includeArtifacts`: Include artifacts
+
+#### `download_build_artifact`
+
+**Description**: Download a single artifact
+**Mode**: Dev
+**Key Capabilities**:
+
+- Return base64-encoded or plain-text content for small artifacts
+- Stream large artifacts directly to disk without buffering in memory
+- Enforce an optional maximum size before initiating the transfer
+
+**Parameters**:
+
+- `buildId` (required): Build identifier
+- `artifactPath` (required): Artifact path or name (as returned by artifact listings)
+- `encoding`: `'base64'` (default), `'text'`, or `'stream'`
+- `maxSize`: Abort download if artifact size exceeds this byte limit
+- `outputPath`: Absolute path to write streamed artifacts (defaults to a temp file when omitted)
+
+**Usage Notes**:
+
+- In `stream` mode the tool writes the artifact to disk and returns metadata (`outputPath`, `bytesWritten`).
+- Base64/text modes embed content directly in the JSON response for easy scripting.
 
 #### `fetch_build_log`
 

@@ -2,7 +2,7 @@
  * Lightweight adapter so managers can work with the unified TeamCityAPI
  * without depending on the legacy TeamCity client implementation.
  */
-import axios, { type AxiosInstance } from 'axios';
+import axios, { type AxiosInstance, type RawAxiosRequestConfig } from 'axios';
 
 import type { TeamCityAPI, TeamCityAPIClientConfig } from '@/api-client';
 import type { TeamCityFullConfig } from '@/teamcity/config';
@@ -152,8 +152,11 @@ export function createAdapterFromTeamCityAPI(
     listTestFailures: (buildId) => api.listTestFailures(buildId),
     builds: buildApi,
     listBuildArtifacts: (buildId, options) => api.listBuildArtifacts(buildId, options),
-    downloadArtifactContent: (buildId, artifactPath) =>
-      api.downloadBuildArtifact(buildId, artifactPath),
+    downloadArtifactContent: <T = ArrayBuffer>(
+      buildId: string,
+      artifactPath: string,
+      requestOptions?: RawAxiosRequestConfig
+    ) => api.downloadBuildArtifact<T>(buildId, artifactPath, requestOptions),
     getBuildStatistics: (buildId, fields) => api.getBuildStatistics(buildId, fields),
     listChangesForBuild: (buildId, fields) => api.listChangesForBuild(buildId, fields),
     listSnapshotDependencies: (buildId) => api.listSnapshotDependencies(buildId),
