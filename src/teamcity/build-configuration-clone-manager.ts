@@ -18,6 +18,12 @@ import {
 } from './types/api-responses';
 import type { TeamCityUnifiedClient } from './types/client';
 
+type BuildTypeClonePayload = Partial<BuildTypeData> & {
+  id: string;
+  name: string;
+  project: { id: string };
+};
+
 export interface CloneOptions {
   name: string;
   targetProjectId: string;
@@ -250,11 +256,7 @@ export class BuildConfigurationCloneManager {
     const configId = this.generateBuildConfigId(options.targetProjectId, options.name);
 
     // Build the configuration payload
-    const configPayload: Partial<BuildTypeData> & {
-      id: string;
-      name: string;
-      project: { id: string };
-    } = {
+    const configPayload: BuildTypeClonePayload = {
       id: configId,
       name: options.name,
       project: {
@@ -363,7 +365,7 @@ export class BuildConfigurationCloneManager {
     try {
       const response = await this.client.modules.buildTypes.createBuildType(
         undefined,
-        configPayload as unknown as BuildType
+        this.prepareBuildTypePayload(configPayload)
       );
 
       const teamcityUrl = getTeamCityUrl();
@@ -409,6 +411,26 @@ export class BuildConfigurationCloneManager {
       );
       throw error;
     }
+  }
+
+  /**
+   * Normalize cloned payload into the generated BuildType shape expected by the API
+   */
+  private prepareBuildTypePayload(payload: BuildTypeClonePayload): BuildType {
+    const clone =
+      typeof structuredClone === 'function'
+        ? structuredClone(payload)
+        : (JSON.parse(JSON.stringify(payload)) as BuildTypeClonePayload);
+
+    if (typeof clone.id !== 'string' || typeof clone.name !== 'string') {
+      throw new Error('Invalid build configuration payload: missing id or name');
+    }
+
+    if (typeof clone.project?.id !== 'string') {
+      throw new Error('Invalid build configuration payload: missing project id');
+    }
+
+    return clone as BuildType;
   }
 
   /**

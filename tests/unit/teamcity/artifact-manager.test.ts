@@ -237,7 +237,7 @@ describe('ArtifactManager', () => {
           },
         })
         .mockResolvedValueOnce({
-          data: mockContent,
+          data: Buffer.from(mockContent),
           headers: { 'content-type': 'text/plain' },
         });
 
@@ -271,6 +271,24 @@ describe('ArtifactManager', () => {
       expect(result.content).toBe(mockContent);
     });
 
+    it('throws when text downloads return a non-string payload', async () => {
+      http.get
+        .mockResolvedValueOnce({
+          data: {
+            file: [{ name: 'broken.txt', fullName: 'broken.txt', size: 1 }],
+          },
+        })
+        .mockResolvedValueOnce({
+          data: 1234,
+        });
+
+      await expect(
+        manager.downloadArtifact('12345', 'broken.txt', {
+          encoding: 'text',
+        })
+      ).rejects.toThrow('non-text payload');
+    });
+
     it('should handle binary artifacts', async () => {
       const binaryData = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG header
 
@@ -291,6 +309,24 @@ describe('ArtifactManager', () => {
 
       expect(result.content).toBe(binaryData.toString('base64'));
       expect(result.mimeType).toBe('image/png');
+    });
+
+    it('throws when binary downloads return unsupported payloads', async () => {
+      http.get
+        .mockResolvedValueOnce({
+          data: {
+            file: [{ name: 'image.png', fullName: 'image.png', size: 4 }],
+          },
+        })
+        .mockResolvedValueOnce({
+          data: { unexpected: true },
+        });
+
+      await expect(
+        manager.downloadArtifact('12345', 'image.png', {
+          encoding: 'base64',
+        })
+      ).rejects.toThrow('unexpected binary payload');
     });
 
     it('should respect size limits', async () => {

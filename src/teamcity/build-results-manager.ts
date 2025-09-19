@@ -502,7 +502,7 @@ export class BuildResultsManager {
   private async downloadArtifactContent(
     buildId: string,
     artifactPath: string
-  ): Promise<ArrayBuffer> {
+  ): Promise<ArrayBufferLike> {
     const normalizedPath = artifactPath
       .split('/')
       .map((segment) => encodeURIComponent(segment))
@@ -517,8 +517,18 @@ export class BuildResultsManager {
       { responseType: 'arraybuffer' }
     );
 
-    const axiosResponse = response as unknown as AxiosResponse<ArrayBuffer>;
-    return axiosResponse.data ?? new ArrayBuffer(0);
+    const axiosResponse = response as AxiosResponse<unknown>;
+    const { data } = axiosResponse;
+
+    if (data instanceof ArrayBuffer) {
+      return data.slice(0);
+    }
+
+    if (Buffer.isBuffer(data)) {
+      return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    }
+
+    throw new Error('Artifact download returned unexpected binary payload type');
   }
 
   /**

@@ -24,13 +24,28 @@ interface AdapterOptions {
 
 const FALLBACK_BASE_URL = 'http://not-configured';
 
+const toRecord = (value: unknown): Record<string, unknown> => {
+  if (typeof value === 'object' && value !== null) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+};
+
+const createBuildApiBridge = (api: TeamCityApiSurface['builds']): BuildApiLike => ({
+  getAllBuilds: (locator, fields, options) => api.getAllBuilds(locator, fields, options),
+  getBuild: (buildLocator, fields, options) => api.getBuild(buildLocator, fields, options),
+  getMultipleBuilds: (locator, fields, options) => api.getMultipleBuilds(locator, fields, options),
+  getBuildProblems: (buildLocator, fields, options) =>
+    api.getBuildProblems(buildLocator, fields, options),
+});
+
 const resolveModules = (api: TeamCityAPI): Readonly<TeamCityApiSurface> => {
   const candidate = (api as { modules?: Readonly<TeamCityApiSurface> }).modules;
   if (candidate != null) {
     return candidate;
   }
 
-  const legacy = api as unknown as Record<string, unknown>;
+  const legacy = toRecord(api);
   const pick = <K extends keyof TeamCityApiSurface>(key: K): TeamCityApiSurface[K] =>
     (legacy[key as string] ?? {}) as TeamCityApiSurface[K];
 
@@ -111,7 +126,7 @@ export function createAdapterFromTeamCityAPI(
   const request = async <T>(fn: (ctx: TeamCityRequestContext) => Promise<T>): Promise<T> =>
     fn({ axios: httpInstance, baseUrl: resolvedApiConfig.baseUrl, requestId: undefined });
 
-  const buildApi = modules.builds as unknown as BuildApiLike;
+  const buildApi = createBuildApiBridge(modules.builds);
 
   return {
     modules,

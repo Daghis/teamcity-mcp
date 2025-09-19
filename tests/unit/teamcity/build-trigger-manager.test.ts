@@ -10,6 +10,7 @@ import {
 import {
   BuildConfigurationNotFoundError,
   CircularDependencyError,
+  TeamCityAPIError,
   TriggerNotFoundError,
   ValidationError,
 } from '@/teamcity/errors';
@@ -129,6 +130,23 @@ describe('BuildTriggerManager', () => {
 
       await expect(manager.listTriggers({ configId: 'Invalid' })).rejects.toThrow(
         BuildConfigurationNotFoundError
+      );
+    });
+
+    it('should surface invalid trigger payloads from the API', async () => {
+      http.get.mockResolvedValue({
+        data: {
+          trigger: [
+            {
+              id: 'BROKEN_TRIGGER',
+              type: 123,
+            },
+          ],
+        },
+      });
+
+      await expect(manager.listTriggers({ configId: 'MyProject_Build' })).rejects.toThrow(
+        TeamCityAPIError
       );
     });
   });
@@ -362,6 +380,20 @@ describe('BuildTriggerManager', () => {
 
         expect(result.success).toBe(true);
         // Behavior-first: avoid verifying request payload shape
+      });
+
+      it('throws when API responds with invalid trigger payload', async () => {
+        http.post.mockResolvedValue({ data: { id: 'BROKEN_TRIGGER', type: 42 } });
+
+        await expect(
+          manager.createTrigger({
+            configId: 'MyProject_Build',
+            type: 'vcsTrigger',
+            properties: {
+              branchFilter: '+:refs/heads/main',
+            } as VcsTriggerProperties,
+          })
+        ).rejects.toThrow(TeamCityAPIError);
       });
     });
 

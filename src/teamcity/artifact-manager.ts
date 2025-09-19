@@ -176,14 +176,22 @@ export class ArtifactManager {
           { responseType }
         );
 
-        const axiosResponse = response as unknown as AxiosResponse<string>;
+        const axiosResponse = response as AxiosResponse<unknown>;
+        const { data, headers } = axiosResponse;
+
+        if (typeof data !== 'string') {
+          throw new Error('Artifact download returned a non-text payload when text was expected');
+        }
+
+        const mimeType =
+          typeof headers?.['content-type'] === 'string' ? headers['content-type'] : undefined;
 
         return {
           name: artifact.name,
           path: artifact.path,
           size: artifact.size,
-          content: axiosResponse.data,
-          mimeType: axiosResponse.headers?.['content-type'],
+          content: data,
+          mimeType,
         };
       }
 
@@ -195,9 +203,8 @@ export class ArtifactManager {
         { responseType }
       );
 
-      const axiosResponse = response as unknown as AxiosResponse<ArrayBuffer>;
-      const arrayBuffer = axiosResponse.data ?? new ArrayBuffer(0);
-      const buffer = Buffer.from(arrayBuffer);
+      const axiosResponse = response as AxiosResponse<unknown>;
+      const buffer = this.ensureBinaryBuffer(axiosResponse.data);
 
       let content: string | Buffer;
       if (options.encoding === 'base64') {
@@ -211,7 +218,10 @@ export class ArtifactManager {
         path: artifact.path,
         size: artifact.size,
         content,
-        mimeType: axiosResponse.headers?.['content-type'],
+        mimeType:
+          typeof axiosResponse.headers?.['content-type'] === 'string'
+            ? axiosResponse.headers['content-type']
+            : undefined,
       };
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -282,6 +292,18 @@ export class ArtifactManager {
     }
 
     return artifacts;
+  }
+
+  private ensureBinaryBuffer(payload: unknown): Buffer {
+    if (Buffer.isBuffer(payload)) {
+      return payload;
+    }
+
+    if (payload instanceof ArrayBuffer) {
+      return Buffer.from(payload);
+    }
+
+    throw new Error('Artifact download returned unexpected binary payload type');
   }
 
   /**
