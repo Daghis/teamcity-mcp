@@ -8,8 +8,6 @@
  * - Delete build steps
  * - Reorder build steps
  */
-import axios, { type AxiosInstance } from 'axios';
-
 import {
   BuildConfigurationNotFoundError,
   BuildStepNotFoundError,
@@ -18,7 +16,7 @@ import {
   ValidationError,
 } from '@/teamcity/errors';
 
-import type { TeamCityClientConfig } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
 
 /**
  * Options for listing build steps
@@ -133,19 +131,23 @@ const RUNNER_REQUIRED_PARAMS: Record<string, string[]> = {
  * Manages build steps in TeamCity configurations
  */
 export class BuildStepManager {
-  private readonly api: AxiosInstance;
+  constructor(private readonly client: TeamCityClientAdapter) {}
 
-  constructor(config: TeamCityClientConfig) {
-    // Create axios instance for direct API calls
-    this.api = axios.create({
-      baseURL: config.baseUrl.replace(/\/$/, ''),
-      timeout: config.timeout ?? 30000,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
+  private request<T>(
+    fn: (ctx: {
+      axios: ReturnType<TeamCityClientAdapter['getAxios']>;
+      baseUrl: string;
+    }) => Promise<T>
+  ): Promise<T> {
+    return this.client.request(fn);
+  }
+
+  private buildRestUrl(baseUrl: string, path: string): string {
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    if (path.startsWith('/')) {
+      return `${normalizedBase}${path}`;
+    }
+    return `${normalizedBase}/${path}`;
   }
 
   /**
@@ -153,12 +155,18 @@ export class BuildStepManager {
    */
   async listBuildSteps(options: BuildStepManagerOptions): Promise<BuildStepListResult> {
     try {
-      const response = await this.api.get(`/app/rest/buildTypes/${options.configId}/steps`, {
-        params: {
-          fields:
-            'count,step(id,name,type,disabled,properties(property(name,value)),parameters(property(name,value)))',
-        },
-      });
+      const response = await this.request((ctx) =>
+        ctx.axios.get(
+          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${options.configId}/steps`),
+          {
+            headers: { Accept: 'application/json' },
+            params: {
+              fields:
+                'count,step(id,name,type,disabled,properties(property(name,value)),parameters(property(name,value)))',
+            },
+          }
+        )
+      );
 
       if (response.data == null) {
         throw new TeamCityAPIError('Invalid response from TeamCity API', 'INVALID_RESPONSE', 500);
@@ -195,9 +203,17 @@ export class BuildStepManager {
     try {
       const stepData = this.buildStepData(options);
 
-      const response = await this.api.post(
-        `/app/rest/buildTypes/${options.configId}/steps`,
-        stepData
+      const response = await this.request((ctx) =>
+        ctx.axios.post(
+          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${options.configId}/steps`),
+          stepData,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+          }
+        )
       );
 
       const step = this.parseStep(response.data);
@@ -245,9 +261,20 @@ export class BuildStepManager {
         };
       }
 
-      const response = await this.api.put(
-        `/app/rest/buildTypes/${options.configId}/steps/${options.stepId}`,
-        updateData
+      const response = await this.request((ctx) =>
+        ctx.axios.put(
+          this.buildRestUrl(
+            ctx.baseUrl,
+            `/app/rest/buildTypes/${options.configId}/steps/${options.stepId}`
+          ),
+          updateData,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+          }
+        )
       );
 
       const step = this.parseStep(response.data);
@@ -267,7 +294,17 @@ export class BuildStepManager {
    */
   async deleteBuildStep(options: BuildStepDeleteOptions): Promise<BuildStepOperationResult> {
     try {
-      await this.api.delete(`/app/rest/buildTypes/${options.configId}/steps/${options.stepId}`);
+      await this.request((ctx) =>
+        ctx.axios.delete(
+          this.buildRestUrl(
+            ctx.baseUrl,
+            `/app/rest/buildTypes/${options.configId}/steps/${options.stepId}`
+          ),
+          {
+            headers: { Accept: 'application/json' },
+          }
+        )
+      );
 
       return {
         success: true,
@@ -303,9 +340,17 @@ export class BuildStepManager {
         step: options.stepOrder.map((id) => ({ id })),
       };
 
-      const response = await this.api.put(
-        `/app/rest/buildTypes/${options.configId}/steps`,
-        reorderData
+      const response = await this.request((ctx) =>
+        ctx.axios.put(
+          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${options.configId}/steps`),
+          reorderData,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+          }
+        )
       );
 
       const steps = this.parseStepList(response.data);

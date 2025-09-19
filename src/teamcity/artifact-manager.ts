@@ -1,9 +1,7 @@
 /**
  * ArtifactManager - Advanced artifact management for TeamCity builds
  */
-import axios from 'axios';
-
-import { getTeamCityToken, getTeamCityUrl } from '@/config';
+import type { TeamCityClientAdapter } from './client-adapter';
 
 export interface ArtifactInfo {
   name: string;
@@ -59,16 +57,36 @@ interface ArtifactFileResponse {
 }
 
 export class ArtifactManager {
-  private baseUrl: string;
-  private token: string;
+  private readonly client: TeamCityClientAdapter;
   private cache: Map<string, CacheEntry> = new Map();
   private static readonly cacheTtlMs = 60000; // 1 minute
   private static readonly defaultLimit = 100;
   private static readonly maxLimit = 1000;
 
-  constructor() {
-    this.baseUrl = getTeamCityUrl();
-    this.token = getTeamCityToken();
+  constructor(client: TeamCityClientAdapter) {
+    this.client = client;
+  }
+
+  private request<T>(
+    fn: (ctx: {
+      axios: ReturnType<TeamCityClientAdapter['getAxios']>;
+      baseUrl: string;
+    }) => Promise<T>
+  ): Promise<T> {
+    return this.client.request(fn);
+  }
+
+  private buildRestUrl(baseUrl: string, path: string): string {
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    if (path.startsWith('/')) {
+      return `${normalizedBase}${path}`;
+    }
+    return `${normalizedBase}/${path}`;
+  }
+
+  private getBaseUrl(): string {
+    const baseUrl = this.client.getApiConfig().baseUrl;
+    return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
   }
 
   /**
@@ -86,18 +104,18 @@ export class ArtifactManager {
 
     try {
       // Fetch artifacts from API
-      const url = `${this.baseUrl}/app/rest/builds/id:${buildId}/artifacts`;
-      const response = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          Accept: 'application/json',
-        },
-      });
+      const response = await this.request((ctx) =>
+        ctx.axios.get(this.buildRestUrl(ctx.baseUrl, `/app/rest/builds/id:${buildId}/artifacts`), {
+          headers: { Accept: 'application/json' },
+        })
+      );
 
+      const baseUrl = this.getBaseUrl();
       let artifacts = this.parseArtifacts(
         response.data as ArtifactFileResponse,
         buildId,
-        options.includeNested
+        options.includeNested,
+        baseUrl
       );
 
       // Apply filters
@@ -153,21 +171,54 @@ export class ArtifactManager {
     }
 
     try {
-      const url = artifact.downloadUrl;
-      const response = await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-        },
-        responseType: options.encoding === 'text' ? 'text' : 'arraybuffer',
-      });
+      const responseType = options.encoding === 'text' ? 'text' : 'arraybuffer';
+      const normalizedPath = artifact.path
+        .split('/')
+        .map((segment) => encodeURIComponent(segment))
+        .join('/');
+
+      if (responseType === 'text') {
+        const response = await this.request((ctx) =>
+          ctx.axios.get<string>(
+            this.buildRestUrl(
+              ctx.baseUrl,
+              `/app/rest/builds/id:${buildId}/artifacts/content/${normalizedPath}`
+            ),
+            {
+              responseType,
+            }
+          )
+        );
+
+        return {
+          name: artifact.name,
+          path: artifact.path,
+          size: artifact.size,
+          content: response.data,
+          mimeType: response.headers['content-type'],
+        };
+      }
+
+      const response = await this.request((ctx) =>
+        ctx.axios.get<ArrayBuffer>(
+          this.buildRestUrl(
+            ctx.baseUrl,
+            `/app/rest/builds/id:${buildId}/artifacts/content/${normalizedPath}`
+          ),
+          {
+            responseType,
+          }
+        )
+      );
+
+      const arrayBuffer = response.data;
+      const buffer = Buffer.from(arrayBuffer);
 
       let content: string | Buffer;
       if (options.encoding === 'base64') {
-        content = Buffer.from(response.data).toString('base64');
-      } else if (options.encoding === 'buffer') {
-        content = Buffer.from(response.data);
+        content = buffer.toString('base64');
       } else {
-        content = response.data;
+        content = buffer;
       }
 
       return {
@@ -220,7 +271,8 @@ export class ArtifactManager {
   private parseArtifacts(
     data: ArtifactFileResponse,
     buildId: string,
-    includeNested?: boolean
+    includeNested: boolean | undefined,
+    baseUrl: string
   ): ArtifactInfo[] {
     const artifacts: ArtifactInfo[] = [];
     const files = data.file ?? [];
@@ -229,7 +281,7 @@ export class ArtifactManager {
       // If it's a directory and has children
       if (file.children && includeNested) {
         // Recursively parse nested artifacts
-        const nested = this.parseArtifacts(file.children, buildId, includeNested);
+        const nested = this.parseArtifacts(file.children, buildId, includeNested, baseUrl);
         artifacts.push(...nested);
       } else if (!file.children) {
         // It's a file, not a directory
@@ -238,7 +290,7 @@ export class ArtifactManager {
           path: file.fullName ?? file.name ?? '',
           size: file.size ?? 0,
           modificationTime: file.modificationTime ?? '',
-          downloadUrl: `${this.baseUrl}/app/rest/builds/id:${buildId}/artifacts/content/${file.fullName ?? file.name ?? ''}`,
+          downloadUrl: `${baseUrl}/app/rest/builds/id:${buildId}/artifacts/content/${file.fullName ?? file.name ?? ''}`,
           isDirectory: false,
         });
       }

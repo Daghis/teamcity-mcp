@@ -9,10 +9,7 @@
  * - Reordering steps
  * - Error handling
  */
-import axios from 'axios';
-
 import { BuildStepManager, type RunnerType } from '@/teamcity/build-step-manager';
-import type { TeamCityClientConfig } from '@/teamcity/client';
 import {
   BuildConfigurationNotFoundError,
   BuildStepNotFoundError,
@@ -21,35 +18,24 @@ import {
   ValidationError,
 } from '@/teamcity/errors';
 
-// Mock axios
-jest.mock('axios');
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
 
 describe('BuildStepManager', () => {
   let manager: BuildStepManager;
-  type MockAxiosInstance = {
-    get: jest.Mock;
-    post: jest.Mock;
-    put: jest.Mock;
-    delete: jest.Mock;
-  };
-  let mockAxiosInstance: MockAxiosInstance;
+  let mockClient: MockTeamCityClient;
+  let http: jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
 
   beforeEach(() => {
-    mockAxiosInstance = {
-      get: jest.fn(),
-      post: jest.fn(),
-      put: jest.fn(),
-      delete: jest.fn(),
-    };
-
-    (axios.create as jest.Mock).mockReturnValue(mockAxiosInstance);
-
-    const config: TeamCityClientConfig = {
-      baseUrl: 'http://teamcity.example.com',
-      token: 'test-token',
-    };
-
-    manager = new BuildStepManager(config);
+    mockClient = createMockTeamCityClient();
+    http = mockClient.http as jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
+    http.get.mockReset();
+    http.post.mockReset();
+    http.put.mockReset();
+    http.delete.mockReset();
+    manager = new BuildStepManager(mockClient);
   });
 
   describe('listBuildSteps', () => {
@@ -96,7 +82,7 @@ describe('BuildStepManager', () => {
     };
 
     it('should list all build steps for a configuration', async () => {
-      mockAxiosInstance.get.mockResolvedValue({ data: mockSteps });
+      http.get.mockResolvedValue({ data: mockSteps });
 
       const result = await manager.listBuildSteps({
         configId: 'MyProject_Build',
@@ -117,7 +103,7 @@ describe('BuildStepManager', () => {
     });
 
     it('should handle empty step list', async () => {
-      mockAxiosInstance.get.mockResolvedValue({ data: { count: 0, step: [] } });
+      http.get.mockResolvedValue({ data: { count: 0, step: [] } });
 
       const result = await manager.listBuildSteps({
         configId: 'MyProject_Build',
@@ -128,7 +114,7 @@ describe('BuildStepManager', () => {
     });
 
     it('should handle configuration not found error', async () => {
-      mockAxiosInstance.get.mockRejectedValue({
+      http.get.mockRejectedValue({
         response: {
           status: 404,
           data: { message: 'Build configuration not found' },
@@ -143,7 +129,7 @@ describe('BuildStepManager', () => {
     });
 
     it('should handle permission denied error', async () => {
-      mockAxiosInstance.get.mockRejectedValue({
+      http.get.mockRejectedValue({
         response: {
           status: 403,
           data: { message: 'Access denied' },
@@ -173,7 +159,7 @@ describe('BuildStepManager', () => {
     };
 
     it('should create a command line step', async () => {
-      mockAxiosInstance.post.mockResolvedValue({ data: newStepResponse });
+      http.post.mockResolvedValue({ data: newStepResponse });
 
       const result = await manager.createBuildStep({
         configId: 'MyProject_Build',
@@ -193,7 +179,7 @@ describe('BuildStepManager', () => {
     });
 
     it('should create a Maven step with validation', async () => {
-      mockAxiosInstance.post.mockResolvedValue({ data: newStepResponse });
+      http.post.mockResolvedValue({ data: newStepResponse });
 
       const result = await manager.createBuildStep({
         configId: 'MyProject_Build',
@@ -237,7 +223,7 @@ describe('BuildStepManager', () => {
     // Comprehensive runner type tests
     describe('Runner Type Creation Tests', () => {
       it('should create a Gradle step with all parameters', async () => {
-        mockAxiosInstance.post.mockResolvedValue({
+        http.post.mockResolvedValue({
           data: {
             id: 'RUNNER_5',
             name: 'Gradle Build',
@@ -268,7 +254,7 @@ describe('BuildStepManager', () => {
       });
 
       it('should create a Docker step with required parameters', async () => {
-        mockAxiosInstance.post.mockResolvedValue({
+        http.post.mockResolvedValue({
           data: {
             id: 'RUNNER_6',
             name: 'Docker Build',
@@ -299,7 +285,7 @@ describe('BuildStepManager', () => {
       });
 
       it('should create a .NET CLI step', async () => {
-        mockAxiosInstance.post.mockResolvedValue({
+        http.post.mockResolvedValue({
           data: {
             id: 'RUNNER_7',
             name: 'DotNet Test',
@@ -330,7 +316,7 @@ describe('BuildStepManager', () => {
       });
 
       it('should create an MSBuild step', async () => {
-        mockAxiosInstance.post.mockResolvedValue({
+        http.post.mockResolvedValue({
           data: {
             id: 'RUNNER_8',
             name: 'MSBuild Compile',
@@ -361,7 +347,7 @@ describe('BuildStepManager', () => {
       });
 
       it('should create a Node.js runner step', async () => {
-        mockAxiosInstance.post.mockResolvedValue({
+        http.post.mockResolvedValue({
           data: {
             id: 'RUNNER_9',
             name: 'Node Build',
@@ -392,7 +378,7 @@ describe('BuildStepManager', () => {
       });
 
       it('should create a Python runner step', async () => {
-        mockAxiosInstance.post.mockResolvedValue({
+        http.post.mockResolvedValue({
           data: {
             id: 'RUNNER_10',
             name: 'Python Tests',
@@ -423,7 +409,7 @@ describe('BuildStepManager', () => {
       });
 
       it('should create a Rust cargo runner step', async () => {
-        mockAxiosInstance.post.mockResolvedValue({
+        http.post.mockResolvedValue({
           data: {
             id: 'RUNNER_11',
             name: 'Cargo Build',
@@ -454,7 +440,7 @@ describe('BuildStepManager', () => {
       });
 
       it('should create a Kotlin Script runner step', async () => {
-        mockAxiosInstance.post.mockResolvedValue({
+        http.post.mockResolvedValue({
           data: {
             id: 'RUNNER_12',
             name: 'Kotlin Script',
@@ -601,7 +587,7 @@ describe('BuildStepManager', () => {
 
   describe('updateBuildStep', () => {
     it('should update an existing build step', async () => {
-      mockAxiosInstance.put.mockResolvedValue({
+      http.put.mockResolvedValue({
         data: {
           id: 'RUNNER_1',
           name: 'Updated Compile',
@@ -627,7 +613,7 @@ describe('BuildStepManager', () => {
     });
 
     it('should handle step not found error', async () => {
-      mockAxiosInstance.put.mockRejectedValue({
+      http.put.mockRejectedValue({
         response: {
           status: 404,
           data: { message: 'Build step not found' },
@@ -644,7 +630,7 @@ describe('BuildStepManager', () => {
     });
 
     it('should enable/disable a step', async () => {
-      mockAxiosInstance.put.mockResolvedValue({
+      http.put.mockResolvedValue({
         data: {
           id: 'RUNNER_1',
           name: 'Test Step',
@@ -670,7 +656,7 @@ describe('BuildStepManager', () => {
 
   describe('deleteBuildStep', () => {
     it('should delete a build step', async () => {
-      mockAxiosInstance.delete.mockResolvedValue({ status: 204 });
+      http.delete.mockResolvedValue({ status: 204 });
 
       const result = await manager.deleteBuildStep({
         configId: 'MyProject_Build',
@@ -682,7 +668,7 @@ describe('BuildStepManager', () => {
     });
 
     it('should handle step not found error', async () => {
-      mockAxiosInstance.delete.mockRejectedValue({
+      http.delete.mockRejectedValue({
         response: {
           status: 404,
           data: { message: 'Build step not found' },
@@ -698,7 +684,7 @@ describe('BuildStepManager', () => {
     });
 
     it('should handle dependency conflict error', async () => {
-      mockAxiosInstance.delete.mockRejectedValue({
+      http.delete.mockRejectedValue({
         response: {
           status: 409,
           data: { message: 'Step has dependencies' },
@@ -724,7 +710,7 @@ describe('BuildStepManager', () => {
           { id: 'RUNNER_3', name: 'Step 3', type: 'simpleRunner', properties: { property: [] } },
         ],
       };
-      mockAxiosInstance.get.mockResolvedValue({ data: existingSteps });
+      http.get.mockResolvedValue({ data: existingSteps });
 
       const reorderedSteps = {
         step: [
@@ -734,7 +720,7 @@ describe('BuildStepManager', () => {
         ],
       };
 
-      mockAxiosInstance.put.mockResolvedValue({ data: reorderedSteps });
+      http.put.mockResolvedValue({ data: reorderedSteps });
 
       const result = await manager.reorderBuildSteps({
         configId: 'MyProject_Build',
@@ -750,7 +736,7 @@ describe('BuildStepManager', () => {
 
     it('should validate step order matches existing steps', async () => {
       // First get existing steps
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           step: [
             { id: 'RUNNER_1', name: 'Step 1', type: 'simpleRunner', properties: { property: [] } },
@@ -849,7 +835,7 @@ describe('BuildStepManager', () => {
 
   describe('error handling', () => {
     it('should handle network errors gracefully', async () => {
-      mockAxiosInstance.get.mockRejectedValue(new Error('Network error'));
+      http.get.mockRejectedValue(new Error('Network error'));
 
       await expect(
         manager.listBuildSteps({
@@ -859,7 +845,7 @@ describe('BuildStepManager', () => {
     });
 
     it('should handle malformed API responses', async () => {
-      mockAxiosInstance.get.mockResolvedValue({ data: null });
+      http.get.mockResolvedValue({ data: null });
 
       await expect(
         manager.listBuildSteps({
@@ -869,7 +855,7 @@ describe('BuildStepManager', () => {
     });
 
     it('should handle authentication errors', async () => {
-      mockAxiosInstance.get.mockRejectedValue({
+      http.get.mockRejectedValue({
         response: {
           status: 401,
           data: { message: 'Authentication required' },

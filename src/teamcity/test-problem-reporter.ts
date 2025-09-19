@@ -2,12 +2,9 @@
  * Test and Problem Reporter for TeamCity
  * Extracts and formats test results and build problems
  */
-import axios, { type AxiosInstance } from 'axios';
-
 import { error } from '@/utils';
 
-import { getTeamCityToken, getTeamCityUrl } from '../config';
-import type { TeamCityClient } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
 
 /**
  * Test statistics for a build
@@ -79,26 +76,34 @@ export interface SummaryOptions {
  * Test and Problem Reporter implementation
  */
 export class TestProblemReporter {
-  private axiosInstance: AxiosInstance;
+  constructor(private readonly client: TeamCityClientAdapter) {}
 
-  constructor(private client: TeamCityClient) {
-    // Create axios instance for direct API calls
-    this.axiosInstance = axios.create({
-      baseURL: `${getTeamCityUrl()}/app/rest`,
-      headers: {
-        Authorization: `Bearer ${getTeamCityToken()}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      timeout: 30000,
-    });
+  private request<T>(
+    fn: (ctx: {
+      axios: ReturnType<TeamCityClientAdapter['getAxios']>;
+      baseUrl: string;
+    }) => Promise<T>
+  ): Promise<T> {
+    return this.client.request(fn);
+  }
+
+  private buildRestUrl(baseUrl: string, path: string): string {
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    if (path.startsWith('/')) {
+      return `${normalizedBase}${path}`;
+    }
+    return `${normalizedBase}/${path}`;
   }
 
   /**
    * Get test statistics for a build
    */
   async getTestStatistics(buildId: string): Promise<BuildTestStatistics> {
-    const response = await this.axiosInstance.get(`/builds/id:${buildId}`);
+    const response = await this.request((ctx) =>
+      ctx.axios.get(this.buildRestUrl(ctx.baseUrl, `/app/rest/builds/id:${buildId}`), {
+        headers: { Accept: 'application/json' },
+      })
+    );
     const build = response.data;
 
     const testOccurrences = build?.testOccurrences ?? {
@@ -139,8 +144,16 @@ export class TestProblemReporter {
    */
   async getFailedTests(buildId: string, maxResults?: number): Promise<TestRun[]> {
     try {
-      const response = await this.axiosInstance.get(
-        `/builds/id:${buildId}/testOccurrences?locator=status:FAILURE${maxResults ? `,count:${maxResults}` : ''}`
+      const response = await this.request((ctx) =>
+        ctx.axios.get(
+          this.buildRestUrl(
+            ctx.baseUrl,
+            `/app/rest/builds/id:${buildId}/testOccurrences?locator=status:FAILURE${maxResults ? `,count:${maxResults}` : ''}`
+          ),
+          {
+            headers: { Accept: 'application/json' },
+          }
+        )
       );
       const data = response.data;
 
@@ -183,7 +196,14 @@ export class TestProblemReporter {
     categorize?: boolean
   ): Promise<BuildProblem[] | CategorizedProblems> {
     try {
-      const response = await this.axiosInstance.get(`/builds/id:${buildId}/problemOccurrences`);
+      const response = await this.request((ctx) =>
+        ctx.axios.get(
+          this.buildRestUrl(ctx.baseUrl, `/app/rest/builds/id:${buildId}/problemOccurrences`),
+          {
+            headers: { Accept: 'application/json' },
+          }
+        )
+      );
       const data = response.data;
 
       if (data.problemOccurrence == null || !Array.isArray(data.problemOccurrence)) {
@@ -346,8 +366,16 @@ export class TestProblemReporter {
     count: number = 10
   ): Promise<Array<{ buildId: string; statistics: BuildTestStatistics }>> {
     try {
-      const response = await this.axiosInstance.get(
-        `/buildTypes/id:${buildTypeId}/builds?locator=count:${count}`
+      const response = await this.request((ctx) =>
+        ctx.axios.get(
+          this.buildRestUrl(
+            ctx.baseUrl,
+            `/app/rest/buildTypes/id:${buildTypeId}/builds?locator=count:${count}`
+          ),
+          {
+            headers: { Accept: 'application/json' },
+          }
+        )
       );
       const builds = response.data;
 
@@ -380,8 +408,16 @@ export class TestProblemReporter {
     count: number = 20
   ): Promise<Record<string, number>> {
     try {
-      const response = await this.axiosInstance.get(
-        `/buildTypes/id:${buildTypeId}/builds?locator=status:FAILURE,count:${count}`
+      const response = await this.request((ctx) =>
+        ctx.axios.get(
+          this.buildRestUrl(
+            ctx.baseUrl,
+            `/app/rest/buildTypes/id:${buildTypeId}/builds?locator=status:FAILURE,count:${count}`
+          ),
+          {
+            headers: { Accept: 'application/json' },
+          }
+        )
       );
       const builds = response.data;
 

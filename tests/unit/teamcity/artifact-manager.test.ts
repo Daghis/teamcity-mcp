@@ -1,25 +1,42 @@
 /**
  * Tests for ArtifactManager
  */
-import axios from 'axios';
-
-import * as config from '@/config';
 import { ArtifactManager } from '@/teamcity/artifact-manager';
 
-jest.mock('axios');
-jest.mock('@/config');
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
 
 describe('ArtifactManager', () => {
   let manager: ArtifactManager;
-  const mockAxios = axios as jest.Mocked<typeof axios>;
-  const mockConfig = config as jest.Mocked<typeof config>;
+  let mockClient: MockTeamCityClient;
+  let http: jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
+  const BASE_URL = 'https://teamcity.example.com';
+
+  const configureClient = () => {
+    mockClient = createMockTeamCityClient();
+    http = mockClient.http as jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
+    http.get.mockReset();
+    mockClient.request.mockImplementation(async (fn) => fn({ axios: http, baseUrl: BASE_URL }));
+    mockClient.getApiConfig.mockReturnValue({
+      baseUrl: BASE_URL,
+      token: 'test-token',
+      timeout: undefined,
+    });
+    mockClient.getConfig.mockReturnValue({
+      connection: {
+        baseUrl: BASE_URL,
+        token: 'test-token',
+        timeout: undefined,
+      },
+    });
+
+    manager = new ArtifactManager(mockClient);
+  };
 
   beforeEach(() => {
-    jest.resetAllMocks();
-    // Reset config mocks with proper values
-    mockConfig.getTeamCityUrl.mockReturnValue('https://teamcity.example.com');
-    mockConfig.getTeamCityToken.mockReturnValue('test-token');
-    manager = new ArtifactManager();
+    configureClient();
   });
 
   describe('Artifact Listing', () => {
@@ -47,7 +64,7 @@ describe('ArtifactManager', () => {
         ],
       };
 
-      mockAxios.get.mockResolvedValue({ data: mockArtifacts });
+      http.get.mockResolvedValue({ data: mockArtifacts });
 
       const result = await manager.listArtifacts('12345');
 
@@ -86,7 +103,7 @@ describe('ArtifactManager', () => {
         ],
       };
 
-      mockAxios.get.mockResolvedValue({ data: mockArtifacts });
+      http.get.mockResolvedValue({ data: mockArtifacts });
 
       const result = await manager.listArtifacts('12345', { includeNested: true });
 
@@ -106,7 +123,7 @@ describe('ArtifactManager', () => {
         nextHref: '/app/rest/builds/id:12345/artifacts?start=100',
       };
 
-      mockAxios.get.mockResolvedValue({ data: mockArtifacts });
+      http.get.mockResolvedValue({ data: mockArtifacts });
 
       const result = await manager.listArtifacts('12345', {
         limit: 100,
@@ -131,7 +148,7 @@ describe('ArtifactManager', () => {
     };
 
     beforeEach(() => {
-      mockAxios.get.mockResolvedValue({ data: mockArtifacts });
+      http.get.mockResolvedValue({ data: mockArtifacts });
     });
 
     it('should filter artifacts by name pattern', async () => {
@@ -191,7 +208,7 @@ describe('ArtifactManager', () => {
         file: [{ name: 'app.jar', fullName: 'target/app.jar', size: 10485760 }],
       };
 
-      mockAxios.get.mockResolvedValue({ data: mockArtifacts });
+      http.get.mockResolvedValue({ data: mockArtifacts });
 
       const result = await manager.listArtifacts('12345');
 
@@ -204,7 +221,7 @@ describe('ArtifactManager', () => {
       const mockContent = 'Hello, World!';
       const base64Content = Buffer.from(mockContent).toString('base64');
 
-      mockAxios.get
+      http.get
         .mockResolvedValueOnce({
           data: {
             file: [{ name: 'hello.txt', fullName: 'hello.txt', size: 13 }],
@@ -227,7 +244,7 @@ describe('ArtifactManager', () => {
     it('should download artifact content as text', async () => {
       const mockContent = 'Hello, World!';
 
-      mockAxios.get
+      http.get
         .mockResolvedValueOnce({
           data: {
             file: [{ name: 'hello.txt', fullName: 'hello.txt', size: 13 }],
@@ -248,7 +265,7 @@ describe('ArtifactManager', () => {
     it('should handle binary artifacts', async () => {
       const binaryData = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG header
 
-      mockAxios.get
+      http.get
         .mockResolvedValueOnce({
           data: {
             file: [{ name: 'image.png', fullName: 'image.png', size: 4 }],
@@ -268,7 +285,7 @@ describe('ArtifactManager', () => {
     });
 
     it('should respect size limits', async () => {
-      mockAxios.get.mockResolvedValueOnce({
+      http.get.mockResolvedValueOnce({
         data: {
           file: [{ name: 'large.bin', fullName: 'large.bin', size: 10485760 }],
         },
@@ -284,7 +301,7 @@ describe('ArtifactManager', () => {
 
   describe('Batch Operations', () => {
     beforeEach(() => {
-      jest.resetAllMocks();
+      configureClient();
     });
 
     it('should download multiple artifacts', async () => {
@@ -298,7 +315,7 @@ describe('ArtifactManager', () => {
 
       // Since Promise.allSettled runs in parallel, all listArtifacts calls happen first,
       // then all download calls happen
-      mockAxios.get
+      http.get
         .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file1
         .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file2
         .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file3
@@ -330,7 +347,7 @@ describe('ArtifactManager', () => {
       };
 
       // Since Promise.allSettled runs in parallel, all listArtifacts calls happen first
-      mockAxios.get
+      http.get
         .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file1
         .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file2
         .mockResolvedValueOnce({ data: Buffer.from('content1'), headers: {} }) // download file1
@@ -346,13 +363,11 @@ describe('ArtifactManager', () => {
 
   describe('Error Handling', () => {
     beforeEach(() => {
-      jest.resetAllMocks();
-      // Create a fresh manager instance to avoid cache issues
-      manager = new ArtifactManager();
+      configureClient();
     });
 
     it('should handle network errors', async () => {
-      mockAxios.get.mockRejectedValue(new Error('Network error'));
+      http.get.mockRejectedValue(new Error('Network error'));
 
       await expect(manager.listArtifacts('12345')).rejects.toThrow('Failed to fetch artifacts');
     });
@@ -362,20 +377,20 @@ describe('ArtifactManager', () => {
         response?: { status: number; data: string };
       };
       error.response = { status: 401, data: 'Unauthorized' };
-      mockAxios.get.mockRejectedValue(error);
+      http.get.mockRejectedValue(error);
 
       await expect(manager.listArtifacts('12345')).rejects.toThrow('Authentication failed');
     });
 
     it('should handle missing artifacts', async () => {
-      mockAxios.get.mockResolvedValue({ data: { file: [] } });
+      http.get.mockResolvedValue({ data: { file: [] } });
 
       const result = await manager.listArtifacts('12345');
       expect(result).toEqual([]);
     });
 
     it('should handle artifact not found during download', async () => {
-      mockAxios.get.mockResolvedValueOnce({
+      http.get.mockResolvedValueOnce({
         data: { file: [] },
       });
 
@@ -391,16 +406,16 @@ describe('ArtifactManager', () => {
         file: [{ name: 'app.jar', fullName: 'target/app.jar', size: 10485760 }],
       };
 
-      mockAxios.get.mockResolvedValue({ data: mockArtifacts });
+      http.get.mockResolvedValue({ data: mockArtifacts });
 
       // First call
       const first = await manager.listArtifacts('12345');
-      expect(mockAxios.get).toHaveBeenCalledTimes(1);
+      expect(http.get).toHaveBeenCalledTimes(1);
       // Second call should produce same results
       const second = await manager.listArtifacts('12345');
       expect(second).toEqual(first);
       // Ensure cache prevented additional HTTP call
-      expect(mockAxios.get).toHaveBeenCalledTimes(1);
+      expect(http.get).toHaveBeenCalledTimes(1);
     });
 
     it('should respect cache TTL', async () => {
@@ -410,7 +425,7 @@ describe('ArtifactManager', () => {
         file: [{ name: 'app.jar', fullName: 'target/app.jar', size: 10485760 }],
       };
 
-      mockAxios.get.mockResolvedValue({ data: mockArtifacts });
+      http.get.mockResolvedValue({ data: mockArtifacts });
 
       // First call
       await manager.listArtifacts('12345');
@@ -426,7 +441,7 @@ describe('ArtifactManager', () => {
       await manager.listArtifacts('12345');
 
       // Behavior-first: returns results after TTL
-      expect(mockAxios.get).toHaveBeenCalledTimes(2);
+      expect(http.get).toHaveBeenCalledTimes(2);
 
       jest.useRealTimers();
     });
@@ -436,7 +451,7 @@ describe('ArtifactManager', () => {
         file: [{ name: 'app.jar', fullName: 'target/app.jar', size: 10485760 }],
       };
 
-      mockAxios.get.mockResolvedValue({ data: mockArtifacts });
+      http.get.mockResolvedValue({ data: mockArtifacts });
 
       // First call
       await manager.listArtifacts('12345');
@@ -444,7 +459,7 @@ describe('ArtifactManager', () => {
       const r2 = await manager.listArtifacts('12345', { forceRefresh: true });
       expect(Array.isArray(r2)).toBe(true);
       // Should have made two HTTP calls due to bypassing cache
-      expect(mockAxios.get).toHaveBeenCalledTimes(2);
+      expect(http.get).toHaveBeenCalledTimes(2);
     });
   });
 });
