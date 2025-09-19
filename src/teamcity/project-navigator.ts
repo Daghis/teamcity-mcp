@@ -1,8 +1,8 @@
 /**
  * ProjectNavigator - Advanced project discovery and navigation for TeamCity
  */
-import { TeamCityAPI } from '@/api-client';
 import type { Project } from '@/teamcity-client/models/project';
+import type { TeamCityClientAdapter } from '@/teamcity/client-adapter';
 import { warn } from '@/utils/logger';
 
 export interface ProjectNavigatorParams {
@@ -108,12 +108,12 @@ interface HierarchyNodeInternal {
 }
 
 export class ProjectNavigator {
-  private api: TeamCityAPI;
+  private readonly client: TeamCityClientAdapter;
   private cache: Map<string, CacheEntry>;
   private readonly cacheTtl = 120000; // 120 seconds
 
-  constructor() {
-    this.api = TeamCityAPI.getInstance();
+  constructor(client: TeamCityClientAdapter) {
+    this.client = client;
     this.cache = new Map();
   }
 
@@ -217,7 +217,7 @@ export class ProjectNavigator {
       : '$long';
 
     // Use the projects API to list all projects
-    const response = await this.api.projects.getAllProjects(locator, fields);
+    const response = await this.client.modules.projects.getAllProjects(locator, fields);
 
     // Get projects from response
     let projects = response.data.project ?? [];
@@ -285,7 +285,7 @@ export class ProjectNavigator {
       visited.add(projectId);
 
       try {
-        const response = await this.api.projects.getProject(projectId);
+        const response = await this.client.modules.projects.getProject(projectId);
         const project = response.data;
 
         const node = {
@@ -353,7 +353,7 @@ export class ProjectNavigator {
     // First verify the target project exists and save it
     let targetProject: Project;
     try {
-      const targetResponse = await this.api.projects.getProject(currentProjectId);
+      const targetResponse = await this.client.modules.projects.getProject(currentProjectId);
       if (targetResponse.data == null) {
         throw new Error(`Project not found: ${params.projectId}`);
       }
@@ -380,7 +380,7 @@ export class ProjectNavigator {
       try {
         // Sequential parent traversal up the chain
         // eslint-disable-next-line no-await-in-loop
-        const response = await this.api.projects.getProject(currentProjectId);
+        const response = await this.client.modules.projects.getProject(currentProjectId);
         const project = response.data;
 
         if (project != null) {
@@ -427,7 +427,7 @@ export class ProjectNavigator {
 
     // First verify the target project exists
     try {
-      const targetResponse = await this.api.projects.getProject(params.projectId);
+      const targetResponse = await this.client.modules.projects.getProject(params.projectId);
       if (targetResponse.data == null) {
         throw new Error(`Project not found: ${params.projectId}`);
       }
@@ -448,7 +448,7 @@ export class ProjectNavigator {
       visited.add(projectId);
 
       try {
-        const response = await this.api.projects.getProject(projectId);
+        const response = await this.client.modules.projects.getProject(projectId);
         const project = response.data;
 
         if (project?.projects?.project?.length) {
@@ -457,7 +457,7 @@ export class ProjectNavigator {
               try {
                 // Get full child project details
                 // eslint-disable-next-line no-await-in-loop
-                const childResponse = await this.api.projects.getProject(child.id);
+                const childResponse = await this.client.modules.projects.getProject(child.id);
                 const childProject = childResponse.data;
 
                 if (childProject != null) {

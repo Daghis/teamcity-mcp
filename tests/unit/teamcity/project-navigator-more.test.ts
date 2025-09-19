@@ -1,19 +1,19 @@
 /** Additional tests for ProjectNavigator to raise branch coverage */
-import { TeamCityAPI } from '@/api-client';
 import type { Projects } from '@/teamcity-client/models/projects';
 import { ProjectNavigator } from '@/teamcity/project-navigator';
 
-jest.mock('@/api-client');
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
 
 describe('ProjectNavigator (more cases)', () => {
   let navigator: ProjectNavigator;
-  type MockClient = { projects: { getAllProjects: jest.Mock; getProject: jest.Mock } };
-  let mockClient: MockClient;
+  let mockClient: MockTeamCityClient;
 
   beforeEach(() => {
-    mockClient = { projects: { getAllProjects: jest.fn(), getProject: jest.fn() } };
-    (TeamCityAPI.getInstance as jest.Mock).mockReturnValue(mockClient);
-    navigator = new ProjectNavigator();
+    mockClient = createMockTeamCityClient();
+    navigator = new ProjectNavigator(mockClient);
   });
 
   it('list mode: hasMore is false when fewer items than pageSize', async () => {

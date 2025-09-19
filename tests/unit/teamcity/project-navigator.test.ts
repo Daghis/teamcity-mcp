@@ -1,35 +1,24 @@
 /**
  * Tests for ProjectNavigator
  */
-import { TeamCityAPI } from '@/api-client';
 import type { Projects } from '@/teamcity-client/models/projects';
 import { ProjectNavigator } from '@/teamcity/project-navigator';
 
-// Mock the TeamCityAPI module
-jest.mock('@/api-client');
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
 
 describe('ProjectNavigator', () => {
   let navigator: ProjectNavigator;
-  type MockClient = {
-    projects: { getAllProjects: jest.Mock; getProject: jest.Mock };
-  };
-  let mockClient: MockClient;
+  let mockClient: MockTeamCityClient;
 
   beforeEach(() => {
     jest.useFakeTimers();
 
-    // Create mock TeamCity client
-    mockClient = {
-      projects: {
-        getAllProjects: jest.fn(),
-        getProject: jest.fn(),
-      },
-    };
+    mockClient = createMockTeamCityClient();
 
-    // Mock TeamCityAPI.getInstance() to return our mock client
-    (TeamCityAPI.getInstance as jest.Mock).mockReturnValue(mockClient);
-
-    navigator = new ProjectNavigator();
+    navigator = new ProjectNavigator(mockClient);
 
     // Clear cache before each test without using any
     type PrivateNav = { cache: Map<string, unknown> };
