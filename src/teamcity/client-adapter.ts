@@ -1,6 +1,6 @@
 /**
  * Lightweight adapter so managers can work with the unified TeamCityAPI
- * without depending on the legacy TeamCityClient implementation.
+ * without depending on the legacy TeamCity client implementation.
  */
 import axios, { type AxiosInstance } from 'axios';
 

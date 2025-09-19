@@ -1,4 +1,4 @@
-import { type TeamCityFullConfig, toApiClientConfig, toClientConfig } from '@/teamcity/config';
+import { type TeamCityFullConfig, toApiClientConfig } from '@/teamcity/config';
 
 describe('teamcity config helpers', () => {
   const fullConfig: TeamCityFullConfig = {
@@ -24,18 +24,6 @@ describe('teamcity config helpers', () => {
       baseUrl: 'https://teamcity.example.com',
       token: 'token-123',
       timeout: 5000,
-    });
-  });
-
-  it('retains legacy TeamCityClientConfig structure', () => {
-    expect(toClientConfig(fullConfig)).toEqual({
-      baseUrl: 'https://teamcity.example.com',
-      token: 'token-123',
-      timeout: 5000,
-      retryConfig: {
-        retries: 4,
-        retryDelay: 250,
-      },
     });
   });
 });

@@ -4,38 +4,14 @@
 import { ResolvedBuildConfiguration } from '@/teamcity/build-configuration-resolver';
 import { ParameterSet, ParameterType } from '@/teamcity/build-parameters-manager';
 import { BuildQueueManager, BuildStatus, QueueBuildOptions } from '@/teamcity/build-queue-manager';
-import type { TeamCityClient } from '@/teamcity/client';
+
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
 
 // Helper to wrap response in Axios format
 const wrapResponse = <T>(data: T) => ({ data });
-
-// Mock TeamCity client
-const mockBuildQueue = {
-  addBuildToQueue: jest.fn(),
-  getAllQueuedBuilds: jest.fn(),
-  setQueuedBuildsOrder: jest.fn(),
-  cancelQueuedBuild: jest.fn(),
-};
-
-const mockBuilds = {
-  getBuild: jest.fn(),
-  getAllBuilds: jest.fn(),
-};
-
-const mockBuildTypes = {
-  getBuildType: jest.fn(),
-};
-
-const mockAgents = {
-  getAllAgents: jest.fn(),
-};
-
-const mockTeamCityClient = {
-  buildQueue: mockBuildQueue,
-  builds: mockBuilds,
-  buildTypes: mockBuildTypes,
-  agents: mockAgents,
-};
 
 // Helper to create a mock parameter set
 const createMockParameterSet = (params?: Record<string, string>): ParameterSet => {
@@ -72,10 +48,12 @@ const createMockBuildConfig = (
 
 describe('BuildQueueManager', () => {
   let manager: BuildQueueManager;
+  let mockClient: MockTeamCityClient;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    manager = new BuildQueueManager(mockTeamCityClient as unknown as TeamCityClient);
+    mockClient = createMockTeamCityClient();
+    manager = new BuildQueueManager(mockClient);
   });
 
   describe('Single Build Queueing', () => {
@@ -85,7 +63,7 @@ describe('BuildQueueManager', () => {
         'env.TEST': 'value',
       });
 
-      mockBuildQueue.addBuildToQueue.mockResolvedValueOnce(
+      mockClient.buildQueue.addBuildToQueue.mockResolvedValueOnce(
         wrapResponse({
           id: 12345,
           buildTypeId: 'Build1',
@@ -97,17 +75,17 @@ describe('BuildQueueManager', () => {
         })
       );
 
-      mockBuildTypes.getBuildType.mockResolvedValueOnce(
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
 
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
 
       const result = await manager.queueBuild({
         buildConfiguration: buildConfig,
@@ -118,7 +96,7 @@ describe('BuildQueueManager', () => {
       expect(result.buildId).toBe('12345');
       expect(result.buildTypeId).toBe('Build1');
       expect(result.webUrl).toBe('https://teamcity.example.com/viewQueued.html?itemId=12345');
-      expect(mockBuildQueue.addBuildToQueue).toHaveBeenCalledWith(
+      expect(mockClient.buildQueue.addBuildToQueue).toHaveBeenCalledWith(
         undefined,
         expect.objectContaining({
           buildType: { id: 'Build1' },
@@ -131,7 +109,7 @@ describe('BuildQueueManager', () => {
       const buildConfig = createMockBuildConfig();
       const parameters = createMockParameterSet();
 
-      mockBuildQueue.addBuildToQueue.mockResolvedValueOnce(
+      mockClient.buildQueue.addBuildToQueue.mockResolvedValueOnce(
         wrapResponse({
           id: 12346,
           buildTypeId: 'Build1',
@@ -140,16 +118,16 @@ describe('BuildQueueManager', () => {
         })
       );
 
-      mockBuildTypes.getBuildType.mockResolvedValueOnce(
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
 
       await manager.queueBuild({
         buildConfiguration: buildConfig,
@@ -157,7 +135,7 @@ describe('BuildQueueManager', () => {
         comment: 'Triggered by PR #123',
       });
 
-      expect(mockBuildQueue.addBuildToQueue).toHaveBeenCalledWith(
+      expect(mockClient.buildQueue.addBuildToQueue).toHaveBeenCalledWith(
         undefined,
         expect.objectContaining({
           comment: { text: 'Triggered by PR #123' },
@@ -169,7 +147,7 @@ describe('BuildQueueManager', () => {
       const buildConfig = createMockBuildConfig();
       const parameters = createMockParameterSet();
 
-      mockBuildQueue.addBuildToQueue.mockResolvedValueOnce(
+      mockClient.buildQueue.addBuildToQueue.mockResolvedValueOnce(
         wrapResponse({
           id: 12347,
           buildTypeId: 'Build1',
@@ -179,16 +157,16 @@ describe('BuildQueueManager', () => {
         })
       );
 
-      mockBuildTypes.getBuildType.mockResolvedValueOnce(
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
 
       const result = await manager.queueBuild({
         buildConfiguration: buildConfig,
@@ -197,7 +175,7 @@ describe('BuildQueueManager', () => {
       });
 
       expect(result.personal).toBe(true);
-      expect(mockBuildQueue.addBuildToQueue).toHaveBeenCalledWith(
+      expect(mockClient.buildQueue.addBuildToQueue).toHaveBeenCalledWith(
         undefined,
         expect.objectContaining({
           personal: true,
@@ -209,16 +187,16 @@ describe('BuildQueueManager', () => {
       const buildConfig = createMockBuildConfig();
       const parameters = createMockParameterSet();
 
-      mockBuildTypes.getBuildType.mockResolvedValueOnce(
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
 
       // Mock should reject, and since it's not a 4xx error, it will be retried and eventually thrown
       interface HttpError extends Error {
@@ -226,7 +204,7 @@ describe('BuildQueueManager', () => {
       }
       const serverError: HttpError = new Error('Access denied');
       serverError.response = { status: 500 }; // Server error will be retried
-      mockBuildQueue.addBuildToQueue
+      mockClient.buildQueue.addBuildToQueue
         .mockRejectedValueOnce(serverError)
         .mockRejectedValueOnce(serverError)
         .mockRejectedValueOnce(serverError)
@@ -244,7 +222,7 @@ describe('BuildQueueManager', () => {
       const buildConfig = createMockBuildConfig();
       const parameters = createMockParameterSet();
 
-      mockBuildQueue.addBuildToQueue.mockResolvedValueOnce(
+      mockClient.buildQueue.addBuildToQueue.mockResolvedValueOnce(
         wrapResponse({
           id: 12348,
           buildTypeId: 'Build1',
@@ -253,14 +231,14 @@ describe('BuildQueueManager', () => {
         })
       );
 
-      mockBuildTypes.getBuildType.mockResolvedValueOnce(
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValue(
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValue(
         wrapResponse({
           build: [
             { id: '12349', buildTypeId: 'Build2' },
@@ -269,9 +247,9 @@ describe('BuildQueueManager', () => {
         })
       );
 
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockBuildQueue.setQueuedBuildsOrder.mockResolvedValue({});
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.buildQueue.setQueuedBuildsOrder.mockResolvedValue({});
 
       const result = await manager.queueBuild({
         buildConfiguration: buildConfig,
@@ -280,7 +258,7 @@ describe('BuildQueueManager', () => {
       });
 
       expect(result.buildId).toBe('12348');
-      expect(mockBuildQueue.setQueuedBuildsOrder).toHaveBeenCalledWith(undefined, {
+      expect(mockClient.buildQueue.setQueuedBuildsOrder).toHaveBeenCalledWith(undefined, {
         build: [{ id: 12348 }],
       });
     });
@@ -303,18 +281,18 @@ describe('BuildQueueManager', () => {
         },
       ];
 
-      mockBuildTypes.getBuildType.mockResolvedValue(
+      mockClient.buildTypes.getBuildType.mockResolvedValue(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValue(wrapResponse({ build: [] }));
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValue(wrapResponse({ build: [] }));
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
 
-      mockBuildQueue.addBuildToQueue
+      mockClient.buildQueue.addBuildToQueue
         .mockResolvedValueOnce(
           wrapResponse({
             id: 101,
@@ -346,7 +324,7 @@ describe('BuildQueueManager', () => {
       expect(results[0]?.buildId).toBe('101');
       expect(results[1]?.buildId).toBe('102');
       expect(results[2]?.buildId).toBe('103');
-      expect(mockBuildQueue.addBuildToQueue).toHaveBeenCalledTimes(3);
+      expect(mockClient.buildQueue.addBuildToQueue).toHaveBeenCalledTimes(3);
     });
 
     it('should handle partial batch failures', async () => {
@@ -361,18 +339,18 @@ describe('BuildQueueManager', () => {
         },
       ];
 
-      mockBuildTypes.getBuildType.mockResolvedValue(
+      mockClient.buildTypes.getBuildType.mockResolvedValue(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValue(wrapResponse({ build: [] }));
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValue(wrapResponse({ build: [] }));
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
 
-      mockBuildQueue.addBuildToQueue
+      mockClient.buildQueue.addBuildToQueue
         .mockResolvedValueOnce(
           wrapResponse({
             id: 201,
@@ -395,7 +373,7 @@ describe('BuildQueueManager', () => {
       const buildConfig = createMockBuildConfig();
       const parameters = createMockParameterSet();
 
-      mockBuildQueue.addBuildToQueue.mockResolvedValueOnce(
+      mockClient.buildQueue.addBuildToQueue.mockResolvedValueOnce(
         wrapResponse({
           id: 401,
           buildTypeId: 'Build1',
@@ -407,16 +385,16 @@ describe('BuildQueueManager', () => {
         })
       );
 
-      mockBuildTypes.getBuildType.mockResolvedValueOnce(
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
 
       const result = await manager.queueBuild({
         buildConfiguration: buildConfig,
@@ -425,7 +403,7 @@ describe('BuildQueueManager', () => {
       });
 
       expect(result.buildId).toBe('401');
-      expect(mockBuildQueue.addBuildToQueue).toHaveBeenCalledWith(
+      expect(mockClient.buildQueue.addBuildToQueue).toHaveBeenCalledWith(
         undefined,
         expect.objectContaining({
           'snapshot-dependencies': {
@@ -439,16 +417,16 @@ describe('BuildQueueManager', () => {
       const buildConfig = createMockBuildConfig();
       const parameters = createMockParameterSet();
 
-      mockBuildTypes.getBuildType.mockResolvedValueOnce(
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
 
       await expect(
         manager.queueBuild({
@@ -465,19 +443,10 @@ describe('BuildQueueManager', () => {
 
   describe('Queue Position Management', () => {
     it('should get queue position for a build', async () => {
-      // Explicitly reset all mock functions to clean state
-      mockBuildQueue.getAllQueuedBuilds.mockReset();
-      mockBuilds.getBuild.mockReset();
-      mockBuildTypes.getBuildType.mockReset();
-      mockAgents.getAllAgents.mockReset();
-      mockBuildQueue.addBuildToQueue.mockReset();
-      mockBuildQueue.setQueuedBuildsOrder.mockReset();
-      mockBuildQueue.cancelQueuedBuild.mockReset();
+      const freshClient = createMockTeamCityClient();
+      const freshManager = new BuildQueueManager(freshClient);
 
-      // Create fresh manager instance to avoid contamination
-      const freshManager = new BuildQueueManager(mockTeamCityClient as unknown as TeamCityClient);
-
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValueOnce(
+      freshClient.buildQueue.getAllQueuedBuilds.mockResolvedValueOnce(
         wrapResponse({
           build: [
             { id: '12345', buildTypeId: 'Build1' },
@@ -495,7 +464,7 @@ describe('BuildQueueManager', () => {
     });
 
     it('should move build to top of queue', async () => {
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValue(
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValue(
         wrapResponse({
           build: [
             { id: '12345', buildTypeId: 'Build1' },
@@ -504,11 +473,11 @@ describe('BuildQueueManager', () => {
         })
       );
 
-      mockBuildQueue.setQueuedBuildsOrder.mockResolvedValueOnce({});
+      mockClient.buildQueue.setQueuedBuildsOrder.mockResolvedValueOnce({});
 
       await manager.moveToTop('12346');
 
-      expect(mockBuildQueue.setQueuedBuildsOrder).toHaveBeenCalledWith(undefined, {
+      expect(mockClient.buildQueue.setQueuedBuildsOrder).toHaveBeenCalledWith(undefined, {
         build: [{ id: 12346 }],
       });
     });
@@ -516,7 +485,7 @@ describe('BuildQueueManager', () => {
     it('should reorder queue', async () => {
       const buildIds = ['12347', '12345', '12346'];
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValue(
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValue(
         wrapResponse({
           build: [
             { id: '12345', buildTypeId: 'Build1' },
@@ -526,17 +495,17 @@ describe('BuildQueueManager', () => {
         })
       );
 
-      mockBuildQueue.setQueuedBuildsOrder.mockResolvedValueOnce({});
+      mockClient.buildQueue.setQueuedBuildsOrder.mockResolvedValueOnce({});
 
       await manager.reorderQueue(buildIds);
 
-      expect(mockBuildQueue.setQueuedBuildsOrder).toHaveBeenCalledWith(undefined, {
+      expect(mockClient.buildQueue.setQueuedBuildsOrder).toHaveBeenCalledWith(undefined, {
         build: buildIds.map((id) => ({ id: parseInt(id) })),
       });
     });
 
     it('should not move build with dependencies to top', async () => {
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValueOnce(
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValueOnce(
         wrapResponse({
           build: [
             { id: '12345', buildTypeId: 'Build1' },
@@ -559,7 +528,7 @@ describe('BuildQueueManager', () => {
 
   describe('Build Status Monitoring', () => {
     it('should get build status', async () => {
-      mockBuilds.getBuild.mockResolvedValueOnce(
+      mockClient.builds.getBuild.mockResolvedValueOnce(
         wrapResponse({
           id: '700',
           state: 'running',
@@ -587,7 +556,7 @@ describe('BuildQueueManager', () => {
     it('should monitor build progress', async () => {
       const statusUpdates: BuildStatus[] = [];
 
-      mockBuilds.getBuild
+      mockClient.builds.getBuild
         .mockResolvedValueOnce(
           wrapResponse({
             id: '701',
@@ -633,29 +602,20 @@ describe('BuildQueueManager', () => {
     });
 
     it('should cancel a build', async () => {
-      mockBuildQueue.cancelQueuedBuild.mockResolvedValueOnce({});
+      mockClient.buildQueue.cancelQueuedBuild.mockResolvedValueOnce({});
 
       await manager.cancelBuild('12345', 'No longer needed');
 
-      expect(mockBuildQueue.cancelQueuedBuild).toHaveBeenCalledWith('12345');
+      expect(mockClient.buildQueue.cancelQueuedBuild).toHaveBeenCalledWith('12345');
     });
   });
 
   describe('Queue Limitations', () => {
     it('should get queue limitations', async () => {
-      // Explicitly reset all mock functions to clean state
-      mockBuildQueue.getAllQueuedBuilds.mockReset();
-      mockBuilds.getBuild.mockReset();
-      mockBuildTypes.getBuildType.mockReset();
-      mockAgents.getAllAgents.mockReset();
-      mockBuildQueue.addBuildToQueue.mockReset();
-      mockBuildQueue.setQueuedBuildsOrder.mockReset();
-      mockBuildQueue.cancelQueuedBuild.mockReset();
+      const freshClient = createMockTeamCityClient();
+      const freshManager = new BuildQueueManager(freshClient);
 
-      // Create fresh manager instance to avoid contamination
-      const freshManager = new BuildQueueManager(mockTeamCityClient as unknown as TeamCityClient);
-
-      mockBuildTypes.getBuildType.mockResolvedValueOnce(
+      freshClient.buildTypes.getBuildType.mockResolvedValueOnce(
         wrapResponse({
           id: 'Build1',
           settings: {
@@ -664,7 +624,7 @@ describe('BuildQueueManager', () => {
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValueOnce(
+      freshClient.buildQueue.getAllQueuedBuilds.mockResolvedValueOnce(
         wrapResponse({
           build: [
             { id: '801', buildTypeId: 'Build1' },
@@ -673,8 +633,8 @@ describe('BuildQueueManager', () => {
         })
       );
 
-      mockBuilds.getAllBuilds.mockResolvedValueOnce(wrapResponse({ count: 1 })); // Running builds
-      mockAgents.getAllAgents.mockResolvedValueOnce(wrapResponse({ count: 5 })); // Available agents
+      freshClient.builds.getAllBuilds.mockResolvedValueOnce(wrapResponse({ count: 1 }));
+      freshClient.agents.getAllAgents.mockResolvedValueOnce(wrapResponse({ count: 5 }));
 
       const limitations = await freshManager.getQueueLimitations('Build1');
 
@@ -685,23 +645,14 @@ describe('BuildQueueManager', () => {
     });
 
     it('should prevent queueing when max concurrent builds reached', async () => {
-      // Explicitly reset all mock functions to clean state
-      mockBuildQueue.getAllQueuedBuilds.mockReset();
-      mockBuilds.getBuild.mockReset();
-      mockBuildTypes.getBuildType.mockReset();
-      mockAgents.getAllAgents.mockReset();
-      mockBuildQueue.addBuildToQueue.mockReset();
-      mockBuildQueue.setQueuedBuildsOrder.mockReset();
-      mockBuildQueue.cancelQueuedBuild.mockReset();
-
-      // Create fresh manager instance to avoid contamination
-      const freshManager = new BuildQueueManager(mockTeamCityClient as unknown as TeamCityClient);
+      const freshClient = createMockTeamCityClient();
+      const freshManager = new BuildQueueManager(freshClient);
 
       const buildConfig = createMockBuildConfig();
       const parameters = createMockParameterSet();
 
       // Set up all mocks needed for getQueueLimitations
-      mockBuildTypes.getBuildType.mockResolvedValue(
+      freshClient.buildTypes.getBuildType.mockResolvedValue(
         wrapResponse({
           id: 'Build1',
           settings: {
@@ -710,10 +661,10 @@ describe('BuildQueueManager', () => {
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValue(wrapResponse({ build: [] }));
+      freshClient.buildQueue.getAllQueuedBuilds.mockResolvedValue(wrapResponse({ build: [] }));
 
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 1 })); // Already 1 running
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 1 }));
+      freshClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 1 }));
+      freshClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 1 }));
 
       await expect(
         freshManager.queueBuild({
@@ -729,18 +680,18 @@ describe('BuildQueueManager', () => {
       const buildConfig = createMockBuildConfig();
       const parameters = createMockParameterSet();
 
-      mockBuildTypes.getBuildType.mockResolvedValue(
+      mockClient.buildTypes.getBuildType.mockResolvedValue(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValue(wrapResponse({ build: [] }));
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValue(wrapResponse({ build: [] }));
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
 
-      mockBuildQueue.addBuildToQueue
+      mockClient.buildQueue.addBuildToQueue
         .mockRejectedValueOnce({ response: { status: 503 } })
         .mockRejectedValueOnce({ response: { status: 503 } })
         .mockResolvedValueOnce(
@@ -758,30 +709,30 @@ describe('BuildQueueManager', () => {
       });
 
       expect(result.buildId).toBe('900');
-      expect(mockBuildQueue.addBuildToQueue).toHaveBeenCalledTimes(3);
+      expect(mockClient.buildQueue.addBuildToQueue).toHaveBeenCalledTimes(3);
     });
 
     it('should not retry on client errors', async () => {
       const buildConfig = createMockBuildConfig();
       const parameters = createMockParameterSet();
 
-      mockBuildTypes.getBuildType.mockResolvedValue(
+      mockClient.buildTypes.getBuildType.mockResolvedValue(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValue(wrapResponse({ build: [] }));
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValue(wrapResponse({ build: [] }));
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
 
       interface HttpError extends Error {
         response?: { status?: number; data?: unknown };
       }
       const clientError: HttpError = new Error('Forbidden');
       clientError.response = { status: 403, data: { message: 'Forbidden' } };
-      mockBuildQueue.addBuildToQueue.mockRejectedValueOnce(clientError);
+      mockClient.buildQueue.addBuildToQueue.mockRejectedValueOnce(clientError);
 
       await expect(
         manager.queueBuild({
@@ -790,7 +741,7 @@ describe('BuildQueueManager', () => {
         })
       ).rejects.toThrow('Forbidden');
 
-      expect(mockBuildQueue.addBuildToQueue).toHaveBeenCalledTimes(1);
+      expect(mockClient.buildQueue.addBuildToQueue).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -804,7 +755,7 @@ describe('BuildQueueManager', () => {
         emittedEvent = event;
       });
 
-      mockBuildQueue.addBuildToQueue.mockResolvedValueOnce(
+      mockClient.buildQueue.addBuildToQueue.mockResolvedValueOnce(
         wrapResponse({
           id: 1000,
           buildTypeId: 'Build1',
@@ -813,16 +764,16 @@ describe('BuildQueueManager', () => {
         })
       );
 
-      mockBuildTypes.getBuildType.mockResolvedValueOnce(
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
 
       await manager.queueBuild({
         buildConfiguration: buildConfig,
@@ -842,16 +793,16 @@ describe('BuildQueueManager', () => {
         emittedError = event;
       });
 
-      mockBuildTypes.getBuildType.mockResolvedValueOnce(
+      mockClient.buildTypes.getBuildType.mockResolvedValueOnce(
         wrapResponse({
           id: 'Build1',
           settings: { property: [] },
         })
       );
 
-      mockBuildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
-      mockBuilds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
-      mockAgents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.buildQueue.getAllQueuedBuilds.mockResolvedValueOnce(wrapResponse({ build: [] }));
+      mockClient.builds.getAllBuilds.mockResolvedValue(wrapResponse({ count: 0 }));
+      mockClient.agents.getAllAgents.mockResolvedValue(wrapResponse({ count: 0 }));
 
       // Mock should reject, and since it's not a 4xx error, it will be retried and eventually thrown
       interface HttpError extends Error {
@@ -859,7 +810,7 @@ describe('BuildQueueManager', () => {
       }
       const serverError: HttpError = new Error('Queue error');
       serverError.response = { status: 500 }; // Server error will be retried
-      mockBuildQueue.addBuildToQueue
+      mockClient.buildQueue.addBuildToQueue
         .mockRejectedValueOnce(serverError)
         .mockRejectedValueOnce(serverError)
         .mockRejectedValueOnce(serverError)

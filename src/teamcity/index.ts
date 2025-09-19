@@ -15,7 +15,6 @@ import {
 } from './config';
 
 // Re-export all public types and utilities
-export * from './client';
 export * from './client-adapter';
 export * from './auth';
 export * from './errors';

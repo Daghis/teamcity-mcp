@@ -5,9 +5,6 @@ import { BuildStatusManager, type BuildStatusOptions } from '@/teamcity/build-st
 import type { TeamCityClientAdapter } from '@/teamcity/client-adapter';
 import { BuildAccessDeniedError, BuildNotFoundError } from '@/teamcity/errors';
 
-// Mock the TeamCityClient
-jest.mock('@/teamcity/client');
-
 describe('BuildStatusManager', () => {
   let manager: BuildStatusManager;
   type MockClient = {

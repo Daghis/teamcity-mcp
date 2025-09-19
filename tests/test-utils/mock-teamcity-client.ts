@@ -60,6 +60,16 @@ export interface MockBuildApi {
 }
 
 /**
+ * Mock interface for BuildQueue API methods used in tests
+ */
+export interface MockBuildQueueApi {
+  addBuildToQueue: jest.Mock;
+  getAllQueuedBuilds: jest.Mock;
+  setQueuedBuildsOrder: jest.Mock;
+  cancelQueuedBuild: jest.Mock;
+}
+
+/**
  * Mock interface for VcsRoot API methods used in tests
  */
 export interface MockVcsRootApi {
@@ -71,13 +81,22 @@ export interface MockVcsRootApi {
 }
 
 /**
+ * Mock interface for Agent API methods used in tests
+ */
+export interface MockAgentApi {
+  getAllAgents: jest.Mock;
+}
+
+/**
  * Subset of modules that we actively mock for manager tests.
  */
 export interface MockTeamCityModules {
   buildTypes: MockBuildTypeApi;
   projects: MockProjectApi;
   builds: MockBuildApi;
+  buildQueue: MockBuildQueueApi;
   vcsRoots: MockVcsRootApi;
+  agents: MockAgentApi;
 }
 
 const DEFAULT_BASE_URL = 'https://teamcity.test.local';
@@ -180,12 +199,21 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
         triggerBuild: jest.fn(),
         cancelBuild: jest.fn(),
       },
+      buildQueue: {
+        addBuildToQueue: jest.fn(),
+        getAllQueuedBuilds: jest.fn(),
+        setQueuedBuildsOrder: jest.fn(),
+        cancelQueuedBuild: jest.fn(),
+      },
       vcsRoots: {
         getAllVcsRoots: jest.fn(),
         addVcsRoot: jest.fn(),
         getVcsRoot: jest.fn(),
         getVcsRootInstances: jest.fn(),
         getVcsRootBranches: jest.fn(),
+      },
+      agents: {
+        getAllAgents: jest.fn(),
       },
       ...overrides,
     } as MockTeamCityModules;
@@ -194,7 +222,9 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
     modules.buildTypes = this.mockModules.buildTypes as unknown as TeamCityApiSurface['buildTypes'];
     modules.projects = this.mockModules.projects as unknown as TeamCityApiSurface['projects'];
     modules.builds = this.mockModules.builds as unknown as TeamCityApiSurface['builds'];
+    modules.buildQueue = this.mockModules.buildQueue as unknown as TeamCityApiSurface['buildQueue'];
     modules.vcsRoots = this.mockModules.vcsRoots as unknown as TeamCityApiSurface['vcsRoots'];
+    modules.agents = this.mockModules.agents as unknown as TeamCityApiSurface['agents'];
 
     this.modules = Object.freeze(modules);
 
@@ -271,6 +301,14 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
 
   get vcsRoots(): MockVcsRootApi {
     return this.mockModules.vcsRoots;
+  }
+
+  get buildQueue(): MockBuildQueueApi {
+    return this.mockModules.buildQueue;
+  }
+
+  get agents(): MockAgentApi {
+    return this.mockModules.agents;
   }
 
   /**
