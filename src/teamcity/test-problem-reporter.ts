@@ -78,31 +78,13 @@ export interface SummaryOptions {
 export class TestProblemReporter {
   constructor(private readonly client: TeamCityClientAdapter) {}
 
-  private request<T>(
-    fn: (ctx: {
-      axios: ReturnType<TeamCityClientAdapter['getAxios']>;
-      baseUrl: string;
-    }) => Promise<T>
-  ): Promise<T> {
-    return this.client.request(fn);
-  }
-
-  private buildRestUrl(baseUrl: string, path: string): string {
-    const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    if (path.startsWith('/')) {
-      return `${normalizedBase}${path}`;
-    }
-    return `${normalizedBase}/${path}`;
-  }
-
   /**
    * Get test statistics for a build
    */
   async getTestStatistics(buildId: string): Promise<BuildTestStatistics> {
-    const response = await this.request((ctx) =>
-      ctx.axios.get(this.buildRestUrl(ctx.baseUrl, `/app/rest/builds/id:${buildId}`), {
-        headers: { Accept: 'application/json' },
-      })
+    const response = await this.client.modules.builds.getBuild(
+      this.toBuildLocator(buildId),
+      'testOccurrences(count,passed,failed,ignored,muted,newFailed)'
     );
     const build = response.data;
 
@@ -139,23 +121,31 @@ export class TestProblemReporter {
     };
   }
 
+  private toBuildLocator(buildId: string): string {
+    return buildId.includes(':') ? buildId : `id:${buildId}`;
+  }
+
   /**
    * Get details of failed tests
    */
   async getFailedTests(buildId: string, maxResults?: number): Promise<TestRun[]> {
     try {
-      const response = await this.request((ctx) =>
-        ctx.axios.get(
-          this.buildRestUrl(
-            ctx.baseUrl,
-            `/app/rest/builds/id:${buildId}/testOccurrences?locator=status:FAILURE${maxResults ? `,count:${maxResults}` : ''}`
-          ),
-          {
-            headers: { Accept: 'application/json' },
-          }
-        )
-      );
-      const data = response.data;
+      const locatorParts = [`build:(id:${buildId})`, 'status:FAILURE'];
+      if (maxResults) {
+        locatorParts.push(`count:${maxResults}`);
+      }
+      const locator = locatorParts.join(',');
+      const response = await this.client.modules.tests.getAllTestOccurrences(locator);
+      const data = response.data as {
+        testOccurrence?: Array<{
+          status: string;
+          id: string;
+          name: string;
+          test?: { className: string };
+          duration: number;
+          details: string;
+        }>;
+      };
 
       if (data.testOccurrence == null || !Array.isArray(data.testOccurrence)) {
         return [];
@@ -177,7 +167,7 @@ export class TestProblemReporter {
             id: testObj.id,
             name: testObj.name,
             className: testObj.test?.className,
-            status: testObj.status ?? 'FAILURE',
+            status: 'FAILURE',
             duration: testObj.duration,
             details: testObj.details,
           };
@@ -196,15 +186,18 @@ export class TestProblemReporter {
     categorize?: boolean
   ): Promise<BuildProblem[] | CategorizedProblems> {
     try {
-      const response = await this.request((ctx) =>
-        ctx.axios.get(
-          this.buildRestUrl(ctx.baseUrl, `/app/rest/builds/id:${buildId}/problemOccurrences`),
-          {
-            headers: { Accept: 'application/json' },
-          }
-        )
+      const response = await this.client.modules.problemOccurrences.getAllBuildProblemOccurrences(
+        `build:(id:${buildId})`
       );
-      const data = response.data;
+      const data = response.data as {
+        problemOccurrence?: Array<{
+          id: string;
+          type: string;
+          identity: string;
+          details: string;
+          additionalData: string;
+        }>;
+      };
 
       if (data.problemOccurrence == null || !Array.isArray(data.problemOccurrence)) {
         return categorize ? { all: [], categorized: {} } : [];
@@ -216,14 +209,17 @@ export class TestProblemReporter {
           type: string;
           identity: string;
           details: string;
-          additionalData: string;
+          additionalData?: Record<string, string> | string;
         };
         return {
           id: problemObj.id,
           type: problemObj.type,
           identity: problemObj.identity,
           details: problemObj.details,
-          additionalData: problemObj.additionalData,
+          additionalData:
+            typeof problemObj.additionalData === 'object' && problemObj.additionalData !== null
+              ? problemObj.additionalData
+              : {},
         };
       });
 
@@ -366,25 +362,16 @@ export class TestProblemReporter {
     count: number = 10
   ): Promise<Array<{ buildId: string; statistics: BuildTestStatistics }>> {
     try {
-      const response = await this.request((ctx) =>
-        ctx.axios.get(
-          this.buildRestUrl(
-            ctx.baseUrl,
-            `/app/rest/buildTypes/id:${buildTypeId}/builds?locator=count:${count}`
-          ),
-          {
-            headers: { Accept: 'application/json' },
-          }
-        )
-      );
-      const builds = response.data;
+      const locator = `buildType:(id:${buildTypeId}),count:${count}`;
+      const response = await this.client.modules.builds.getAllBuilds(locator, 'build(id)');
+      const builds = response.data as { build?: Array<{ id: string }> };
 
       if (builds.build == null || !Array.isArray(builds.build)) {
         return [];
       }
 
       const trend = await Promise.all(
-        builds.build.map(async (build: unknown) => {
+        builds.build.map(async (build) => {
           const buildObj = build as { id: string };
           return {
             buildId: buildObj.id,
@@ -408,18 +395,9 @@ export class TestProblemReporter {
     count: number = 20
   ): Promise<Record<string, number>> {
     try {
-      const response = await this.request((ctx) =>
-        ctx.axios.get(
-          this.buildRestUrl(
-            ctx.baseUrl,
-            `/app/rest/buildTypes/id:${buildTypeId}/builds?locator=status:FAILURE,count:${count}`
-          ),
-          {
-            headers: { Accept: 'application/json' },
-          }
-        )
-      );
-      const builds = response.data;
+      const locator = `buildType:(id:${buildTypeId}),status:FAILURE,count:${count}`;
+      const response = await this.client.modules.builds.getAllBuilds(locator, 'build(id)');
+      const builds = response.data as { build?: Array<{ id: string }> };
 
       if (builds.build == null || !Array.isArray(builds.build)) {
         return {};

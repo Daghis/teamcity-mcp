@@ -225,18 +225,13 @@ export class BuildListManager {
         .filter((part) => !part.startsWith('count:') && !part.startsWith('start:'))
         .join(',');
 
-      const response = await this.client.request((ctx) =>
-        ctx.axios.get<string>(`${ctx.baseUrl}/app/rest/builds/count`, {
-          params: countLocator ? { locator: countLocator } : undefined,
-          headers: {
-            Accept: 'text/plain',
-          },
-          responseType: 'text',
-          transformResponse: [(data) => data],
-        })
+      const response = await this.client.modules.builds.getAllBuilds(
+        countLocator || undefined,
+        'count'
       );
 
-      return parseInt(String(response.data), 10);
+      const total = response.data?.count;
+      return typeof total === 'number' ? total : Number.parseInt(String(total ?? 0), 10);
     } catch (error: unknown) {
       // Total count is optional, don't fail the main request
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

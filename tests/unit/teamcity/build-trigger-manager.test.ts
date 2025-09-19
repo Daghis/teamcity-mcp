@@ -15,6 +15,7 @@ import {
 } from '@/teamcity/errors';
 
 import {
+  type MockBuildTypeApi,
   type MockTeamCityClient,
   createMockTeamCityClient,
 } from '../../test-utils/mock-teamcity-client';
@@ -23,6 +24,7 @@ describe('BuildTriggerManager', () => {
   let manager: BuildTriggerManager;
   let mockClient: MockTeamCityClient;
   let http: jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
+  let buildTypesApi: MockBuildTypeApi;
 
   beforeEach(() => {
     mockClient = createMockTeamCityClient();
@@ -31,6 +33,34 @@ describe('BuildTriggerManager', () => {
     http.post.mockReset();
     http.put.mockReset();
     http.delete.mockReset();
+    buildTypesApi = mockClient.mockModules.buildTypes;
+    buildTypesApi.getAllTriggers.mockImplementation((configId: string, fields?: string) =>
+      fields
+        ? http.get(`/app/rest/buildTypes/${configId}/triggers?fields=${fields}`)
+        : http.get(`/app/rest/buildTypes/${configId}/triggers`)
+    );
+    buildTypesApi.addTriggerToBuildType.mockImplementation(
+      (configId: string, _fields?: string, body?: unknown) =>
+        http.post(`/app/rest/buildTypes/${configId}/triggers`, body)
+    );
+    buildTypesApi.getTrigger.mockImplementation(
+      (configId: string, triggerId: string, fields?: string) =>
+        fields
+          ? http.get(`/app/rest/buildTypes/${configId}/triggers/${triggerId}?fields=${fields}`)
+          : http.get(`/app/rest/buildTypes/${configId}/triggers/${triggerId}`)
+    );
+    buildTypesApi.replaceTrigger.mockImplementation(
+      (configId: string, triggerId: string, _fields?: string, body?: unknown) =>
+        http.put(`/app/rest/buildTypes/${configId}/triggers/${triggerId}`, body)
+    );
+    buildTypesApi.deleteTrigger.mockImplementation((configId: string, triggerId: string) =>
+      http.delete(`/app/rest/buildTypes/${configId}/triggers/${triggerId}`)
+    );
+    buildTypesApi.getAllVcsRootsOfBuildType.mockImplementation((configId: string, fields?: string) =>
+      fields
+        ? http.get(`/app/rest/buildTypes/${configId}/vcs-root-entries?fields=${fields}`)
+        : http.get(`/app/rest/buildTypes/${configId}/vcs-root-entries`)
+    );
     manager = new BuildTriggerManager(mockClient);
   });
 
