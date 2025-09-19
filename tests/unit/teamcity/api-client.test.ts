@@ -1,10 +1,22 @@
+import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+
 import { TeamCityAPI, TeamCityAPIClientConfig } from '@/api-client';
+import type { Build } from '@/teamcity-client/models/build';
+import type { Changes } from '@/teamcity-client/models/changes';
 
 const baseConfig: TeamCityAPIClientConfig = {
   baseUrl: 'https://teamcity.example.com',
   token: 'test-token',
   timeout: 4321,
 };
+
+const createAxiosResponse = <T>(data: T): AxiosResponse<T> => ({
+  data,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config: { headers: {} } as InternalAxiosRequestConfig,
+});
 
 describe('TeamCityAPI unified surface', () => {
   beforeEach(() => {
@@ -50,5 +62,31 @@ describe('TeamCityAPI unified surface', () => {
     const second = TeamCityAPI.getInstance({ ...baseConfig, token: 'alternate-token' });
 
     expect(second).not.toBe(first);
+  });
+
+  it('routes listChangesForBuild through the generated ChangeApi', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const mockResponse = createAxiosResponse<Changes>({ change: [] });
+    const getAllChangesSpy = jest
+      .spyOn(api.changes, 'getAllChanges')
+      .mockResolvedValue(mockResponse);
+
+    const response = await api.listChangesForBuild('123', 'change($short)');
+
+    expect(getAllChangesSpy).toHaveBeenCalledWith('build:(id:123)', 'change($short)');
+    expect(response).toBe(mockResponse);
+  });
+
+  it('routes listSnapshotDependencies through the generated BuildApi and unwraps payload', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const dependencies = { build: [] };
+    const buildPayload = { 'snapshot-dependencies': dependencies } as Build;
+    const mockResponse = createAxiosResponse<Build>(buildPayload);
+    const getBuildSpy = jest.spyOn(api.builds, 'getBuild').mockResolvedValue(mockResponse);
+
+    const response = await api.listSnapshotDependencies('123');
+
+    expect(getBuildSpy).toHaveBeenCalledWith('id:123', 'snapshot-dependencies');
+    expect(response.data).toBe(dependencies);
   });
 });
