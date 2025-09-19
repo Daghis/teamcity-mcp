@@ -8,6 +8,7 @@ type StubbedModules = {
     getBuild: jest.Mock;
     getFilesListOfBuild: jest.Mock;
     getBuildStatisticValues: jest.Mock;
+    getAllBuilds: jest.Mock;
   };
   changes: {
     getAllChanges: jest.Mock;
@@ -27,6 +28,7 @@ const createStubClient = (): StubbedClient => {
       getBuild: jest.fn(),
       getFilesListOfBuild: jest.fn(),
       getBuildStatisticValues: jest.fn(),
+      getAllBuilds: jest.fn(),
     },
     changes: {
       getAllChanges: jest.fn(),
@@ -189,8 +191,8 @@ describe('BuildResultsManager', () => {
   });
 
   describe('fetchDependencies', () => {
-    it('uses shared axios request helper for snapshot dependencies', async () => {
-      stub.http.get.mockResolvedValueOnce({
+    it('fetches snapshot dependencies through the builds module API', async () => {
+      stub.modules.builds.getAllBuilds.mockResolvedValueOnce({
         data: {
           build: [
             { id: 1, number: '100', buildTypeId: 'Cfg_A', status: 'SUCCESS' },
@@ -206,9 +208,9 @@ describe('BuildResultsManager', () => {
         status: string;
       }>;
 
-      expect(stub.request).toHaveBeenCalledWith(expect.any(Function));
-      expect(stub.http.get).toHaveBeenCalledWith(
-        `${BASE_URL}/app/rest/builds/id:12345/snapshot-dependencies`
+      expect(stub.modules.builds.getAllBuilds).toHaveBeenCalledWith(
+        'snapshotDependency:(to:(id:12345))',
+        'build(id,number,buildTypeId,status)'
       );
       expect(dependencies).toEqual([
         { buildId: 1, buildNumber: '100', buildTypeId: 'Cfg_A', status: 'SUCCESS' },

@@ -7,14 +7,10 @@ import {
 
 describe('TestProblemReporter: trends and patterns', () => {
   let mockClient: MockTeamCityClient;
-  let http: jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
   const BASE_URL = 'http://localhost:8111';
 
   const configureClient = () => {
     mockClient = createMockTeamCityClient();
-    http = mockClient.http as jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
-    http.get.mockReset();
-    mockClient.request.mockImplementation(async (fn) => fn({ axios: http, baseUrl: BASE_URL }));
     mockClient.getApiConfig.mockReturnValue({
       baseUrl: BASE_URL,
       token: 'token',
@@ -32,17 +28,16 @@ describe('TestProblemReporter: trends and patterns', () => {
   beforeEach(() => configureClient());
 
   it('getTestTrend aggregates stats for recent builds', async () => {
-    // First call returns builds list
-    http.get.mockImplementation((path: string) => {
-      if (path.includes('/buildTypes/id:bt1/builds')) {
-        return Promise.resolve({ data: { build: [{ id: 'b1' }, { id: 'b2' }] } });
-      }
-      if (path.includes('/builds/id:b1')) {
+    mockClient.mockModules.builds.getAllBuilds.mockResolvedValue({
+      data: { build: [{ id: 'b1' }, { id: 'b2' }] },
+    });
+    mockClient.mockModules.builds.getBuild.mockImplementation((locator: string) => {
+      if (locator === 'id:b1') {
         return Promise.resolve({
           data: { id: 'b1', testOccurrences: { count: 10, passed: 8, failed: 2 } },
         });
       }
-      if (path.includes('/builds/id:b2')) {
+      if (locator === 'id:b2') {
         return Promise.resolve({
           data: { id: 'b2', testOccurrences: { count: 5, passed: 5, failed: 0 } },
         });
@@ -59,11 +54,11 @@ describe('TestProblemReporter: trends and patterns', () => {
 
   it('getFailurePatterns counts repeated failures across builds', async () => {
     // Return two failed builds
-    http.get.mockImplementation((path: string) => {
-      if (path.includes('/buildTypes/id:bt2/builds?locator=status:FAILURE')) {
-        return Promise.resolve({ data: { build: [{ id: 'b10' }, { id: 'b11' }] } });
-      }
-      if (path.includes('/testOccurrences?locator=status:FAILURE')) {
+    mockClient.mockModules.builds.getAllBuilds.mockResolvedValue({
+      data: { build: [{ id: 'b10' }, { id: 'b11' }] },
+    });
+    mockClient.mockModules.tests.getAllTestOccurrences.mockImplementation((locator: string) => {
+      if (locator.includes('build:(id:b10)')) {
         return Promise.resolve({
           data: {
             testOccurrence: [
@@ -73,13 +68,17 @@ describe('TestProblemReporter: trends and patterns', () => {
           },
         });
       }
-      if (path.includes('/builds/id:')) {
-        // getTestStatistics called inside getFailurePatterns via getFailedTests indirectly; ensure stats call is harmless
+      if (locator.includes('build:(id:b11)')) {
         return Promise.resolve({
-          data: { id: 'b', testOccurrences: { count: 2, passed: 0, failed: 2 } },
+          data: {
+            testOccurrence: [{ id: 't3', name: 'C', status: 'FAILURE', test: { className: 'D' } }],
+          },
         });
       }
       return Promise.resolve({ data: {} });
+    });
+    mockClient.mockModules.builds.getBuild.mockResolvedValue({
+      data: { id: 'b', testOccurrences: { count: 2, passed: 0, failed: 2 } },
     });
 
     const reporter = new TestProblemReporter(mockClient);

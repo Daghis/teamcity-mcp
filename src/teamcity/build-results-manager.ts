@@ -1,6 +1,8 @@
 /**
  * BuildResultsManager - Manages comprehensive build results retrieval
  */
+import type { AxiosResponse } from 'axios';
+
 import { warn } from '@/utils/logger';
 
 import type { TeamCityUnifiedClient } from './types/client';
@@ -451,8 +453,9 @@ export class BuildResultsManager {
    */
   private async fetchDependencies(buildId: string): Promise<BuildResult['dependencies']> {
     try {
-      const response = await this.client.request((ctx) =>
-        ctx.axios.get(`${ctx.baseUrl}/app/rest/builds/id:${buildId}/snapshot-dependencies`)
+      const response = await this.client.modules.builds.getAllBuilds(
+        `snapshotDependency:(to:(id:${buildId}))`,
+        'build(id,number,buildTypeId,status)'
       );
       const depsData = response.data as {
         build?: Array<{
@@ -508,16 +511,17 @@ export class BuildResultsManager {
       .map((segment) => encodeURIComponent(segment))
       .join('/');
 
-    const response = await this.client.request((ctx) =>
-      ctx.axios.get<ArrayBuffer>(
-        `${ctx.baseUrl}/app/rest/builds/id:${buildId}/artifacts/content/${normalizedPath}`,
-        {
-          responseType: 'arraybuffer',
-        }
-      )
+    const buildLocator = this.toBuildLocator(buildId);
+    const response = await this.client.modules.builds.downloadFileOfBuild(
+      `content/${normalizedPath}`,
+      buildLocator,
+      undefined,
+      undefined,
+      { responseType: 'arraybuffer' }
     );
 
-    return response.data;
+    const axiosResponse = response as unknown as AxiosResponse<ArrayBuffer>;
+    return axiosResponse.data ?? new ArrayBuffer(0);
   }
 
   /**

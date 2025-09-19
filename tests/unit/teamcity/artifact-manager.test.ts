@@ -4,6 +4,7 @@
 import { ArtifactManager } from '@/teamcity/artifact-manager';
 
 import {
+  type MockBuildApi,
   type MockTeamCityClient,
   createMockTeamCityClient,
 } from '../../test-utils/mock-teamcity-client';
@@ -12,12 +13,20 @@ describe('ArtifactManager', () => {
   let manager: ArtifactManager;
   let mockClient: MockTeamCityClient;
   let http: jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
+  let buildsApi: MockBuildApi;
   const BASE_URL = 'https://teamcity.example.com';
 
   const configureClient = () => {
     mockClient = createMockTeamCityClient();
     http = mockClient.http as jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
     http.get.mockReset();
+    buildsApi = mockClient.mockModules.builds;
+    buildsApi.getFilesListOfBuild.mockImplementation((buildLocator: string) =>
+      http.get(`/app/rest/builds/${buildLocator}/artifacts`)
+    );
+    buildsApi.downloadFileOfBuild.mockImplementation((path: string, buildLocator: string) =>
+      http.get(`/app/rest/builds/${buildLocator}/artifacts/${path}`)
+    );
     mockClient.request.mockImplementation(async (fn) => fn({ axios: http, baseUrl: BASE_URL }));
     mockClient.getApiConfig.mockReturnValue({
       baseUrl: BASE_URL,

@@ -8,6 +8,8 @@
  * - Delete build steps
  * - Reorder build steps
  */
+import type { Step } from '@/teamcity-client/models/step';
+import type { Steps } from '@/teamcity-client/models/steps';
 import {
   BuildConfigurationNotFoundError,
   BuildStepNotFoundError,
@@ -133,39 +135,14 @@ const RUNNER_REQUIRED_PARAMS: Record<string, string[]> = {
 export class BuildStepManager {
   constructor(private readonly client: TeamCityClientAdapter) {}
 
-  private request<T>(
-    fn: (ctx: {
-      axios: ReturnType<TeamCityClientAdapter['getAxios']>;
-      baseUrl: string;
-    }) => Promise<T>
-  ): Promise<T> {
-    return this.client.request(fn);
-  }
-
-  private buildRestUrl(baseUrl: string, path: string): string {
-    const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    if (path.startsWith('/')) {
-      return `${normalizedBase}${path}`;
-    }
-    return `${normalizedBase}/${path}`;
-  }
-
   /**
    * List all build steps in a configuration
    */
   async listBuildSteps(options: BuildStepManagerOptions): Promise<BuildStepListResult> {
     try {
-      const response = await this.request((ctx) =>
-        ctx.axios.get(
-          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${options.configId}/steps`),
-          {
-            headers: { Accept: 'application/json' },
-            params: {
-              fields:
-                'count,step(id,name,type,disabled,properties(property(name,value)),parameters(property(name,value)))',
-            },
-          }
-        )
+      const response = await this.client.modules.buildTypes.getAllBuildSteps(
+        options.configId,
+        'count,step(id,name,type,disabled,properties(property(name,value)),parameters(property(name,value)))'
       );
 
       if (response.data == null) {
@@ -203,17 +180,10 @@ export class BuildStepManager {
     try {
       const stepData = this.buildStepData(options);
 
-      const response = await this.request((ctx) =>
-        ctx.axios.post(
-          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${options.configId}/steps`),
-          stepData,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
-          }
-        )
+      const response = await this.client.modules.buildTypes.addBuildStepToBuildType(
+        options.configId,
+        undefined,
+        stepData as Step
       );
 
       const step = this.parseStep(response.data);
@@ -261,20 +231,11 @@ export class BuildStepManager {
         };
       }
 
-      const response = await this.request((ctx) =>
-        ctx.axios.put(
-          this.buildRestUrl(
-            ctx.baseUrl,
-            `/app/rest/buildTypes/${options.configId}/steps/${options.stepId}`
-          ),
-          updateData,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
-          }
-        )
+      const response = await this.client.modules.buildTypes.replaceBuildStep(
+        options.configId,
+        options.stepId,
+        undefined,
+        updateData as Step
       );
 
       const step = this.parseStep(response.data);
@@ -294,17 +255,7 @@ export class BuildStepManager {
    */
   async deleteBuildStep(options: BuildStepDeleteOptions): Promise<BuildStepOperationResult> {
     try {
-      await this.request((ctx) =>
-        ctx.axios.delete(
-          this.buildRestUrl(
-            ctx.baseUrl,
-            `/app/rest/buildTypes/${options.configId}/steps/${options.stepId}`
-          ),
-          {
-            headers: { Accept: 'application/json' },
-          }
-        )
-      );
+      await this.client.modules.buildTypes.deleteBuildStep(options.configId, options.stepId);
 
       return {
         success: true,
@@ -336,21 +287,15 @@ export class BuildStepManager {
       }
 
       // Build reorder request
-      const reorderData = {
+      const reorderData: Steps = {
         step: options.stepOrder.map((id) => ({ id })),
+        count: options.stepOrder.length,
       };
 
-      const response = await this.request((ctx) =>
-        ctx.axios.put(
-          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${options.configId}/steps`),
-          reorderData,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
-          }
-        )
+      const response = await this.client.modules.buildTypes.replaceAllBuildSteps(
+        options.configId,
+        undefined,
+        reorderData
       );
 
       const steps = this.parseStepList(response.data);

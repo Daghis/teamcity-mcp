@@ -158,23 +158,6 @@ export interface ValidateTriggerResult {
 export class BuildTriggerManager {
   constructor(private readonly client: TeamCityClientAdapter) {}
 
-  private request<T>(
-    fn: (ctx: {
-      axios: ReturnType<TeamCityClientAdapter['getAxios']>;
-      baseUrl: string;
-    }) => Promise<T>
-  ): Promise<T> {
-    return this.client.request(fn);
-  }
-
-  private buildRestUrl(baseUrl: string, path: string): string {
-    const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    if (path.startsWith('/')) {
-      return `${normalizedBase}${path}`;
-    }
-    return `${normalizedBase}/${path}`;
-  }
-
   /**
    * List all triggers for a build configuration
    */
@@ -184,17 +167,9 @@ export class BuildTriggerManager {
     try {
       debug('Listing triggers for build configuration', { configId });
 
-      const response = await this.request((ctx) =>
-        ctx.axios.get<TeamCityTriggersResponse>(
-          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${configId}/triggers`),
-          {
-            headers: { Accept: 'application/json' },
-            params: fields ? { fields } : undefined,
-          }
-        )
-      );
+      const response = await this.client.modules.buildTypes.getAllTriggers(configId, fields);
 
-      const triggers = this.parseTriggerList(response.data);
+      const triggers = this.parseTriggerList(response.data as unknown as TeamCityTriggersResponse);
 
       return {
         success: true,
@@ -251,20 +226,13 @@ export class BuildTriggerManager {
 
       const triggerData = this.buildTriggerPayload(type, properties, !enabled);
 
-      const response = await this.request((ctx) =>
-        ctx.axios.post(
-          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${configId}/triggers`),
-          triggerData,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
-          }
-        )
+      const response = await this.client.modules.buildTypes.addTriggerToBuildType(
+        configId,
+        undefined,
+        triggerData
       );
 
-      const trigger = this.parseTrigger(response.data);
+      const trigger = this.parseTrigger(response.data as unknown as TeamCityTriggerResponse);
 
       return {
         success: true,
@@ -295,16 +263,11 @@ export class BuildTriggerManager {
       debug('Updating trigger', { configId, triggerId });
 
       // Get existing trigger first
-      const existingResponse = await this.request((ctx) =>
-        ctx.axios.get(
-          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${configId}/triggers/${triggerId}`),
-          {
-            headers: { Accept: 'application/json' },
-          }
-        )
-      );
+      const existingResponse = await this.client.modules.buildTypes.getTrigger(configId, triggerId);
 
-      const existingTrigger = this.parseTrigger(existingResponse.data);
+      const existingTrigger = this.parseTrigger(
+        existingResponse.data as unknown as TeamCityTriggerResponse
+      );
 
       // Merge properties
       const mergedProperties = properties
@@ -328,20 +291,14 @@ export class BuildTriggerManager {
         enabled !== undefined ? !enabled : !existingTrigger.enabled
       );
 
-      const response = await this.request((ctx) =>
-        ctx.axios.put(
-          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${configId}/triggers/${triggerId}`),
-          triggerData,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
-          }
-        )
+      const response = await this.client.modules.buildTypes.replaceTrigger(
+        configId,
+        triggerId,
+        undefined,
+        triggerData
       );
 
-      const trigger = this.parseTrigger(response.data);
+      const trigger = this.parseTrigger(response.data as unknown as TeamCityTriggerResponse);
 
       return {
         success: true,
@@ -365,14 +322,7 @@ export class BuildTriggerManager {
     try {
       debug('Deleting trigger', { configId, triggerId });
 
-      await this.request((ctx) =>
-        ctx.axios.delete(
-          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${configId}/triggers/${triggerId}`),
-          {
-            headers: { Accept: 'application/json' },
-          }
-        )
-      );
+      await this.client.modules.buildTypes.deleteTrigger(configId, triggerId);
 
       return {
         success: true,
@@ -464,7 +414,7 @@ export class BuildTriggerManager {
     const properties = propertiesToRecord(propsArray);
 
     const trigger: BuildTrigger = {
-      id: data.id,
+      id: data.id ?? '',
       type: data.type as TriggerType,
       enabled: data.disabled !== true,
       properties,
@@ -565,16 +515,12 @@ export class BuildTriggerManager {
   private async validateVcsRoot(configId: string, vcsRootId: string): Promise<void> {
     try {
       // Check if VCS root is attached to this build configuration
-      const response = await this.request((ctx) =>
-        ctx.axios.get<TeamCityVcsRootEntriesResponse>(
-          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${configId}/vcs-root-entries`),
-          {
-            headers: { Accept: 'application/json' },
-          }
-        )
+      const response = await this.client.modules.buildTypes.getAllVcsRootsOfBuildType(
+        configId,
+        'vcs-root(id)'
       );
 
-      const rootEntries = normalizeVcsRootEntries(response.data);
+      const rootEntries = normalizeVcsRootEntries(response.data as TeamCityVcsRootEntriesResponse);
       const hasVcsRoot = rootEntries.some((entry) => entry['vcs-root']?.id === vcsRootId);
 
       if (!hasVcsRoot) {
@@ -598,16 +544,9 @@ export class BuildTriggerManager {
   private async checkCircularDependency(sourceConfig: string, targetConfig: string): Promise<void> {
     // Get triggers from target config
     try {
-      const response = await this.request((ctx) =>
-        ctx.axios.get(
-          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${targetConfig}/triggers`),
-          {
-            headers: { Accept: 'application/json' },
-          }
-        )
-      );
+      const response = await this.client.modules.buildTypes.getAllTriggers(targetConfig);
 
-      const triggers = this.parseTriggerList(response.data);
+      const triggers = this.parseTriggerList(response.data as unknown as TeamCityTriggersResponse);
 
       // Check if target already depends on source
       const hasCycle = triggers.some(

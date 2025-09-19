@@ -7,7 +7,10 @@ import {
   TestProblemReporter,
 } from '../../../src/teamcity/test-problem-reporter';
 import {
+  type MockBuildApi,
+  type MockProblemOccurrenceApi,
   type MockTeamCityClient,
+  type MockTestOccurrenceApi,
   createMockTeamCityClient,
 } from '../../test-utils/mock-teamcity-client';
 
@@ -15,12 +18,34 @@ describe('TestProblemReporter', () => {
   let reporter: TestProblemReporter;
   let mockClient: MockTeamCityClient;
   let http: jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
+  let buildsApi: MockBuildApi;
+  let testsApi: MockTestOccurrenceApi;
+  let problemOccurrencesApi: MockProblemOccurrenceApi;
   const BASE_URL = 'http://localhost:8111';
 
   beforeEach(() => {
     mockClient = createMockTeamCityClient();
     http = mockClient.http as jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
     http.get.mockReset();
+    buildsApi = mockClient.mockModules.builds;
+    testsApi = mockClient.mockModules.tests;
+    problemOccurrencesApi = mockClient.mockModules.problemOccurrences;
+    buildsApi.getBuild.mockImplementation((locator: string) =>
+      http.get(`/app/rest/builds/${locator}`)
+    );
+    buildsApi.getAllBuilds.mockImplementation((locator?: string) =>
+      locator ? http.get(`/app/rest/builds?locator=${locator}`) : http.get('/app/rest/builds')
+    );
+    testsApi.getAllTestOccurrences.mockImplementation((locator?: string) =>
+      locator
+        ? http.get(`/app/rest/testOccurrences?locator=${locator}`)
+        : http.get('/app/rest/testOccurrences')
+    );
+    problemOccurrencesApi.getAllBuildProblemOccurrences.mockImplementation((locator?: string) =>
+      locator
+        ? http.get(`/app/rest/problemOccurrences?locator=${locator}`)
+        : http.get('/app/rest/problemOccurrences')
+    );
     mockClient.request.mockImplementation(async (fn) => fn({ axios: http, baseUrl: BASE_URL }));
     mockClient.getApiConfig.mockReturnValue({
       baseUrl: BASE_URL,
@@ -293,7 +318,7 @@ describe('TestProblemReporter', () => {
 
       // Mock test statistics
       http.get.mockImplementation((path: string) => {
-        if (path.includes('/testOccurrences?locator=status:FAILURE')) {
+        if (path.includes(`/testOccurrences?locator=build:(id:${buildId}),status:FAILURE`)) {
           return Promise.resolve({
             data: {
               testOccurrence: [
@@ -418,7 +443,7 @@ describe('TestProblemReporter', () => {
       const buildId = '12357';
 
       http.get.mockImplementation((path: string) => {
-        if (path.includes('/testOccurrences?locator=status:FAILURE')) {
+        if (path.includes(`/testOccurrences?locator=build:(id:${buildId}),status:FAILURE`)) {
           return Promise.resolve({
             data: {
               testOccurrence: [
@@ -485,7 +510,7 @@ describe('TestProblemReporter', () => {
       }));
 
       http.get.mockImplementation((path: string) => {
-        if (path.includes('/testOccurrences?locator=status:FAILURE')) {
+        if (path.includes(`/testOccurrences?locator=build:(id:${buildId}),status:FAILURE`)) {
           return Promise.resolve({
             data: { testOccurrence: tests },
           });

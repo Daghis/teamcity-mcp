@@ -33,6 +33,17 @@ export interface MockBuildTypeApi {
   setBuildTypeField: jest.Mock;
   deleteBuildParameterOfBuildType: jest.Mock;
   deleteBuildParameterOfBuildType_2: jest.Mock;
+  getAllBuildSteps: jest.Mock;
+  addBuildStepToBuildType: jest.Mock;
+  replaceBuildStep: jest.Mock;
+  deleteBuildStep: jest.Mock;
+  replaceAllBuildSteps: jest.Mock;
+  getAllTriggers: jest.Mock;
+  addTriggerToBuildType: jest.Mock;
+  getTrigger: jest.Mock;
+  replaceTrigger: jest.Mock;
+  deleteTrigger: jest.Mock;
+  getAllVcsRootsOfBuildType: jest.Mock;
 }
 
 /**
@@ -57,6 +68,9 @@ export interface MockBuildApi {
   getBuildProblems: jest.Mock;
   triggerBuild: jest.Mock;
   cancelBuild: jest.Mock;
+  getFilesListOfBuild: jest.Mock;
+  getFileMetadataOfBuild: jest.Mock;
+  downloadFileOfBuild: jest.Mock;
 }
 
 /**
@@ -87,6 +101,16 @@ export interface MockAgentApi {
   getAllAgents: jest.Mock;
 }
 
+export interface MockTestOccurrenceApi {
+  getAllTestOccurrences: jest.Mock;
+  getTestOccurrence: jest.Mock;
+}
+
+export interface MockProblemOccurrenceApi {
+  getAllBuildProblemOccurrences: jest.Mock;
+  getBuildProblemOccurrence: jest.Mock;
+}
+
 /**
  * Subset of modules that we actively mock for manager tests.
  */
@@ -97,6 +121,8 @@ export interface MockTeamCityModules {
   buildQueue: MockBuildQueueApi;
   vcsRoots: MockVcsRootApi;
   agents: MockAgentApi;
+  tests: MockTestOccurrenceApi;
+  problemOccurrences: MockProblemOccurrenceApi;
 }
 
 const DEFAULT_BASE_URL = 'https://teamcity.test.local';
@@ -182,6 +208,17 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
         setBuildTypeField: jest.fn(),
         deleteBuildParameterOfBuildType: jest.fn(),
         deleteBuildParameterOfBuildType_2: jest.fn(),
+        getAllBuildSteps: jest.fn(),
+        addBuildStepToBuildType: jest.fn(),
+        replaceBuildStep: jest.fn(),
+        deleteBuildStep: jest.fn(),
+        replaceAllBuildSteps: jest.fn(),
+        getAllTriggers: jest.fn(),
+        addTriggerToBuildType: jest.fn(),
+        getTrigger: jest.fn(),
+        replaceTrigger: jest.fn(),
+        deleteTrigger: jest.fn(),
+        getAllVcsRootsOfBuildType: jest.fn(),
       },
       projects: {
         getAllProjects: jest.fn(),
@@ -198,6 +235,9 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
         getBuildProblems: jest.fn(),
         triggerBuild: jest.fn(),
         cancelBuild: jest.fn(),
+        getFilesListOfBuild: jest.fn(),
+        getFileMetadataOfBuild: jest.fn(),
+        downloadFileOfBuild: jest.fn(),
       },
       buildQueue: {
         addBuildToQueue: jest.fn(),
@@ -215,6 +255,14 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
       agents: {
         getAllAgents: jest.fn(),
       },
+      tests: {
+        getAllTestOccurrences: jest.fn(),
+        getTestOccurrence: jest.fn(),
+      },
+      problemOccurrences: {
+        getAllBuildProblemOccurrences: jest.fn(),
+        getBuildProblemOccurrence: jest.fn(),
+      },
       ...overrides,
     } as MockTeamCityModules;
 
@@ -225,6 +273,9 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
     modules.buildQueue = this.mockModules.buildQueue as unknown as TeamCityApiSurface['buildQueue'];
     modules.vcsRoots = this.mockModules.vcsRoots as unknown as TeamCityApiSurface['vcsRoots'];
     modules.agents = this.mockModules.agents as unknown as TeamCityApiSurface['agents'];
+    modules.tests = this.mockModules.tests as unknown as TeamCityApiSurface['tests'];
+    modules.problemOccurrences = this.mockModules
+      .problemOccurrences as unknown as TeamCityApiSurface['problemOccurrences'];
 
     this.modules = Object.freeze(modules);
 

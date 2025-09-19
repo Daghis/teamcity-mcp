@@ -1,6 +1,8 @@
 /**
  * ArtifactManager - Advanced artifact management for TeamCity builds
  */
+import type { AxiosResponse } from 'axios';
+
 import type { TeamCityClientAdapter } from './client-adapter';
 
 export interface ArtifactInfo {
@@ -67,26 +69,13 @@ export class ArtifactManager {
     this.client = client;
   }
 
-  private request<T>(
-    fn: (ctx: {
-      axios: ReturnType<TeamCityClientAdapter['getAxios']>;
-      baseUrl: string;
-    }) => Promise<T>
-  ): Promise<T> {
-    return this.client.request(fn);
-  }
-
-  private buildRestUrl(baseUrl: string, path: string): string {
-    const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    if (path.startsWith('/')) {
-      return `${normalizedBase}${path}`;
-    }
-    return `${normalizedBase}/${path}`;
-  }
-
   private getBaseUrl(): string {
     const baseUrl = this.client.getApiConfig().baseUrl;
     return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  }
+
+  private toBuildLocator(buildId: string): string {
+    return buildId.includes(':') ? buildId : `id:${buildId}`;
   }
 
   /**
@@ -103,16 +92,18 @@ export class ArtifactManager {
     }
 
     try {
+      const buildLocator = this.toBuildLocator(buildId);
       // Fetch artifacts from API
-      const response = await this.request((ctx) =>
-        ctx.axios.get(this.buildRestUrl(ctx.baseUrl, `/app/rest/builds/id:${buildId}/artifacts`), {
-          headers: { Accept: 'application/json' },
-        })
+      const response = await this.client.modules.builds.getFilesListOfBuild(
+        buildLocator,
+        undefined,
+        undefined,
+        'file(name,fullName,size,modificationTime,href,children(file(name,fullName,size,modificationTime,href)))'
       );
 
       const baseUrl = this.getBaseUrl();
       let artifacts = this.parseArtifacts(
-        response.data as ArtifactFileResponse,
+        (response.data as ArtifactFileResponse) ?? {},
         buildId,
         options.includeNested,
         baseUrl
@@ -176,42 +167,39 @@ export class ArtifactManager {
         .split('/')
         .map((segment) => encodeURIComponent(segment))
         .join('/');
+      const buildLocator = this.toBuildLocator(buildId);
+      const artifactPath = `content/${normalizedPath}`;
 
       if (responseType === 'text') {
-        const response = await this.request((ctx) =>
-          ctx.axios.get<string>(
-            this.buildRestUrl(
-              ctx.baseUrl,
-              `/app/rest/builds/id:${buildId}/artifacts/content/${normalizedPath}`
-            ),
-            {
-              responseType,
-            }
-          )
+        const response = await this.client.modules.builds.downloadFileOfBuild(
+          artifactPath,
+          buildLocator,
+          undefined,
+          undefined,
+          { responseType }
         );
+
+        const axiosResponse = response as unknown as AxiosResponse<string>;
 
         return {
           name: artifact.name,
           path: artifact.path,
           size: artifact.size,
-          content: response.data,
-          mimeType: response.headers['content-type'],
+          content: axiosResponse.data,
+          mimeType: axiosResponse.headers?.['content-type'],
         };
       }
 
-      const response = await this.request((ctx) =>
-        ctx.axios.get<ArrayBuffer>(
-          this.buildRestUrl(
-            ctx.baseUrl,
-            `/app/rest/builds/id:${buildId}/artifacts/content/${normalizedPath}`
-          ),
-          {
-            responseType,
-          }
-        )
+      const response = await this.client.modules.builds.downloadFileOfBuild(
+        artifactPath,
+        buildLocator,
+        undefined,
+        undefined,
+        { responseType }
       );
 
-      const arrayBuffer = response.data;
+      const axiosResponse = response as unknown as AxiosResponse<ArrayBuffer>;
+      const arrayBuffer = axiosResponse.data ?? new ArrayBuffer(0);
       const buffer = Buffer.from(arrayBuffer);
 
       let content: string | Buffer;
@@ -226,7 +214,7 @@ export class ArtifactManager {
         path: artifact.path,
         size: artifact.size,
         content,
-        mimeType: response.headers['content-type'],
+        mimeType: axiosResponse.headers?.['content-type'],
       };
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : 'Unknown error';

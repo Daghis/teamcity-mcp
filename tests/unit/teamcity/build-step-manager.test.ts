@@ -19,6 +19,7 @@ import {
 } from '@/teamcity/errors';
 
 import {
+  type MockBuildTypeApi,
   type MockTeamCityClient,
   createMockTeamCityClient,
 } from '../../test-utils/mock-teamcity-client';
@@ -27,6 +28,7 @@ describe('BuildStepManager', () => {
   let manager: BuildStepManager;
   let mockClient: MockTeamCityClient;
   let http: jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
+  let buildTypesApi: MockBuildTypeApi;
 
   beforeEach(() => {
     mockClient = createMockTeamCityClient();
@@ -35,6 +37,29 @@ describe('BuildStepManager', () => {
     http.post.mockReset();
     http.put.mockReset();
     http.delete.mockReset();
+    buildTypesApi = mockClient.mockModules.buildTypes;
+    buildTypesApi.getAllBuildSteps.mockImplementation((configId: string, fields?: string) =>
+      http.get(
+        fields
+          ? `/app/rest/buildTypes/${configId}/steps?fields=${fields}`
+          : `/app/rest/buildTypes/${configId}/steps`
+      )
+    );
+    buildTypesApi.addBuildStepToBuildType.mockImplementation(
+      (configId: string, _fields?: string, body?: unknown) =>
+        http.post(`/app/rest/buildTypes/${configId}/steps`, body)
+    );
+    buildTypesApi.replaceBuildStep.mockImplementation(
+      (configId: string, stepId: string, _fields?: string, body?: unknown) =>
+        http.put(`/app/rest/buildTypes/${configId}/steps/${stepId}`, body)
+    );
+    buildTypesApi.deleteBuildStep.mockImplementation((configId: string, stepId: string) =>
+      http.delete(`/app/rest/buildTypes/${configId}/steps/${stepId}`)
+    );
+    buildTypesApi.replaceAllBuildSteps.mockImplementation(
+      (configId: string, _fields?: string, body?: unknown) =>
+        http.put(`/app/rest/buildTypes/${configId}/steps`, body)
+    );
     manager = new BuildStepManager(mockClient);
   });
 
