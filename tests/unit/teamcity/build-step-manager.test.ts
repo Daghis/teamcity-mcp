@@ -40,7 +40,9 @@ describe('BuildStepManager', () => {
     buildTypesApi = mockClient.mockModules.buildTypes;
     buildTypesApi.getAllBuildSteps.mockImplementation((configId: string, fields?: string) =>
       http.get(
-        fields ? `/app/rest/buildTypes/${configId}/steps?fields=${fields}` : `/app/rest/buildTypes/${configId}/steps`
+        fields
+          ? `/app/rest/buildTypes/${configId}/steps?fields=${fields}`
+          : `/app/rest/buildTypes/${configId}/steps`
       )
     );
     buildTypesApi.addBuildStepToBuildType.mockImplementation(

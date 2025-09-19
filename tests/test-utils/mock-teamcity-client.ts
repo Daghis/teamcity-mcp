@@ -274,7 +274,8 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
     modules.vcsRoots = this.mockModules.vcsRoots as unknown as TeamCityApiSurface['vcsRoots'];
     modules.agents = this.mockModules.agents as unknown as TeamCityApiSurface['agents'];
     modules.tests = this.mockModules.tests as unknown as TeamCityApiSurface['tests'];
-    modules.problemOccurrences = this.mockModules.problemOccurrences as unknown as TeamCityApiSurface['problemOccurrences'];
+    modules.problemOccurrences = this.mockModules
+      .problemOccurrences as unknown as TeamCityApiSurface['problemOccurrences'];
 
     this.modules = Object.freeze(modules);
 

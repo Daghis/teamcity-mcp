@@ -169,9 +169,7 @@ export class BuildTriggerManager {
 
       const response = await this.client.modules.buildTypes.getAllTriggers(configId, fields);
 
-      const triggers = this.parseTriggerList(
-        response.data as unknown as TeamCityTriggersResponse
-      );
+      const triggers = this.parseTriggerList(response.data as unknown as TeamCityTriggersResponse);
 
       return {
         success: true,
@@ -548,9 +546,7 @@ export class BuildTriggerManager {
     try {
       const response = await this.client.modules.buildTypes.getAllTriggers(targetConfig);
 
-      const triggers = this.parseTriggerList(
-        response.data as unknown as TeamCityTriggersResponse
-      );
+      const triggers = this.parseTriggerList(response.data as unknown as TeamCityTriggersResponse);
 
       // Check if target already depends on source
       const hasCycle = triggers.some(

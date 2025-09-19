@@ -56,10 +56,11 @@ describe('BuildTriggerManager', () => {
     buildTypesApi.deleteTrigger.mockImplementation((configId: string, triggerId: string) =>
       http.delete(`/app/rest/buildTypes/${configId}/triggers/${triggerId}`)
     );
-    buildTypesApi.getAllVcsRootsOfBuildType.mockImplementation((configId: string, fields?: string) =>
-      fields
-        ? http.get(`/app/rest/buildTypes/${configId}/vcs-root-entries?fields=${fields}`)
-        : http.get(`/app/rest/buildTypes/${configId}/vcs-root-entries`)
+    buildTypesApi.getAllVcsRootsOfBuildType.mockImplementation(
+      (configId: string, fields?: string) =>
+        fields
+          ? http.get(`/app/rest/buildTypes/${configId}/vcs-root-entries?fields=${fields}`)
+          : http.get(`/app/rest/buildTypes/${configId}/vcs-root-entries`)
     );
     manager = new BuildTriggerManager(mockClient);
   });

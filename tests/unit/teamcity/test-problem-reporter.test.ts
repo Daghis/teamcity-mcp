@@ -34,9 +34,7 @@ describe('TestProblemReporter', () => {
       http.get(`/app/rest/builds/${locator}`)
     );
     buildsApi.getAllBuilds.mockImplementation((locator?: string) =>
-      locator
-        ? http.get(`/app/rest/builds?locator=${locator}`)
-        : http.get('/app/rest/builds')
+      locator ? http.get(`/app/rest/builds?locator=${locator}`) : http.get('/app/rest/builds')
     );
     testsApi.getAllTestOccurrences.mockImplementation((locator?: string) =>
       locator

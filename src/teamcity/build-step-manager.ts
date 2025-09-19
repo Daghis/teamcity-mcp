@@ -8,6 +8,8 @@
  * - Delete build steps
  * - Reorder build steps
  */
+import type { Step } from '@/teamcity-client/models/step';
+import type { Steps } from '@/teamcity-client/models/steps';
 import {
   BuildConfigurationNotFoundError,
   BuildStepNotFoundError,
@@ -16,8 +18,6 @@ import {
   ValidationError,
 } from '@/teamcity/errors';
 
-import type { Step } from '@/teamcity-client/models/step';
-import type { Steps } from '@/teamcity-client/models/steps';
 import type { TeamCityClientAdapter } from './client-adapter';
 
 /**

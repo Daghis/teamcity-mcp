@@ -71,9 +71,7 @@ describe('TestProblemReporter: trends and patterns', () => {
       if (locator.includes('build:(id:b11)')) {
         return Promise.resolve({
           data: {
-            testOccurrence: [
-              { id: 't3', name: 'C', status: 'FAILURE', test: { className: 'D' } },
-            ],
+            testOccurrence: [{ id: 't3', name: 'C', status: 'FAILURE', test: { className: 'D' } }],
           },
         });
       }
