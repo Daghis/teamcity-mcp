@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.5](https://github.com/Daghis/teamcity-mcp/compare/v1.3.4...v1.3.5) (2025-09-19)
+
+
+### Bug Fixes
+
+* **tools:** repair manage_build_steps updates ([#154](https://github.com/Daghis/teamcity-mcp/issues/154)) ([b557e44](https://github.com/Daghis/teamcity-mcp/commit/b557e4424d5129de9d3b6e3240e1a876488da040))
+
 ## [1.3.4](https://github.com/Daghis/teamcity-mcp/compare/v1.3.3...v1.3.4) (2025-09-19)
 
 
