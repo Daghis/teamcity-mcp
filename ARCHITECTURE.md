@@ -36,7 +36,7 @@ src/
 ## TeamCity Client Layering
 
 - `api-client.ts` instantiates the singleton `TeamCityAPI`, wiring auth, retries, and every generated REST module.
-- `teamcity/client-adapter.ts` converts the singleton into a `TeamCityClientAdapter` that exposes the unified `modules` surface plus helper methods.
+- `teamcity/client-adapter.ts` converts the singleton into a `TeamCityClientAdapter` that exposes the unified `modules` surface plus helper methods (see [docs/teamcity-unified-client.md](./docs/teamcity-unified-client.md) for the detailed contract).
 - Managers under `teamcity/` depend exclusively on the adapter—they never instantiate generated clients or import axios directly.
 
 ## Configuration
