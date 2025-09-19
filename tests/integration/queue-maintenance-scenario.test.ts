@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import type { ActionResult, ListResult } from '../types/tool-results';
-import { callTool } from './lib/mcp-runner';
+import { callTool, callToolsBatch, callToolsBatchExpect } from './lib/mcp-runner';
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
@@ -24,34 +24,60 @@ describe('Queue maintenance (full)', () => {
   });
   it('creates project and build config (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const cproj = await callTool<ActionResult>('full', 'create_project', {
-      id: PROJECT_ID,
-      name: PROJECT_NAME,
-    });
-    expect(cproj).toMatchObject({ success: true, action: 'create_project' });
-    const cbt = await callTool<ActionResult>('full', 'create_build_config', {
-      projectId: PROJECT_ID,
-      id: BT_ID,
-      name: BT_NAME,
-    });
-    expect(cbt).toMatchObject({ success: true, action: 'create_build_config' });
+    const results = await callToolsBatchExpect('full', [
+      {
+        tool: 'create_project',
+        args: {
+          id: PROJECT_ID,
+          name: PROJECT_NAME,
+        },
+      },
+      {
+        tool: 'create_build_config',
+        args: {
+          projectId: PROJECT_ID,
+          id: BT_ID,
+          name: BT_NAME,
+        },
+      },
+    ]);
+
+    const projectResult = results[0]?.result as ActionResult | undefined;
+    const buildConfigResult = results[1]?.result as ActionResult | undefined;
+
+    expect(projectResult).toMatchObject({ success: true, action: 'create_project' });
+    expect(buildConfigResult).toMatchObject({ success: true, action: 'create_build_config' });
   }, 60000);
 
   it('adds a simple step, triggers multiple builds to create queued work (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const step = await callTool<ActionResult>('full', 'manage_build_steps', {
-      buildTypeId: BT_ID,
-      action: 'add',
-      name: 'quick-step',
-      type: 'simpleRunner',
-      properties: { 'script.content': 'echo queue-test' },
+    const stepBatch = await callToolsBatchExpect('full', [
+      {
+        tool: 'manage_build_steps',
+        args: {
+          buildTypeId: BT_ID,
+          action: 'add',
+          name: 'quick-step',
+          type: 'simpleRunner',
+          properties: { 'script.content': 'echo queue-test' },
+        },
+      },
+    ]);
+    const stepResult = stepBatch[0]?.result as ActionResult | undefined;
+    expect(stepResult).toMatchObject({ success: true, action: 'add_build_step' });
+
+    const triggerBatch = await callToolsBatch('dev', [
+      { tool: 'trigger_build', args: { buildTypeId: BT_ID, comment: 'q1' } },
+      { tool: 'trigger_build', args: { buildTypeId: BT_ID, comment: 'q2' } },
+      { tool: 'trigger_build', args: { buildTypeId: BT_ID, comment: 'q3' } },
+    ]);
+
+    triggerBatch.results.forEach((step) => {
+      if (!step.ok) {
+        // Non-fatal if triggering fails (e.g., permissions)
+        expect(true).toBe(true);
+      }
     });
-    expect(step).toMatchObject({ success: true, action: 'add_build_step' });
-    // Trigger a few builds — some environments may not queue if ample agents exist; tests below are tolerant
-    await callTool('dev', 'trigger_build', { buildTypeId: BT_ID, comment: 'q1' });
-    await callTool('dev', 'trigger_build', { buildTypeId: BT_ID, comment: 'q2' });
-    await callTool('dev', 'trigger_build', { buildTypeId: BT_ID, comment: 'q3' });
-    expect(true).toBe(true);
   }, 90000);
 
   it('reorders queued builds when available (full)', async () => {
@@ -106,22 +132,18 @@ describe('Queue maintenance (full)', () => {
 
   it('cancels queued builds for build type and by locator (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    try {
-      const byBt = await callTool('full', 'cancel_queued_builds_for_build_type', {
-        buildTypeId: BT_ID,
-      });
-      expect(byBt).toHaveProperty('canceled');
-    } catch (e) {
-      expect(true).toBe(true);
-    }
-    try {
-      const byLoc = await callTool('full', 'cancel_queued_builds_by_locator', {
-        locator: `project:(id:${PROJECT_ID})`,
-      });
-      expect(byLoc).toHaveProperty('canceled');
-    } catch (e) {
-      expect(true).toBe(true);
-    }
+    const batch = await callToolsBatch('full', [
+      { tool: 'cancel_queued_builds_for_build_type', args: { buildTypeId: BT_ID } },
+      { tool: 'cancel_queued_builds_by_locator', args: { locator: `project:(id:${PROJECT_ID})` } },
+    ]);
+
+    batch.results.forEach((step) => {
+      if (!step.ok) {
+        expect(true).toBe(true);
+      } else {
+        expect(step.result).toHaveProperty('canceled');
+      }
+    });
   }, 60000);
 
   it('deletes project (full)', async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { callTool } from './lib/mcp-runner';
+import { callTool, callToolsBatchExpect } from './lib/mcp-runner';
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
@@ -10,19 +10,29 @@ const hasTeamCityEnv = Boolean(
 describe('Server env and health checks', () => {
   it('get_server_info and check_teamcity_connection (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const info = await callTool<Record<string, unknown>>('dev', 'get_server_info', {});
+    const results = await callToolsBatchExpect('dev', [
+      { tool: 'get_server_info', args: {} },
+      { tool: 'check_teamcity_connection', args: {} },
+    ]);
+
+    const info = results[0]?.result as Record<string, unknown> | undefined;
+    const conn = results[1]?.result as Record<string, unknown> | undefined;
+
     expect(info).toBeDefined();
-    const conn = await callTool<Record<string, unknown>>('dev', 'check_teamcity_connection', {});
     expect(conn).toHaveProperty('ok');
   }, 30000);
 
   it('check_availability_guard (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const guard = await callTool<Record<string, unknown>>('dev', 'check_availability_guard', {});
+    const results = await callToolsBatchExpect('dev', [
+      { tool: 'check_availability_guard', args: {} },
+      { tool: 'check_availability_guard', args: { failOnWarning: true } },
+    ]);
+
+    const guard = results[0]?.result as Record<string, unknown> | undefined;
+    const guardStrict = results[1]?.result as Record<string, unknown> | undefined;
+
     expect(guard).toHaveProperty('ok');
-    const guardStrict = await callTool<Record<string, unknown>>('dev', 'check_availability_guard', {
-      failOnWarning: true,
-    });
     expect(guardStrict).toHaveProperty('ok');
   }, 30000);
 

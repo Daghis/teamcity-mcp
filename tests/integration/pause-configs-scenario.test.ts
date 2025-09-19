@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import type { ActionResult } from '../types/tool-results';
-import { callTool } from './lib/mcp-runner';
+import { callTool, callToolsBatch, callToolsBatchExpect } from './lib/mcp-runner';
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
@@ -24,46 +24,49 @@ describe('Pause/unpause build configs (full) with dev verification', () => {
   });
   it('creates project and two build configs (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const cproj = await callTool('full', 'create_project', { id: PROJECT_ID, name: PROJECT_NAME });
-    expect(cproj).toMatchObject({ success: true, action: 'create_project' });
-    const cbt1 = await callTool('full', 'create_build_config', {
-      projectId: PROJECT_ID,
-      id: BT1_ID,
-      name: 'E2E Pause BT1',
-    });
-    const cbt2 = await callTool('full', 'create_build_config', {
-      projectId: PROJECT_ID,
-      id: BT2_ID,
-      name: 'E2E Pause BT2',
-    });
-    expect(cbt1).toMatchObject({ success: true, action: 'create_build_config' });
-    expect(cbt2).toMatchObject({ success: true, action: 'create_build_config' });
+    const results = await callToolsBatchExpect('full', [
+      { tool: 'create_project', args: { id: PROJECT_ID, name: PROJECT_NAME } },
+      {
+        tool: 'create_build_config',
+        args: { projectId: PROJECT_ID, id: BT1_ID, name: 'E2E Pause BT1' },
+      },
+      {
+        tool: 'create_build_config',
+        args: { projectId: PROJECT_ID, id: BT2_ID, name: 'E2E Pause BT2' },
+      },
+    ]);
+
+    const projectResult = results[0]?.result as ActionResult | undefined;
+    const bt1Result = results[1]?.result as ActionResult | undefined;
+    const bt2Result = results[2]?.result as ActionResult | undefined;
+
+    expect(projectResult).toMatchObject({ success: true, action: 'create_project' });
+    expect(bt1Result).toMatchObject({ success: true, action: 'create_build_config' });
+    expect(bt2Result).toMatchObject({ success: true, action: 'create_build_config' });
   }, 60000);
 
   it('pauses and unpauses both (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    try {
-      const pause = await callTool<ActionResult>('full', 'set_build_configs_paused', {
-        buildTypeIds: [BT1_ID, BT2_ID],
-        paused: true,
-      });
-      expect(pause).toHaveProperty('action');
-    } catch (e) {
+    const batch = await callToolsBatch('full', [
+      { tool: 'set_build_configs_paused', args: { buildTypeIds: [BT1_ID, BT2_ID], paused: true } },
+      { tool: 'set_build_configs_paused', args: { buildTypeIds: [BT1_ID, BT2_ID], paused: false } },
+    ]);
+
+    const pauseStep = batch.results[0];
+    if (!pauseStep?.ok) {
       // eslint-disable-next-line no-console
-      console.warn('set_build_configs_paused (pause) failed (non-fatal):', e);
+      console.warn('set_build_configs_paused (pause) failed (non-fatal):', pauseStep?.error);
       return expect(true).toBe(true);
     }
+    expect(pauseStep.result).toHaveProperty('action');
 
-    try {
-      const unpause = await callTool<ActionResult>('full', 'set_build_configs_paused', {
-        buildTypeIds: [BT1_ID, BT2_ID],
-        paused: false,
-      });
-      expect(unpause).toHaveProperty('action');
-    } catch (e) {
+    const unpauseStep = batch.results[1];
+    if (!unpauseStep?.ok) {
       // eslint-disable-next-line no-console
-      console.warn('set_build_configs_paused (unpause) failed (non-fatal):', e);
+      console.warn('set_build_configs_paused (unpause) failed (non-fatal):', unpauseStep?.error);
+      return expect(true).toBe(true);
     }
+    expect(unpauseStep.result).toHaveProperty('action');
   }, 90000);
 
   it('deletes project (full)', async () => {

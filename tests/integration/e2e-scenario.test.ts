@@ -8,7 +8,7 @@ import type {
   ProjectRef,
   TriggerBuildResult,
 } from '../types/tool-results';
-import { callTool } from './lib/mcp-runner';
+import { callTool, callToolsBatchExpect } from './lib/mcp-runner';
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
@@ -34,63 +34,80 @@ describe('E2E scenario: full setup → dev reads → full teardown', () => {
       expect(true).toBe(true);
     }
   });
-  it('creates a temporary project (full)', async () => {
+  it('sets up project, build configuration, and step (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const res = await callTool('full', 'create_project', {
-      id: PROJECT_ID,
-      name: PROJECT_NAME,
-      description: 'Ephemeral project for e2e scenario',
-    });
-    expect(res).toMatchObject({ success: true, action: 'create_project' });
+    const results = await callToolsBatchExpect('full', [
+      {
+        tool: 'create_project',
+        args: {
+          id: PROJECT_ID,
+          name: PROJECT_NAME,
+          description: 'Ephemeral project for e2e scenario',
+        },
+      },
+      {
+        tool: 'create_build_config',
+        args: {
+          projectId: PROJECT_ID,
+          id: BT_ID,
+          name: BT_NAME,
+          description: 'Ephemeral build config',
+        },
+      },
+      {
+        tool: 'manage_build_steps',
+        args: {
+          buildTypeId: BT_ID,
+          action: 'add',
+          name: 'echo-step',
+          type: 'simpleRunner',
+          properties: { 'script.content': 'echo "hello from e2e"' },
+        },
+      },
+    ]);
+
+    const projectResult = results[0]?.result as ActionResult | undefined;
+    const buildConfigResult = results[1]?.result as ActionResult | undefined;
+    const stepResult = results[2]?.result as ActionResult | undefined;
+
+    expect(projectResult).toMatchObject({ success: true, action: 'create_project' });
+    expect(buildConfigResult).toMatchObject({ success: true, action: 'create_build_config' });
+    expect(stepResult).toMatchObject({ success: true, action: 'add_build_step' });
+
     created = true;
+    createdBuildType = true;
   }, 60000);
 
   it('lists and gets project (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const list = await callTool<ListResult<ProjectRef>>('dev', 'list_projects', {
-      locator: `id:${PROJECT_ID}`,
-    });
-    expect(Array.isArray(list.items)).toBe(true);
-    const foundProj = (list.items ?? []).find((p) => p.id === PROJECT_ID);
-    expect(Boolean(foundProj)).toBe(true);
-    const proj = await callTool<ProjectRef>('dev', 'get_project', { projectId: PROJECT_ID });
-    expect(proj.id).toBe(PROJECT_ID);
-  }, 60000);
+    const results = await callToolsBatchExpect('dev', [
+      { tool: 'list_projects', args: { locator: `id:${PROJECT_ID}` } },
+      { tool: 'get_project', args: { projectId: PROJECT_ID } },
+    ]);
 
-  it('creates a build configuration (full)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const res = await callTool('full', 'create_build_config', {
-      projectId: PROJECT_ID,
-      id: BT_ID,
-      name: BT_NAME,
-      description: 'Ephemeral build config',
-    });
-    expect(res).toMatchObject({ success: true, action: 'create_build_config' });
-    createdBuildType = true;
+    const list = results[0]?.result as ListResult<ProjectRef> | undefined;
+    expect(Array.isArray(list?.items)).toBe(true);
+    const foundProj = (list?.items ?? []).find((p) => p.id === PROJECT_ID);
+    expect(Boolean(foundProj)).toBe(true);
+
+    const proj = results[1]?.result as ProjectRef | undefined;
+    expect(proj?.id).toBe(PROJECT_ID);
   }, 60000);
 
   it('lists and gets build configuration (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const list = await callTool<ListResult<BuildTypeSummary>>('dev', 'list_build_configs', {
-      projectId: PROJECT_ID,
-    });
-    expect(Array.isArray(list.items)).toBe(true);
-    const hasBt = (list.items ?? []).some((b) => b.id === BT_ID);
-    expect(hasBt).toBe(true);
-    const cfg = await callTool<BuildTypeSummary>('dev', 'get_build_config', { buildTypeId: BT_ID });
-    expect(cfg.id).toBe(BT_ID);
-  }, 60000);
+    const results = await callToolsBatchExpect('dev', [
+      { tool: 'list_build_configs', args: { projectId: PROJECT_ID } },
+      { tool: 'get_build_config', args: { buildTypeId: BT_ID } },
+    ]);
 
-  it('adds a simpleRunner step (full)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const res = await callTool('full', 'manage_build_steps', {
-      buildTypeId: BT_ID,
-      action: 'add',
-      name: 'echo-step',
-      type: 'simpleRunner',
-      properties: { 'script.content': 'echo "hello from e2e"' },
-    });
-    expect(res).toMatchObject({ success: true, action: 'add_build_step' });
+    const list = results[0]?.result as ListResult<BuildTypeSummary> | undefined;
+    expect(Array.isArray(list?.items)).toBe(true);
+    const hasBt = (list?.items ?? []).some((b) => b.id === BT_ID);
+    expect(hasBt).toBe(true);
+
+    const cfg = results[1]?.result as BuildTypeSummary | undefined;
+    expect(cfg?.id).toBe(BT_ID);
   }, 60000);
 
   it('triggers a build (dev)', async () => {
@@ -126,16 +143,18 @@ describe('E2E scenario: full setup → dev reads → full teardown', () => {
 
   it('lists agents and compatibility (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const agents = await callTool<Record<string, unknown>>('dev', 'list_agents', { pageSize: 10 });
+    const agentResults = await callToolsBatchExpect('dev', [
+      { tool: 'list_agents', args: { pageSize: 10 } },
+      ...(createdBuildType
+        ? [
+            { tool: 'get_compatible_agents_for_build_type', args: { buildTypeId: BT_ID } },
+            { tool: 'count_compatible_agents_for_build_type', args: { buildTypeId: BT_ID } },
+          ]
+        : []),
+    ]);
+
+    const agents = agentResults[0]?.result as Record<string, unknown> | undefined;
     expect(agents).toHaveProperty('items');
-    if (createdBuildType) {
-      await callTool<Record<string, unknown>>('dev', 'get_compatible_agents_for_build_type', {
-        buildTypeId: BT_ID,
-      });
-      await callTool<Record<string, unknown>>('dev', 'count_compatible_agents_for_build_type', {
-        buildTypeId: BT_ID,
-      });
-    }
   }, 60000);
 
   it('deletes the temporary project (full)', async () => {

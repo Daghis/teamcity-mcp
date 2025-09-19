@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import type { ActionResult, BuildTypeSummary, ListResult } from '../types/tool-results';
-import { callTool } from './lib/mcp-runner';
+import { callTool, callToolsBatchExpect } from './lib/mcp-runner';
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
@@ -19,18 +19,30 @@ const CLONE_NAME = `E2E Clone Copy ${ts}`;
 describe('Build configuration clone and update (full) with dev verification', () => {
   it('creates project and build config (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const cproj = await callTool<ActionResult>('full', 'create_project', {
-      id: PROJECT_ID,
-      name: PROJECT_NAME,
-    });
-    expect(cproj).toMatchObject({ success: true, action: 'create_project' });
-    const cbt = await callTool<ActionResult>('full', 'create_build_config', {
-      projectId: PROJECT_ID,
-      id: BT_ID,
-      name: BT_NAME,
-      description: 'Original configuration',
-    });
-    expect(cbt).toMatchObject({ success: true, action: 'create_build_config' });
+    const results = await callToolsBatchExpect('full', [
+      {
+        tool: 'create_project',
+        args: {
+          id: PROJECT_ID,
+          name: PROJECT_NAME,
+        },
+      },
+      {
+        tool: 'create_build_config',
+        args: {
+          projectId: PROJECT_ID,
+          id: BT_ID,
+          name: BT_NAME,
+          description: 'Original configuration',
+        },
+      },
+    ]);
+
+    const projectResult = results[0]?.result as ActionResult | undefined;
+    const buildConfigResult = results[1]?.result as ActionResult | undefined;
+
+    expect(projectResult).toMatchObject({ success: true, action: 'create_project' });
+    expect(buildConfigResult).toMatchObject({ success: true, action: 'create_build_config' });
   }, 60000);
 
   it('updates build config name/description/paused (full), verifies via dev', async () => {
