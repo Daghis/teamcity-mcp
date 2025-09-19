@@ -446,16 +446,26 @@ export class TeamCityAPI {
   }
 
   async listChangesForBuild(buildId: string, fields?: string): Promise<AxiosResponse<unknown>> {
-    return this.axiosInstance.get('/app/rest/changes', {
-      params: {
-        locator: `build:(id:${buildId})`,
-        fields,
-      },
-    });
+    return this.changes.getAllChanges(`build:(id:${buildId})`, fields);
   }
 
   async listSnapshotDependencies(buildId: string): Promise<AxiosResponse<unknown>> {
-    return this.axiosInstance.get(`/app/rest/builds/id:${buildId}/snapshot-dependencies`);
+    const response = await this.builds.getBuild(
+      this.toBuildLocator(buildId),
+      'snapshot-dependencies'
+    );
+
+    const dependencies =
+      (response.data as { 'snapshot-dependencies'?: unknown })['snapshot-dependencies'];
+
+    if (dependencies == null) {
+      return response;
+    }
+
+    return {
+      ...response,
+      data: dependencies,
+    };
   }
 
   getBaseUrl(): string {
