@@ -13,7 +13,10 @@ import type {
   TeamCityTriggersResponse,
 } from '@/teamcity/api-types';
 import type {
+  BuildApiLike,
   TeamCityApiSurface,
+  TeamCityBuildLogChunk,
+  TeamCityClientAdapter,
   TeamCityRequestContext,
   TeamCityUnifiedClient,
 } from '@/teamcity/types/client';
@@ -51,6 +54,7 @@ export interface MockBuildApi {
   getAllBuilds: jest.Mock;
   getMultipleBuilds: jest.Mock;
   getBuild: jest.Mock;
+  getBuildProblems: jest.Mock;
   triggerBuild: jest.Mock;
   cancelBuild: jest.Mock;
 }
@@ -115,7 +119,7 @@ const createEmptyModules = (): TeamCityApiSurface => ({
 /**
  * Properly typed mock TeamCity client that implements the unified client surface.
  */
-export class MockTeamCityClient implements TeamCityUnifiedClient {
+export class MockTeamCityClient implements TeamCityClientAdapter {
   public readonly modules: Readonly<TeamCityApiSurface>;
   public readonly http: AxiosInstance;
   public readonly request: jest.MockedFunction<TeamCityUnifiedClient['request']>;
@@ -123,6 +127,30 @@ export class MockTeamCityClient implements TeamCityUnifiedClient {
   public readonly getApiConfig: jest.Mock<ReturnType<TeamCityUnifiedClient['getApiConfig']>, []>;
   public readonly getAxios: jest.Mock<ReturnType<TeamCityUnifiedClient['getAxios']>, []>;
   public readonly mockModules: MockTeamCityModules;
+  public readonly baseUrl: string;
+  public readonly builds: MockBuildApi & BuildApiLike;
+  public readonly listProjects: jest.Mock;
+  public readonly getProject: jest.Mock;
+  public readonly listBuilds: jest.Mock;
+  public readonly getBuild: jest.Mock;
+  public readonly triggerBuild: jest.Mock;
+  public readonly getBuildLog: jest.Mock;
+  public readonly getBuildLogChunk: jest.Mock<
+    Promise<TeamCityBuildLogChunk>,
+    [string, { startLine?: number; lineCount?: number }?]
+  >;
+  public readonly listBuildTypes: jest.Mock;
+  public readonly getBuildType: jest.Mock;
+  public readonly listTestFailures: jest.Mock;
+  public readonly listBuildArtifacts: jest.Mock;
+  public readonly downloadArtifactContent: jest.Mock;
+  public readonly getBuildStatistics: jest.Mock;
+  public readonly listChangesForBuild: jest.Mock;
+  public readonly listSnapshotDependencies: jest.Mock;
+  public readonly listVcsRoots: jest.Mock;
+  public readonly listAgents: jest.Mock;
+  public readonly listAgentPools: jest.Mock;
+  private readonly adapterMockFns: jest.Mock[];
 
   constructor(overrides?: Partial<MockTeamCityModules>) {
     this.mockModules = {
@@ -148,6 +176,7 @@ export class MockTeamCityClient implements TeamCityUnifiedClient {
         getAllBuilds: jest.fn(),
         getMultipleBuilds: jest.fn(),
         getBuild: jest.fn(),
+        getBuildProblems: jest.fn(),
         triggerBuild: jest.fn(),
         cancelBuild: jest.fn(),
       },
@@ -169,6 +198,27 @@ export class MockTeamCityClient implements TeamCityUnifiedClient {
 
     this.modules = Object.freeze(modules);
 
+    this.baseUrl = DEFAULT_BASE_URL;
+    this.listProjects = jest.fn();
+    this.getProject = jest.fn();
+    this.listBuilds = jest.fn();
+    this.getBuild = jest.fn();
+    this.triggerBuild = jest.fn();
+    this.getBuildLog = jest.fn();
+    this.getBuildLogChunk = jest.fn();
+    this.listBuildTypes = jest.fn();
+    this.getBuildType = jest.fn();
+    this.listTestFailures = jest.fn();
+    this.listBuildArtifacts = jest.fn();
+    this.downloadArtifactContent = jest.fn();
+    this.getBuildStatistics = jest.fn();
+    this.listChangesForBuild = jest.fn();
+    this.listSnapshotDependencies = jest.fn();
+    this.listVcsRoots = jest.fn();
+    this.listAgents = jest.fn();
+    this.listAgentPools = jest.fn();
+    this.builds = this.mockModules.builds as unknown as MockBuildApi & BuildApiLike;
+
     this.http = createMockAxiosInstance();
     this.request = jest.fn(async (fn: (ctx: TeamCityRequestContext) => Promise<unknown>) =>
       fn({ axios: this.http, baseUrl: DEFAULT_BASE_URL })
@@ -186,6 +236,26 @@ export class MockTeamCityClient implements TeamCityUnifiedClient {
       timeout: undefined,
     })) as jest.Mock;
     this.getAxios = jest.fn(() => this.http) as jest.Mock;
+    this.adapterMockFns = [
+      this.listProjects,
+      this.getProject,
+      this.listBuilds,
+      this.getBuild,
+      this.triggerBuild,
+      this.getBuildLog,
+      this.getBuildLogChunk as unknown as jest.Mock,
+      this.listBuildTypes,
+      this.getBuildType,
+      this.listTestFailures,
+      this.listBuildArtifacts,
+      this.downloadArtifactContent,
+      this.getBuildStatistics,
+      this.listChangesForBuild,
+      this.listSnapshotDependencies,
+      this.listVcsRoots,
+      this.listAgents,
+      this.listAgentPools,
+    ];
   }
 
   /**
@@ -197,10 +267,6 @@ export class MockTeamCityClient implements TeamCityUnifiedClient {
 
   get projects(): MockProjectApi {
     return this.mockModules.projects;
-  }
-
-  get builds(): MockBuildApi {
-    return this.mockModules.builds;
   }
 
   get vcsRoots(): MockVcsRootApi {
@@ -230,6 +296,7 @@ export class MockTeamCityClient implements TeamCityUnifiedClient {
     this.getConfig.mockReset();
     this.getApiConfig.mockReset();
     this.getAxios.mockReset();
+    this.adapterMockFns.forEach((fn) => fn.mockReset());
   }
 
   /**
@@ -248,14 +315,15 @@ export class MockTeamCityClient implements TeamCityUnifiedClient {
     this.getConfig.mockClear();
     this.getApiConfig.mockClear();
     this.getAxios.mockClear();
+    this.adapterMockFns.forEach((fn) => fn.mockClear());
   }
 }
 
 /**
  * Create a fully typed mock TeamCity unified client.
  */
-export function createMockTeamCityClient(): MockTeamCityClient & TeamCityUnifiedClient {
-  return new MockTeamCityClient() as MockTeamCityClient & TeamCityUnifiedClient;
+export function createMockTeamCityClient(): MockTeamCityClient & TeamCityClientAdapter {
+  return new MockTeamCityClient() as MockTeamCityClient & TeamCityClientAdapter;
 }
 
 /**

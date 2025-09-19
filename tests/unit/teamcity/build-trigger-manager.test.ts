@@ -1,8 +1,6 @@
 /**
  * Unit tests for BuildTriggerManager
  */
-import axios from 'axios';
-
 import {
   BuildTriggerManager,
   type DependencyTriggerProperties,
@@ -16,26 +14,24 @@ import {
   ValidationError,
 } from '@/teamcity/errors';
 
-jest.mock('axios');
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
 
 describe('BuildTriggerManager', () => {
   let manager: BuildTriggerManager;
-  let mockAxiosInstance: jest.Mocked<typeof axios>;
+  let mockClient: MockTeamCityClient;
+  let http: jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-
-    mockAxiosInstance = {
-      get: jest.fn(),
-      post: jest.fn(),
-      put: jest.fn(),
-      delete: jest.fn(),
-      request: jest.fn(),
-      defaults: {},
-    } as unknown as jest.Mocked<typeof axios>;
-
-    // Pass the mock axios instance directly
-    manager = new BuildTriggerManager(mockAxiosInstance);
+    mockClient = createMockTeamCityClient();
+    http = mockClient.http as jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
+    http.get.mockReset();
+    http.post.mockReset();
+    http.put.mockReset();
+    http.delete.mockReset();
+    manager = new BuildTriggerManager(mockClient);
   });
 
   describe('listTriggers', () => {
@@ -67,7 +63,7 @@ describe('BuildTriggerManager', () => {
         ],
       };
 
-      mockAxiosInstance.get.mockResolvedValue({ data: mockTriggers });
+      http.get.mockResolvedValue({ data: mockTriggers });
 
       const result = await manager.listTriggers({ configId: 'MyProject_Build' });
 
@@ -87,7 +83,7 @@ describe('BuildTriggerManager', () => {
     });
 
     it('should handle empty trigger list', async () => {
-      mockAxiosInstance.get.mockResolvedValue({ data: {} });
+      http.get.mockResolvedValue({ data: {} });
 
       const result = await manager.listTriggers({ configId: 'MyProject_Build' });
 
@@ -96,7 +92,7 @@ describe('BuildTriggerManager', () => {
     });
 
     it('should handle build configuration not found', async () => {
-      mockAxiosInstance.get.mockRejectedValue({
+      http.get.mockRejectedValue({
         response: { status: 404, data: { message: 'Build configuration not found' } },
       });
 
@@ -117,7 +113,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -157,7 +153,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -185,7 +181,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -214,7 +210,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -253,7 +249,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -283,7 +279,7 @@ describe('BuildTriggerManager', () => {
 
       it('should validate VCS root attachment when specified', async () => {
         // Mock VCS root entries response - root not attached
-        mockAxiosInstance.get.mockResolvedValue({
+        http.get.mockResolvedValue({
           data: {
             'vcs-root-entry': [{ 'vcs-root': { id: 'OTHER_ROOT' } }],
           },
@@ -305,7 +301,7 @@ describe('BuildTriggerManager', () => {
 
       it('should create VCS trigger with specific VCS root', async () => {
         // Mock VCS root entries response - root is attached
-        mockAxiosInstance.get.mockResolvedValue({
+        http.get.mockResolvedValue({
           data: {
             'vcs-root-entry': [{ 'vcs-root': { id: 'MY_VCS_ROOT' } }],
           },
@@ -322,7 +318,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -351,7 +347,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -387,7 +383,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -412,7 +408,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -424,8 +420,8 @@ describe('BuildTriggerManager', () => {
         });
 
         expect(result.success).toBe(true);
-        expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/app/rest/buildTypes/MyProject_Build/triggers',
+        expect(http.post).toHaveBeenCalledWith(
+          expect.stringContaining('/app/rest/buildTypes/MyProject_Build/triggers'),
           expect.objectContaining({
             properties: expect.objectContaining({
               property: expect.arrayContaining([
@@ -450,7 +446,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -479,7 +475,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -491,8 +487,8 @@ describe('BuildTriggerManager', () => {
         });
 
         expect(result.success).toBe(true);
-        expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-          '/app/rest/buildTypes/MyProject_Build/triggers',
+        expect(http.post).toHaveBeenCalledWith(
+          expect.stringContaining('/app/rest/buildTypes/MyProject_Build/triggers'),
           expect.objectContaining({
             properties: expect.objectContaining({
               property: expect.arrayContaining([
@@ -556,7 +552,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -596,7 +592,7 @@ describe('BuildTriggerManager', () => {
           },
         };
 
-        mockAxiosInstance.post.mockResolvedValue({ data: newTrigger });
+        http.post.mockResolvedValue({ data: newTrigger });
 
         const result = await manager.createTrigger({
           configId: 'MyProject_Build',
@@ -613,7 +609,7 @@ describe('BuildTriggerManager', () => {
 
       it('should detect circular dependencies', async () => {
         // Mock checking for existing triggers that would create a cycle
-        mockAxiosInstance.get.mockResolvedValue({
+        http.get.mockResolvedValue({
           data: {
             trigger: [
               {
@@ -628,7 +624,7 @@ describe('BuildTriggerManager', () => {
         });
 
         // Mock POST in case it gets called (it shouldn't due to circular dependency)
-        mockAxiosInstance.post.mockResolvedValue({ data: {} });
+        http.post.mockResolvedValue({ data: {} });
 
         await expect(
           manager.createTrigger({
@@ -646,7 +642,7 @@ describe('BuildTriggerManager', () => {
   describe('updateTrigger', () => {
     it('should update an existing trigger', async () => {
       // Mock GET to fetch existing trigger
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           id: 'TRIGGER_1',
           type: 'vcsTrigger',
@@ -666,7 +662,7 @@ describe('BuildTriggerManager', () => {
         },
       };
 
-      mockAxiosInstance.put.mockResolvedValue({ data: updatedTrigger });
+      http.put.mockResolvedValue({ data: updatedTrigger });
 
       const result = await manager.updateTrigger({
         configId: 'MyProject_Build',
@@ -684,7 +680,7 @@ describe('BuildTriggerManager', () => {
 
     it('should handle trigger not found', async () => {
       // Mock GET to return 404
-      mockAxiosInstance.get.mockRejectedValue({
+      http.get.mockRejectedValue({
         response: { status: 404, data: { message: 'Trigger not found' } },
       });
 
@@ -699,7 +695,7 @@ describe('BuildTriggerManager', () => {
 
   describe('deleteTrigger', () => {
     it('should delete a trigger', async () => {
-      mockAxiosInstance.delete.mockResolvedValue({ status: 204 });
+      http.delete.mockResolvedValue({ status: 204 });
 
       const result = await manager.deleteTrigger({
         configId: 'MyProject_Build',
@@ -711,7 +707,7 @@ describe('BuildTriggerManager', () => {
     });
 
     it('should handle trigger not found', async () => {
-      mockAxiosInstance.delete.mockRejectedValue({
+      http.delete.mockRejectedValue({
         response: { status: 404 },
       });
 
@@ -764,7 +760,7 @@ describe('BuildTriggerManager', () => {
         },
       };
 
-      mockAxiosInstance.post.mockResolvedValueOnce({ data: newTrigger });
+      http.post.mockResolvedValueOnce({ data: newTrigger });
 
       const result = await manager.createTrigger({
         configId: 'Build_Config_1',
@@ -798,7 +794,7 @@ describe('BuildTriggerManager', () => {
         },
       };
 
-      mockAxiosInstance.post.mockResolvedValueOnce({ data: newTrigger });
+      http.post.mockResolvedValueOnce({ data: newTrigger });
 
       const result = await manager.createTrigger({
         configId: 'Build_Config_1',
@@ -861,7 +857,7 @@ describe('BuildTriggerManager', () => {
         ],
       };
 
-      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockTriggers });
+      http.get.mockResolvedValueOnce({ data: mockTriggers });
 
       const result = await manager.listTriggers({ configId: 'Build_Config_1' });
       expect(result.triggers).toHaveLength(1);
@@ -882,7 +878,7 @@ describe('BuildTriggerManager', () => {
         },
       };
 
-      mockAxiosInstance.post.mockResolvedValueOnce({ data: newTrigger });
+      http.post.mockResolvedValueOnce({ data: newTrigger });
 
       const result = await manager.createTrigger({
         configId: 'Build_Config_1',
@@ -920,7 +916,7 @@ describe('BuildTriggerManager', () => {
       // Build_Config_1 depends on Build_Config_2
       // Build_Config_2 depends on Build_Config_3
       // So if Build_Config_3 tries to depend on Build_Config_1, it creates a cycle
-      mockAxiosInstance.get
+      http.get
         .mockResolvedValueOnce({
           data: {
             // Dependencies for Build_Config_1
@@ -974,7 +970,7 @@ describe('BuildTriggerManager', () => {
         },
       };
 
-      mockAxiosInstance.post.mockResolvedValueOnce({ data: newTrigger });
+      http.post.mockResolvedValueOnce({ data: newTrigger });
 
       const result = await manager.createTrigger({
         configId: 'Build_Config_1',
@@ -1006,7 +1002,7 @@ describe('BuildTriggerManager', () => {
         },
       };
 
-      mockAxiosInstance.get.mockResolvedValueOnce({
+      http.get.mockResolvedValueOnce({
         data: {
           id: 'TRIGGER_DEP_1',
           type: 'buildDependencyTrigger',
@@ -1018,7 +1014,7 @@ describe('BuildTriggerManager', () => {
           },
         },
       });
-      mockAxiosInstance.put.mockResolvedValueOnce({ data: updatedTrigger });
+      http.put.mockResolvedValueOnce({ data: updatedTrigger });
 
       const result = await manager.updateTrigger({
         configId: 'Build_Config_1',
@@ -1038,7 +1034,7 @@ describe('BuildTriggerManager', () => {
     });
 
     it('should delete dependency trigger', async () => {
-      mockAxiosInstance.delete.mockResolvedValueOnce({});
+      http.delete.mockResolvedValueOnce({});
 
       const result = await manager.deleteTrigger({
         configId: 'Build_Config_1',

@@ -1,37 +1,48 @@
-import axios from 'axios';
-
-import type { TeamCityClient } from '@/teamcity/client';
 import { TestProblemReporter } from '@/teamcity/test-problem-reporter';
 
-jest.mock('axios');
-const mockedAxios = jest.mocked(axios, { shallow: false });
-
-jest.mock('@/config', () => ({
-  getTeamCityUrl: () => 'http://localhost:8111',
-  getTeamCityToken: () => 'token',
-}));
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
 
 describe('TestProblemReporter: trends and patterns', () => {
-  const mockClient = {} as TeamCityClient;
-  const makeAxios = () => {
-    const instance = { get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() };
-    (mockedAxios.create as jest.Mock).mockReturnValue(instance);
-    return instance as unknown as { get: jest.Mock };
+  let mockClient: MockTeamCityClient;
+  let http: jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
+  const BASE_URL = 'http://localhost:8111';
+
+  const configureClient = () => {
+    mockClient = createMockTeamCityClient();
+    http = mockClient.http as jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
+    http.get.mockReset();
+    mockClient.request.mockImplementation(async (fn) => fn({ axios: http, baseUrl: BASE_URL }));
+    mockClient.getApiConfig.mockReturnValue({
+      baseUrl: BASE_URL,
+      token: 'token',
+      timeout: undefined,
+    });
+    mockClient.getConfig.mockReturnValue({
+      connection: {
+        baseUrl: BASE_URL,
+        token: 'token',
+        timeout: undefined,
+      },
+    });
   };
 
+  beforeEach(() => configureClient());
+
   it('getTestTrend aggregates stats for recent builds', async () => {
-    const ax = makeAxios();
     // First call returns builds list
-    ax.get.mockImplementation((path: string) => {
-      if (path.startsWith('/buildTypes/id:bt1/builds')) {
+    http.get.mockImplementation((path: string) => {
+      if (path.includes('/buildTypes/id:bt1/builds')) {
         return Promise.resolve({ data: { build: [{ id: 'b1' }, { id: 'b2' }] } });
       }
-      if (path === '/builds/id:b1') {
+      if (path.includes('/builds/id:b1')) {
         return Promise.resolve({
           data: { id: 'b1', testOccurrences: { count: 10, passed: 8, failed: 2 } },
         });
       }
-      if (path === '/builds/id:b2') {
+      if (path.includes('/builds/id:b2')) {
         return Promise.resolve({
           data: { id: 'b2', testOccurrences: { count: 5, passed: 5, failed: 0 } },
         });
@@ -47,10 +58,9 @@ describe('TestProblemReporter: trends and patterns', () => {
   });
 
   it('getFailurePatterns counts repeated failures across builds', async () => {
-    const ax = makeAxios();
     // Return two failed builds
-    ax.get.mockImplementation((path: string) => {
-      if (path.startsWith('/buildTypes/id:bt2/builds?locator=status:FAILURE')) {
+    http.get.mockImplementation((path: string) => {
+      if (path.includes('/buildTypes/id:bt2/builds?locator=status:FAILURE')) {
         return Promise.resolve({ data: { build: [{ id: 'b10' }, { id: 'b11' }] } });
       }
       if (path.includes('/testOccurrences?locator=status:FAILURE')) {
@@ -63,7 +73,7 @@ describe('TestProblemReporter: trends and patterns', () => {
           },
         });
       }
-      if (path.startsWith('/builds/id:')) {
+      if (path.includes('/builds/id:')) {
         // getTestStatistics called inside getFailurePatterns via getFailedTests indirectly; ensure stats call is harmless
         return Promise.resolve({
           data: { id: 'b', testOccurrences: { count: 2, passed: 0, failed: 2 } },

@@ -1,51 +1,48 @@
 /**
  * Tests for TeamCity Test and Problem Reporter
  */
-import axios from 'axios';
-
-import type { TeamCityClient } from '../../../src/teamcity/client';
 import {
   type BuildProblem,
   type CategorizedProblems,
   TestProblemReporter,
 } from '../../../src/teamcity/test-problem-reporter';
-
-// Mock axios
-jest.mock('axios');
-const mockedAxios = jest.mocked(axios, { shallow: false });
-
-// Mock config
-jest.mock('../../../src/config', () => ({
-  getTeamCityUrl: jest.fn(() => 'http://localhost:8111'),
-  getTeamCityToken: jest.fn(() => 'test-token'),
-}));
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
 
 describe('TestProblemReporter', () => {
   let reporter: TestProblemReporter;
-  let mockClient: TeamCityClient | Partial<TeamCityClient>;
-  type MockAxios = { get: jest.Mock; post: jest.Mock; put: jest.Mock; delete: jest.Mock };
-  let mockAxiosInstance: MockAxios;
+  let mockClient: MockTeamCityClient;
+  let http: jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
+  const BASE_URL = 'http://localhost:8111';
 
   beforeEach(() => {
-    mockAxiosInstance = {
-      get: jest.fn(),
-      post: jest.fn(),
-      put: jest.fn(),
-      delete: jest.fn(),
-    };
+    mockClient = createMockTeamCityClient();
+    http = mockClient.http as jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
+    http.get.mockReset();
+    mockClient.request.mockImplementation(async (fn) => fn({ axios: http, baseUrl: BASE_URL }));
+    mockClient.getApiConfig.mockReturnValue({
+      baseUrl: BASE_URL,
+      token: 'test-token',
+      timeout: undefined,
+    });
+    mockClient.getConfig.mockReturnValue({
+      connection: {
+        baseUrl: BASE_URL,
+        token: 'test-token',
+        timeout: undefined,
+      },
+    });
 
-    (mockedAxios.create as jest.Mock).mockReturnValue(mockAxiosInstance);
-
-    mockClient = {} as Partial<TeamCityClient>;
-
-    reporter = new TestProblemReporter(mockClient as TeamCityClient);
+    reporter = new TestProblemReporter(mockClient);
   });
 
   describe('getTestStatistics', () => {
     it('should extract test statistics from build response', async () => {
       const buildId = '12345';
 
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           id: buildId,
           testOccurrences: {
@@ -75,7 +72,7 @@ describe('TestProblemReporter', () => {
     it('should handle builds without test data', async () => {
       const buildId = '12346';
 
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           id: buildId,
           // No testOccurrences property
@@ -98,7 +95,7 @@ describe('TestProblemReporter', () => {
     it('should calculate correct success rate', async () => {
       const buildId = '12347';
 
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           id: buildId,
           testOccurrences: {
@@ -120,7 +117,7 @@ describe('TestProblemReporter', () => {
     it('should retrieve failed test details', async () => {
       const buildId = '12348';
 
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           testOccurrence: [
             {
@@ -167,7 +164,7 @@ describe('TestProblemReporter', () => {
     it('should handle no failed tests', async () => {
       const buildId = '12349';
 
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           testOccurrence: [],
         },
@@ -181,7 +178,7 @@ describe('TestProblemReporter', () => {
     it('should filter only failed tests', async () => {
       const buildId = '12350';
 
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           testOccurrence: [
             {
@@ -215,7 +212,7 @@ describe('TestProblemReporter', () => {
     it('should retrieve build problems', async () => {
       const buildId = '12351';
 
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           problemOccurrence: [
             {
@@ -256,7 +253,7 @@ describe('TestProblemReporter', () => {
     it('should handle no problems', async () => {
       const buildId = '12352';
 
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           problemOccurrence: [],
         },
@@ -270,7 +267,7 @@ describe('TestProblemReporter', () => {
     it('should categorize problems by type', async () => {
       const buildId = '12353';
 
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           problemOccurrence: [
             { type: 'TC_COMPILATION_ERROR', details: 'Compilation failed' },
@@ -295,19 +292,7 @@ describe('TestProblemReporter', () => {
       const buildId = '12354';
 
       // Mock test statistics
-      mockAxiosInstance.get.mockImplementation((path: string) => {
-        if (path === `/builds/id:${buildId}`) {
-          return Promise.resolve({
-            data: {
-              id: buildId,
-              testOccurrences: {
-                count: 100,
-                passed: 95,
-                failed: 5,
-              },
-            },
-          });
-        }
+      http.get.mockImplementation((path: string) => {
         if (path.includes('/testOccurrences?locator=status:FAILURE')) {
           return Promise.resolve({
             data: {
@@ -334,6 +319,18 @@ describe('TestProblemReporter', () => {
                   details: 'Compilation error',
                 },
               ],
+            },
+          });
+        }
+        if (path.includes(`/builds/id:${buildId}`)) {
+          return Promise.resolve({
+            data: {
+              id: buildId,
+              testOccurrences: {
+                count: 100,
+                passed: 95,
+                failed: 5,
+              },
             },
           });
         }
@@ -366,7 +363,7 @@ describe('TestProblemReporter', () => {
     it('should handle optional inclusion flags', async () => {
       const buildId = '12355';
 
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           id: buildId,
           testOccurrences: {
@@ -392,19 +389,7 @@ describe('TestProblemReporter', () => {
       const buildId = '12356';
 
       // Build with no test failures but problems
-      mockAxiosInstance.get.mockImplementation((path: string) => {
-        if (path === `/builds/id:${buildId}`) {
-          return Promise.resolve({
-            data: {
-              id: buildId,
-              testOccurrences: {
-                count: 100,
-                passed: 100,
-                failed: 0,
-              },
-            },
-          });
-        }
+      http.get.mockImplementation((path: string) => {
         if (path.includes('/problemOccurrences')) {
           return Promise.resolve({
             data: {
@@ -432,19 +417,7 @@ describe('TestProblemReporter', () => {
     it('should format comprehensive failure reason', async () => {
       const buildId = '12357';
 
-      mockAxiosInstance.get.mockImplementation((path: string) => {
-        if (path === `/builds/id:${buildId}`) {
-          return Promise.resolve({
-            data: {
-              id: buildId,
-              testOccurrences: {
-                count: 100,
-                failed: 5,
-                passed: 95,
-              },
-            },
-          });
-        }
+      http.get.mockImplementation((path: string) => {
         if (path.includes('/testOccurrences?locator=status:FAILURE')) {
           return Promise.resolve({
             data: {
@@ -472,8 +445,27 @@ describe('TestProblemReporter', () => {
             },
           });
         }
+        if (path.includes(`/builds/id:${buildId}`)) {
+          return Promise.resolve({
+            data: {
+              id: buildId,
+              testOccurrences: {
+                count: 100,
+                passed: 95,
+                failed: 5,
+              },
+            },
+          });
+        }
         return Promise.resolve({ data: {} });
       });
+
+      const stats = await reporter.getTestStatistics(buildId);
+      const failed = await reporter.getFailedTests(buildId, 10);
+      const problemsResult = (await reporter.getBuildProblems(buildId)) as BuildProblem[];
+      expect(stats.failedTests).toBeGreaterThan(0);
+      expect(failed.length).toBeGreaterThan(0);
+      expect(problemsResult.length).toBeGreaterThan(0);
 
       const reason = await reporter.formatFailureReason(buildId);
 
@@ -492,8 +484,18 @@ describe('TestProblemReporter', () => {
         status: 'FAILURE',
       }));
 
-      mockAxiosInstance.get.mockImplementation((path: string) => {
-        if (path === `/builds/id:${buildId}`) {
+      http.get.mockImplementation((path: string) => {
+        if (path.includes('/testOccurrences?locator=status:FAILURE')) {
+          return Promise.resolve({
+            data: { testOccurrence: tests },
+          });
+        }
+        if (path.includes('/problemOccurrences')) {
+          return Promise.resolve({
+            data: { problemOccurrence: [] },
+          });
+        }
+        if (path.includes(`/builds/id:${buildId}`)) {
           return Promise.resolve({
             data: {
               id: buildId,
@@ -503,16 +505,6 @@ describe('TestProblemReporter', () => {
                 passed: 90,
               },
             },
-          });
-        }
-        if (path.includes('/testOccurrences?locator=status:FAILURE')) {
-          return Promise.resolve({
-            data: { testOccurrence: tests },
-          });
-        }
-        if (path.includes('/problemOccurrences')) {
-          return Promise.resolve({
-            data: { problemOccurrence: [] },
           });
         }
         return Promise.resolve({ data: {} });
@@ -528,7 +520,7 @@ describe('TestProblemReporter', () => {
     it('should handle API errors gracefully', async () => {
       const buildId = '12359';
 
-      mockAxiosInstance.get.mockRejectedValue(new Error('API Error'));
+      http.get.mockRejectedValue(new Error('API Error'));
 
       await expect(reporter.getTestStatistics(buildId)).rejects.toThrow('API Error');
     });
@@ -536,7 +528,7 @@ describe('TestProblemReporter', () => {
     it('should handle malformed responses', async () => {
       const buildId = '12360';
 
-      mockAxiosInstance.get.mockResolvedValue({
+      http.get.mockResolvedValue({
         data: {
           // Missing expected structure
           unexpected: 'data',

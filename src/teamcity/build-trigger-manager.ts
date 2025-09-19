@@ -1,8 +1,6 @@
 /**
  * BuildTriggerManager - Manages build triggers in TeamCity
  */
-import axios, { type AxiosInstance } from 'axios';
-
 import { debug, error as logError } from '@/utils/logger';
 
 import {
@@ -15,7 +13,7 @@ import {
   normalizeVcsRootEntries,
   propertiesToRecord,
 } from './api-types';
-import type { TeamCityClientConfig } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
 import {
   BuildConfigurationNotFoundError,
   CircularDependencyError,
@@ -158,23 +156,23 @@ export interface ValidateTriggerResult {
  * Manages build triggers in TeamCity
  */
 export class BuildTriggerManager {
-  private axios: AxiosInstance;
+  constructor(private readonly client: TeamCityClientAdapter) {}
 
-  constructor(config: TeamCityClientConfig | AxiosInstance) {
-    // Support both config and direct axios instance (for testing)
-    if ('defaults' in config) {
-      this.axios = config;
-    } else {
-      const clientConfig = config;
-      this.axios = axios.create({
-        baseURL: clientConfig.baseUrl,
-        timeout: clientConfig.timeout ?? 30000,
-        headers: {
-          Authorization: `Bearer ${clientConfig.token}`,
-          Accept: 'application/json',
-        },
-      });
+  private request<T>(
+    fn: (ctx: {
+      axios: ReturnType<TeamCityClientAdapter['getAxios']>;
+      baseUrl: string;
+    }) => Promise<T>
+  ): Promise<T> {
+    return this.client.request(fn);
+  }
+
+  private buildRestUrl(baseUrl: string, path: string): string {
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    if (path.startsWith('/')) {
+      return `${normalizedBase}${path}`;
     }
+    return `${normalizedBase}/${path}`;
   }
 
   /**
@@ -186,12 +184,14 @@ export class BuildTriggerManager {
     try {
       debug('Listing triggers for build configuration', { configId });
 
-      const response = await this.axios.get<TeamCityTriggersResponse>(
-        `/app/rest/buildTypes/${configId}/triggers`,
-        {
-          headers: { Accept: 'application/json' },
-          params: fields ? { fields } : undefined,
-        }
+      const response = await this.request((ctx) =>
+        ctx.axios.get<TeamCityTriggersResponse>(
+          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${configId}/triggers`),
+          {
+            headers: { Accept: 'application/json' },
+            params: fields ? { fields } : undefined,
+          }
+        )
       );
 
       const triggers = this.parseTriggerList(response.data);
@@ -251,15 +251,17 @@ export class BuildTriggerManager {
 
       const triggerData = this.buildTriggerPayload(type, properties, !enabled);
 
-      const response = await this.axios.post(
-        `/app/rest/buildTypes/${configId}/triggers`,
-        triggerData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-        }
+      const response = await this.request((ctx) =>
+        ctx.axios.post(
+          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${configId}/triggers`),
+          triggerData,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+          }
+        )
       );
 
       const trigger = this.parseTrigger(response.data);
@@ -293,11 +295,13 @@ export class BuildTriggerManager {
       debug('Updating trigger', { configId, triggerId });
 
       // Get existing trigger first
-      const existingResponse = await this.axios.get(
-        `/app/rest/buildTypes/${configId}/triggers/${triggerId}`,
-        {
-          headers: { Accept: 'application/json' },
-        }
+      const existingResponse = await this.request((ctx) =>
+        ctx.axios.get(
+          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${configId}/triggers/${triggerId}`),
+          {
+            headers: { Accept: 'application/json' },
+          }
+        )
       );
 
       const existingTrigger = this.parseTrigger(existingResponse.data);
@@ -324,15 +328,17 @@ export class BuildTriggerManager {
         enabled !== undefined ? !enabled : !existingTrigger.enabled
       );
 
-      const response = await this.axios.put(
-        `/app/rest/buildTypes/${configId}/triggers/${triggerId}`,
-        triggerData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-        }
+      const response = await this.request((ctx) =>
+        ctx.axios.put(
+          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${configId}/triggers/${triggerId}`),
+          triggerData,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+          }
+        )
       );
 
       const trigger = this.parseTrigger(response.data);
@@ -359,9 +365,14 @@ export class BuildTriggerManager {
     try {
       debug('Deleting trigger', { configId, triggerId });
 
-      await this.axios.delete(`/app/rest/buildTypes/${configId}/triggers/${triggerId}`, {
-        headers: { Accept: 'application/json' },
-      });
+      await this.request((ctx) =>
+        ctx.axios.delete(
+          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${configId}/triggers/${triggerId}`),
+          {
+            headers: { Accept: 'application/json' },
+          }
+        )
+      );
 
       return {
         success: true,
@@ -554,11 +565,13 @@ export class BuildTriggerManager {
   private async validateVcsRoot(configId: string, vcsRootId: string): Promise<void> {
     try {
       // Check if VCS root is attached to this build configuration
-      const response = await this.axios.get<TeamCityVcsRootEntriesResponse>(
-        `/app/rest/buildTypes/${configId}/vcs-root-entries`,
-        {
-          headers: { Accept: 'application/json' },
-        }
+      const response = await this.request((ctx) =>
+        ctx.axios.get<TeamCityVcsRootEntriesResponse>(
+          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${configId}/vcs-root-entries`),
+          {
+            headers: { Accept: 'application/json' },
+          }
+        )
       );
 
       const rootEntries = normalizeVcsRootEntries(response.data);
@@ -585,9 +598,14 @@ export class BuildTriggerManager {
   private async checkCircularDependency(sourceConfig: string, targetConfig: string): Promise<void> {
     // Get triggers from target config
     try {
-      const response = await this.axios.get(`/app/rest/buildTypes/${targetConfig}/triggers`, {
-        headers: { Accept: 'application/json' },
-      });
+      const response = await this.request((ctx) =>
+        ctx.axios.get(
+          this.buildRestUrl(ctx.baseUrl, `/app/rest/buildTypes/${targetConfig}/triggers`),
+          {
+            headers: { Accept: 'application/json' },
+          }
+        )
+      );
 
       const triggers = this.parseTriggerList(response.data);
 
@@ -977,12 +995,7 @@ export class BuildTriggerManager {
    * Check if error is a 404
    */
   private isNotFoundError(err: unknown): boolean {
-    if (axios.isAxiosError(err)) {
-      return err.response?.status === 404;
-    }
-    // Support mock/test error objects
-    const error = err as { response?: { status?: number } };
-    return error?.response?.status === 404;
+    return this.extractErrorResponse(err)?.status === 404;
   }
 
   /**
@@ -1065,19 +1078,30 @@ export class BuildTriggerManager {
    * Handle API errors
    */
   private handleApiError(err: unknown, context: string): Error {
-    logError(context, err instanceof Error ? err : new Error(String(err)));
+    const normalizedError = err instanceof Error ? err : new Error(String(err));
+    logError(context, normalizedError);
 
-    if (axios.isAxiosError(err)) {
-      const errorData = err.response?.data as TeamCityErrorResponse | undefined;
-      if (errorData?.message) {
-        return new TeamCityAPIError(
-          `${context}: ${errorData.message}`,
-          `HTTP_${err.response?.status ?? 500}`,
-          err.response?.status ?? 500
-        );
-      }
+    const response = this.extractErrorResponse(err);
+    if (response != null) {
+      const errorData = response.data as TeamCityErrorResponse | undefined;
+      const status = response.status ?? 500;
+      const message = errorData?.message ?? normalizedError.message ?? 'Request failed';
+      return new TeamCityAPIError(`${context}: ${message}`, `HTTP_${status}`, status);
     }
 
-    return err instanceof Error ? err : new Error(context);
+    return normalizedError;
+  }
+
+  private extractErrorResponse(
+    err: unknown
+  ): { status?: number; data?: { message?: string } } | undefined {
+    if (typeof err === 'object' && err !== null && 'response' in err) {
+      const response = (err as { response?: { status?: number; data?: { message?: string } } })
+        .response;
+      if (response != null) {
+        return response;
+      }
+    }
+    return undefined;
   }
 }
