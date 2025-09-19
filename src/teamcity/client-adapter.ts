@@ -6,6 +6,7 @@ import axios, { type AxiosInstance } from 'axios';
 
 import type { TeamCityAPI, TeamCityAPIClientConfig } from '@/api-client';
 import type { TeamCityFullConfig } from '@/teamcity/config';
+import { warn } from '@/utils/logger';
 
 import type {
   BuildApiLike,
@@ -20,6 +21,8 @@ interface AdapterOptions {
   fullConfig?: TeamCityFullConfig;
   apiConfig?: TeamCityAPIClientConfig;
 }
+
+const FALLBACK_BASE_URL = 'http://not-configured';
 
 const resolveModules = (api: TeamCityAPI): Readonly<TeamCityApiSurface> => {
   const candidate = (api as { modules?: Readonly<TeamCityApiSurface> }).modules;
@@ -72,9 +75,18 @@ export function createAdapterFromTeamCityAPI(
   options: AdapterOptions = {}
 ): TeamCityClientAdapter {
   const modules = resolveModules(api);
-  const baseUrl = api.getBaseUrl();
-  const httpInstance: AxiosInstance = api.http ?? axios.create({ baseURL: baseUrl });
-  const fallbackApiConfig = resolveApiClientConfigFromApi(api, httpInstance);
+  const getBaseUrl = (api as { getBaseUrl?: () => string }).getBaseUrl;
+  const inferredBaseUrl = typeof getBaseUrl === 'function' ? getBaseUrl.call(api) : undefined;
+  const fallbackBaseUrl =
+    inferredBaseUrl ??
+    options.apiConfig?.baseUrl ??
+    ((api as { http?: AxiosInstance }).http?.defaults?.baseURL as string | undefined) ??
+    FALLBACK_BASE_URL;
+
+  const httpInstance: AxiosInstance =
+    (api as { http?: AxiosInstance }).http ?? axios.create({ baseURL: fallbackBaseUrl });
+
+  const fallbackApiConfig = resolveApiClientConfigFromApi(api, httpInstance, fallbackBaseUrl);
   const resolvedApiConfig: TeamCityAPIClientConfig = {
     baseUrl: options.apiConfig?.baseUrl ?? fallbackApiConfig.baseUrl,
     token: options.apiConfig?.token ?? fallbackApiConfig.token,
@@ -89,8 +101,15 @@ export function createAdapterFromTeamCityAPI(
     },
   };
 
+  if (fallbackBaseUrl === FALLBACK_BASE_URL && resolvedApiConfig.baseUrl === FALLBACK_BASE_URL) {
+    warn('TeamCity adapter using fallback baseUrl placeholder', {
+      reason: 'missing_base_url',
+      hasApiConfig: Boolean(options.apiConfig),
+    });
+  }
+
   const request = async <T>(fn: (ctx: TeamCityRequestContext) => Promise<T>): Promise<T> =>
-    fn({ axios: httpInstance, baseUrl, requestId: undefined });
+    fn({ axios: httpInstance, baseUrl: resolvedApiConfig.baseUrl, requestId: undefined });
 
   const buildApi = modules.builds as unknown as BuildApiLike;
 
@@ -101,7 +120,10 @@ export function createAdapterFromTeamCityAPI(
     getConfig: () => resolvedFullConfig,
     getApiConfig: () => resolvedApiConfig,
     getAxios: () => httpInstance,
-    testConnection: () => api.testConnection(),
+    testConnection: () =>
+      typeof (api as { testConnection?: () => Promise<boolean> }).testConnection === 'function'
+        ? (api as { testConnection: () => Promise<boolean> }).testConnection()
+        : Promise.resolve(true),
     listProjects: (locator) => api.listProjects(locator),
     getProject: (projectId) => api.getProject(projectId),
     listBuilds: (locator) => api.listBuilds(locator),
@@ -123,7 +145,7 @@ export function createAdapterFromTeamCityAPI(
     listVcsRoots: (projectId) => api.listVcsRoots(projectId),
     listAgents: () => api.listAgents(),
     listAgentPools: () => api.listAgentPools(),
-    baseUrl,
+    baseUrl: resolvedApiConfig.baseUrl,
   };
 }
 
@@ -142,14 +164,24 @@ const isAxiosHeadersRecord = (value: unknown): value is AxiosHeadersRecord =>
  */
 const resolveApiClientConfigFromApi = (
   api: TeamCityAPI,
-  http: AxiosInstance
+  http: AxiosInstance,
+  baseUrlFallback: string
 ): TeamCityAPIClientConfig => {
   const timeout = resolveTimeout(http);
   const authHeader = getAuthorizationHeader(http);
   const token = stripBearerPrefix(authHeader);
 
+  const getBaseUrl = (api as { getBaseUrl?: () => string }).getBaseUrl;
+  const resolvedBaseUrl =
+    typeof getBaseUrl === 'function'
+      ? getBaseUrl.call(api)
+      : (http.defaults.baseURL ?? baseUrlFallback);
+
   return {
-    baseUrl: api.getBaseUrl(),
+    baseUrl:
+      typeof resolvedBaseUrl === 'string' && resolvedBaseUrl.length > 0
+        ? resolvedBaseUrl
+        : baseUrlFallback,
     token: token ?? '',
     timeout,
   };
