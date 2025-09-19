@@ -5,6 +5,7 @@
 import { error } from '@/utils';
 
 import type { TeamCityClientAdapter } from './client-adapter';
+import { toBuildLocator } from './utils/build-locator';
 
 /**
  * Test statistics for a build
@@ -83,7 +84,7 @@ export class TestProblemReporter {
    */
   async getTestStatistics(buildId: string): Promise<BuildTestStatistics> {
     const response = await this.client.modules.builds.getBuild(
-      this.toBuildLocator(buildId),
+      toBuildLocator(buildId),
       'testOccurrences(count,passed,failed,ignored,muted,newFailed)'
     );
     const build = response.data;
@@ -119,10 +120,6 @@ export class TestProblemReporter {
       newFailedTests,
       successRate,
     };
-  }
-
-  private toBuildLocator(buildId: string): string {
-    return buildId.includes(':') ? buildId : `id:${buildId}`;
   }
 
   /**

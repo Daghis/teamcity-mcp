@@ -4,6 +4,7 @@
 import type { AxiosResponse } from 'axios';
 
 import type { TeamCityClientAdapter } from './client-adapter';
+import { toBuildLocator } from './utils/build-locator';
 
 export interface ArtifactInfo {
   name: string;
@@ -74,10 +75,6 @@ export class ArtifactManager {
     return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
   }
 
-  private toBuildLocator(buildId: string): string {
-    return buildId.includes(':') ? buildId : `id:${buildId}`;
-  }
-
   /**
    * List artifacts for a build
    */
@@ -92,7 +89,7 @@ export class ArtifactManager {
     }
 
     try {
-      const buildLocator = this.toBuildLocator(buildId);
+      const buildLocator = toBuildLocator(buildId);
       // Fetch artifacts from API
       const response = await this.client.modules.builds.getFilesListOfBuild(
         buildLocator,
@@ -167,7 +164,7 @@ export class ArtifactManager {
         .split('/')
         .map((segment) => encodeURIComponent(segment))
         .join('/');
-      const buildLocator = this.toBuildLocator(buildId);
+      const buildLocator = toBuildLocator(buildId);
       const artifactPath = `content/${normalizedPath}`;
 
       if (responseType === 'text') {

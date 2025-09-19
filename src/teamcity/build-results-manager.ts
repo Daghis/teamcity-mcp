@@ -6,6 +6,7 @@ import type { AxiosResponse } from 'axios';
 import { warn } from '@/utils/logger';
 
 import type { TeamCityUnifiedClient } from './types/client';
+import { toBuildLocator } from './utils/build-locator';
 
 export interface BuildResultsOptions {
   includeArtifacts?: boolean;
@@ -218,7 +219,7 @@ export class BuildResultsManager {
    */
   private async fetchBuildSummary(buildId: string): Promise<unknown> {
     const response = await this.client.modules.builds.getBuild(
-      this.toBuildLocator(buildId),
+      toBuildLocator(buildId),
       BuildResultsManager.fields
     );
     return response.data;
@@ -305,7 +306,7 @@ export class BuildResultsManager {
   ): Promise<BuildResult['artifacts']> {
     try {
       const response = await this.client.modules.builds.getFilesListOfBuild(
-        this.toBuildLocator(buildId)
+        toBuildLocator(buildId)
       );
       const artifactListing = response.data as { file?: TeamCityArtifact[] };
       let artifacts = artifactListing.file ?? [];
@@ -381,7 +382,7 @@ export class BuildResultsManager {
   private async fetchStatistics(buildId: string): Promise<BuildResult['statistics']> {
     try {
       const response = await this.client.modules.builds.getBuildStatisticValues(
-        this.toBuildLocator(buildId)
+        toBuildLocator(buildId)
       );
       const payload = response.data as { property?: Array<{ name: string; value: string }> };
       const properties = payload.property ?? [];
@@ -498,10 +499,6 @@ export class BuildResultsManager {
     return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
   }
 
-  private toBuildLocator(buildId: string): string {
-    return buildId.includes(':') ? buildId : `id:${buildId}`;
-  }
-
   private async downloadArtifactContent(
     buildId: string,
     artifactPath: string
@@ -511,7 +508,7 @@ export class BuildResultsManager {
       .map((segment) => encodeURIComponent(segment))
       .join('/');
 
-    const buildLocator = this.toBuildLocator(buildId);
+    const buildLocator = toBuildLocator(buildId);
     const response = await this.client.modules.builds.downloadFileOfBuild(
       `content/${normalizedPath}`,
       buildLocator,

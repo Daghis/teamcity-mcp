@@ -14,6 +14,7 @@ import {
 } from '@/teamcity/auth';
 import { TeamCityAPIError, isRetryableError } from '@/teamcity/errors';
 import type { TeamCityApiSurface } from '@/teamcity/types/client';
+import { toBuildLocator } from '@/teamcity/utils/build-locator';
 import { info } from '@/utils/logger';
 
 import { AgentApi } from './teamcity-client/api/agent-api';
@@ -292,7 +293,7 @@ export class TeamCityAPI {
   }
 
   async getBuild(buildId: string) {
-    const response = await this.builds.getBuild(this.toBuildLocator(buildId));
+    const response = await this.builds.getBuild(toBuildLocator(buildId));
     return response.data;
   }
 
@@ -416,7 +417,7 @@ export class TeamCityAPI {
     }
   ): Promise<AxiosResponse<unknown>> {
     return this.builds.getFilesListOfBuild(
-      this.toBuildLocator(buildId),
+      toBuildLocator(buildId),
       options?.basePath,
       options?.locator,
       options?.fields,
@@ -442,7 +443,7 @@ export class TeamCityAPI {
   }
 
   async getBuildStatistics(buildId: string, fields?: string): Promise<AxiosResponse<unknown>> {
-    return this.builds.getBuildStatisticValues(this.toBuildLocator(buildId), fields);
+    return this.builds.getBuildStatisticValues(toBuildLocator(buildId), fields);
   }
 
   async listChangesForBuild(buildId: string, fields?: string): Promise<AxiosResponse<unknown>> {
@@ -450,10 +451,7 @@ export class TeamCityAPI {
   }
 
   async listSnapshotDependencies(buildId: string): Promise<AxiosResponse<unknown>> {
-    const response = await this.builds.getBuild(
-      this.toBuildLocator(buildId),
-      'snapshot-dependencies'
-    );
+    const response = await this.builds.getBuild(toBuildLocator(buildId), 'snapshot-dependencies');
 
     const dependencies = (response.data as { 'snapshot-dependencies'?: unknown })[
       'snapshot-dependencies'
@@ -495,10 +493,6 @@ export class TeamCityAPI {
   static reset() {
     this.instance = undefined;
     this.instanceConfig = undefined;
-  }
-
-  private toBuildLocator(buildId: string): string {
-    return buildId.includes(':') ? buildId : `id:${buildId}`;
   }
 
   private createApi<T>(
