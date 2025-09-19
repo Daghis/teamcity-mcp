@@ -97,6 +97,11 @@ export interface TeamCityUnifiedClient {
 }
 
 export interface BuildApiLike {
+  getAllBuilds: (
+    locator?: string,
+    fields?: string,
+    options?: RawAxiosRequestConfig
+  ) => Promise<AxiosResponse<unknown>>;
   getBuild: (
     buildLocator: string,
     fields?: string,

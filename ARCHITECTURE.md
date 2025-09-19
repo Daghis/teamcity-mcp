@@ -22,7 +22,7 @@ src/
 ## Design Principles
 
 - Direct implementation: no DI container, minimal indirection
-- Singleton API client via `TeamCityAPI.getInstance()`
+- Singleton API client via `TeamCityAPI.getInstance()` wrapped by the unified `TeamCityClientAdapter`
 - Tools are registered via a simple list; handlers call the API client
 - Explicit error shaping for MCP responses; logs redact sensitive values
 
@@ -32,6 +32,12 @@ src/
 2. `server.ts` registers `tools/list` and `tools/call` handlers
 3. `tools.ts` exposes tools according to `MCP_MODE` (`dev` or `full`)
 4. Tool handlers use `api-client.ts` and/or `teamcity/` managers
+
+## TeamCity Client Layering
+
+- `api-client.ts` instantiates the singleton `TeamCityAPI`, wiring auth, retries, and every generated REST module.
+- `teamcity/client-adapter.ts` converts the singleton into a `TeamCityClientAdapter` that exposes the unified `modules` surface plus helper methods.
+- Managers under `teamcity/` depend exclusively on the adapter—they never instantiate generated clients or import axios directly.
 
 ## Configuration
 

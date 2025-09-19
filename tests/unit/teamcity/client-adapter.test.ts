@@ -39,6 +39,7 @@ describe('createAdapterFromTeamCityAPI', () => {
   beforeEach(() => {
     http = axios.create();
     const buildsMock: BuildApiLike = {
+      getAllBuilds: jest.fn(),
       getBuild: jest.fn(),
       getMultipleBuilds: jest.fn(),
       getBuildProblems: jest.fn(),

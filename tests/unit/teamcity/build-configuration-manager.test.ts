@@ -2,9 +2,12 @@
  * Tests for BuildConfigurationManager
  */
 import { BuildConfigurationManager } from '@/teamcity/build-configuration-manager';
+import {
+  type MockTeamCityClient,
+  createMockTeamCityClient,
+} from '../../test-utils/mock-teamcity-client';
 
 // Mock dependencies
-jest.mock('@/teamcity/client');
 jest.mock('@/config', () => ({
   getTeamCityUrl: jest.fn(() => 'https://teamcity.example.com'),
   getTeamCityToken: jest.fn(() => 'test-token'),
@@ -13,31 +16,14 @@ jest.mock('@/config', () => ({
 
 describe('BuildConfigurationManager', () => {
   let manager: BuildConfigurationManager;
-  type MockClient = {
-    projects: { getProject: jest.Mock };
-    vcsRoots: { addVcsRoot: jest.Mock };
-    buildTypes: { createBuildType: jest.Mock };
-  };
-  let mockClient: MockClient;
+  let mockClient: MockTeamCityClient;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockClient = {
-      projects: {
-        getProject: jest.fn(),
-      },
-      vcsRoots: {
-        addVcsRoot: jest.fn(),
-      },
-      buildTypes: {
-        createBuildType: jest.fn(),
-      },
-    };
+    mockClient = createMockTeamCityClient();
 
-    manager = new BuildConfigurationManager(
-      mockClient as unknown as import('@/teamcity/client').TeamCityClient
-    );
+    manager = new BuildConfigurationManager(mockClient);
   });
 
   describe('Build Step Transformations', () => {
@@ -730,9 +716,7 @@ describe('BuildConfigurationManager', () => {
 
   describe('Build Configuration ID Generation', () => {
     it('should generate valid IDs', () => {
-      const manager = new BuildConfigurationManager(
-        mockClient as unknown as import('@/teamcity/client').TeamCityClient
-      );
+      const manager = new BuildConfigurationManager(mockClient);
 
       // Access private method through typed private access
       type PrivateMgr = { generateBuildConfigId: (projectId: string, name: string) => string };

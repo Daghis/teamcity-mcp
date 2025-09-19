@@ -89,8 +89,8 @@ Examples
 
 ## TeamCity API Map
 - Entry point: `src/teamcity/index.ts` — re-exports auth/config/utilities and exposes `initializeTeamCity`, `getTeamCityClient`, `createTeamCityClient`, plus convenience helpers (e.g., `triggerBuild`, `getBuildStatus`).
-- Client: `client.ts` (`TeamCityClient`) and `client-adapter.ts` — typed HTTP access to TeamCity REST APIs.
-- Config: `config.ts` — `loadTeamCityConfig`, `validateConfig`, `toClientConfig`, `TeamCityFullConfig`.
+- Client: `client-adapter.ts` — exposes the unified `TeamCityClientAdapter` built on top of the `TeamCityAPI` singleton.
+- Config: `config.ts` — `loadTeamCityConfig`, `validateConfig`, `toApiClientConfig`, `TeamCityFullConfig`.
 - Types: `api-types.ts` and `src/teamcity/types/**` — API contracts and normalized shapes.
 - Managers (behavioral layers):
   - Build: `build-configuration-*.ts`, `build-config-manager.ts`, `build-step-manager.ts`, `build-trigger-manager.ts`, `build-parameters-manager.ts`, `build-queue-manager.ts`, `build-results-manager.ts`, `build-status-manager.ts`, `build-list-manager.ts`.

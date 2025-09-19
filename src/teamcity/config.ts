@@ -4,8 +4,6 @@
 import type { TeamCityAPIClientConfig } from '@/api-client';
 import { getConfig, getTeamCityOptions } from '@/config';
 
-import type { TeamCityClientConfig } from './client';
-
 export interface TeamCityConnectionConfig {
   baseUrl: string;
   token: string;
@@ -143,24 +141,6 @@ export function toApiClientConfig(config: TeamCityFullConfig): TeamCityAPIClient
     baseUrl: config.connection.baseUrl,
     token: config.connection.token,
     timeout: config.connection.timeout,
-  };
-}
-
-/**
- * @deprecated Use toApiClientConfig instead.
- */
-export function toClientConfig(config: TeamCityFullConfig): TeamCityClientConfig {
-  return {
-    baseUrl: config.connection.baseUrl,
-    token: config.connection.token,
-    timeout: config.connection.timeout,
-    retryConfig:
-      config.retry?.enabled === true
-        ? {
-            retries: config.retry.maxRetries,
-            retryDelay: config.retry.baseDelay,
-          }
-        : undefined,
   };
 }
 

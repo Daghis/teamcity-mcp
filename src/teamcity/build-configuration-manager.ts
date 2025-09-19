@@ -4,7 +4,7 @@
 import { getTeamCityUrl } from '@/config';
 import { debug, info, error as logError } from '@/utils/logger';
 
-import type { TeamCityClient } from './client';
+import type { TeamCityClientAdapter } from './client-adapter';
 
 export interface BuildConfigData {
   projectId: string;
@@ -51,9 +51,9 @@ export interface BuildTrigger {
 }
 
 export class BuildConfigurationManager {
-  private client: TeamCityClient;
+  private client: TeamCityClientAdapter;
 
-  constructor(client: TeamCityClient) {
+  constructor(client: TeamCityClientAdapter) {
     this.client = client;
   }
 
@@ -62,7 +62,7 @@ export class BuildConfigurationManager {
    */
   async validateProject(projectId: string): Promise<{ id: string; name: string } | null> {
     try {
-      const response = await this.client.projects.getProject(projectId, '$short');
+      const response = await this.client.modules.projects.getProject(projectId, '$short');
 
       const id = response.data?.id;
       const name = response.data?.name;
@@ -131,7 +131,7 @@ export class BuildConfigurationManager {
       }
     }
 
-    const response = await this.client.vcsRoots.addVcsRoot(undefined, vcsRootPayload);
+    const response = await this.client.modules.vcsRoots.addVcsRoot(undefined, vcsRootPayload);
     const id = response.data.id;
     if (!id) {
       throw new Error('VCS root creation failed: missing id');
@@ -395,7 +395,10 @@ export class BuildConfigurationManager {
     }
 
     try {
-      const response = await this.client.buildTypes.createBuildType(undefined, configPayload);
+      const response = await this.client.modules.buildTypes.createBuildType(
+        undefined,
+        configPayload
+      );
 
       const teamcityUrl = getTeamCityUrl();
       const result = {
