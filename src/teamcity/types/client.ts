@@ -153,6 +153,10 @@ export interface TeamCityClientAdapter extends TeamCityUnifiedClient {
     artifactPath: string,
     options?: RawAxiosRequestConfig
   ) => Promise<AxiosResponse<T>>;
+  downloadBuildLogContent: <T = string>(
+    buildId: string,
+    options?: RawAxiosRequestConfig<T>
+  ) => Promise<AxiosResponse<T>>;
   getBuildStatistics: (buildId: string, fields?: string) => Promise<AxiosResponse<unknown>>;
   listChangesForBuild: (buildId: string, fields?: string) => Promise<AxiosResponse<unknown>>;
   listSnapshotDependencies: (buildId: string) => Promise<AxiosResponse<unknown>>;

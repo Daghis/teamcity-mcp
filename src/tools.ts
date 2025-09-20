@@ -26,6 +26,9 @@ import { json, runTool } from '@/utils/mcp';
 
 import { TeamCityAPI } from './api-client';
 
+const isReadableStream = (value: unknown): value is Readable =>
+  typeof value === 'object' && value !== null && typeof (value as Readable).pipe === 'function';
+
 // Tool response type
 export interface ToolResponse {
   content?: Array<{ type: string; text: string }>;
@@ -558,6 +561,17 @@ const DEV_TOOLS: ToolDefinition[] = [
         startLine: { type: 'number', description: '0-based start line (overrides page)' },
         lineCount: { type: 'number', description: 'Max lines to return (overrides pageSize)' },
         tail: { type: 'boolean', description: 'Tail mode: return last N lines' },
+        encoding: {
+          type: 'string',
+          description: "Response encoding: 'text' (default) or 'stream'",
+          enum: ['text', 'stream'],
+          default: 'text',
+        },
+        outputPath: {
+          type: 'string',
+          description:
+            'Optional absolute path to write streamed logs; defaults to a temp file when streaming',
+        },
       },
       required: [],
     },
@@ -572,9 +586,24 @@ const DEV_TOOLS: ToolDefinition[] = [
           startLine: z.number().int().min(0).optional(),
           lineCount: z.number().int().min(1).max(5000).optional(),
           tail: z.boolean().optional(),
+          encoding: z.enum(['text', 'stream']).default('text'),
+          outputPath: z.string().min(1).optional(),
         })
-        .refine((v) => Boolean(v.buildId) || Boolean(v.buildNumber), {
-          message: 'Provide either buildId or buildNumber',
+        .superRefine((value, ctx) => {
+          if (!value.buildId && typeof value.buildNumber === 'undefined') {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Provide either buildId or buildNumber',
+              path: ['buildId'],
+            });
+          }
+          if (value.encoding === 'stream' && value.tail) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Streaming mode does not support tail queries',
+              path: ['tail'],
+            });
+          }
         });
 
       return runTool(
@@ -664,12 +693,27 @@ const DEV_TOOLS: ToolDefinition[] = [
             return false;
           };
 
+          const normalizeError = (error: unknown): Error => {
+            if (isAxiosError(error)) {
+              const status = error.response?.status;
+              const statusText = (error.response?.statusText ?? '').trim();
+              const base = status
+                ? `${status}${statusText ? ` ${statusText}` : ''}`
+                : error.message;
+              return new Error(base || 'Request failed');
+            }
+            if (error instanceof Error) {
+              return error;
+            }
+            return new Error(String(error));
+          };
+
           const wait = (ms: number) =>
             new Promise((resolve) => {
               setTimeout(resolve, ms);
             });
 
-          const attemptFetch = async () => {
+          const attemptBuffered = async () => {
             if (typed.tail) {
               const count = typed.lineCount ?? typed.pageSize ?? 500;
               const full = await adapter.getBuildLog(effectiveBuildId);
@@ -730,18 +774,64 @@ const DEV_TOOLS: ToolDefinition[] = [
             });
           };
 
-          const maxAttempts = typed.tail ? 5 : 3;
+          const attemptStream = async () => {
+            const effectivePageSize = typed.lineCount ?? typed.pageSize ?? 500;
+            const startLine =
+              typeof typed.startLine === 'number'
+                ? typed.startLine
+                : ((typed.page ?? 1) - 1) * effectivePageSize;
+
+            const response = await adapter.downloadBuildLogContent<Readable>(effectiveBuildId, {
+              params: {
+                start: startLine,
+                count: effectivePageSize,
+              },
+              responseType: 'stream',
+            });
+
+            const stream = response.data;
+            if (!isReadableStream(stream)) {
+              throw new Error('Streaming log download did not return a readable stream');
+            }
+
+            const safeBuildId = effectiveBuildId.replace(/[^a-zA-Z0-9._-]/g, '_') || 'build';
+            const defaultFileName = `build-log-${safeBuildId}-${startLine}-${randomUUID()}.log`;
+            const targetPath = typed.outputPath ?? join(tmpdir(), defaultFileName);
+            await fs.mkdir(dirname(targetPath), { recursive: true });
+            await pipeline(stream, createWriteStream(targetPath));
+            const stats = await fs.stat(targetPath);
+
+            const page = Math.floor(startLine / effectivePageSize) + 1;
+
+            return json({
+              encoding: 'stream',
+              outputPath: targetPath,
+              bytesWritten: stats.size,
+              meta: {
+                buildId: effectiveBuildId,
+                buildNumber:
+                  typeof typed.buildNumber !== 'undefined' ? String(typed.buildNumber) : undefined,
+                buildTypeId: typed.buildTypeId,
+                page,
+                pageSize: effectivePageSize,
+                startLine,
+              },
+            });
+          };
+
+          const isStream = typed.encoding === 'stream';
+          const maxAttempts = isStream ? 3 : typed.tail ? 5 : 3;
           for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
             try {
               // eslint-disable-next-line no-await-in-loop -- sequential retry attempts require awaiting inside loop
-              return await attemptFetch();
+              return await (isStream ? attemptStream() : attemptBuffered());
             } catch (error) {
               if (shouldRetry(error) && attempt < maxAttempts - 1) {
                 // eslint-disable-next-line no-await-in-loop -- intentional backoff between sequential retries
                 await wait(500 * (attempt + 1));
                 continue;
               }
-              throw error;
+              throw normalizeError(error);
             }
           }
 
@@ -1829,11 +1919,6 @@ const DEV_TOOLS: ToolDefinition[] = [
         maxSize: z.number().int().positive().optional(),
         outputPath: z.string().min(1).optional(),
       });
-
-      const isReadableStream = (value: unknown): value is Readable =>
-        typeof value === 'object' &&
-        value !== null &&
-        typeof (value as Readable).pipe === 'function';
 
       const toTempFilePath = (artifactName: string): string => {
         const base = basename(artifactName || 'artifact');

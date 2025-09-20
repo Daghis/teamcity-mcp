@@ -50,8 +50,8 @@ This document lists all Model Context Protocol (MCP) tools exposed by the TeamCi
   - Mode: full
 - `get_build_status` — Build status with optional queue context
   - Args: `buildId: string`, `includeTests?: boolean`, `includeProblems?: boolean`, `includeQueueTotals?: boolean` (adds totalQueued; extra call when queued), `includeQueueReason?: boolean` (adds waitReason; extra call when queued)
-- `fetch_build_log` — Build log by lines (pagination/tail)
-  - Args: `buildId?: string`, `buildNumber?: string|number` (with optional `buildTypeId` to disambiguate), `buildTypeId?: string`, `page?: number`, `pageSize?: number`, `startLine?: number`, `lineCount?: number`, `tail?: boolean`
+- `fetch_build_log` — Build log by lines (pagination/tail or stream-to-file)
+  - Args: `buildId?: string`, `buildNumber?: string|number` (with optional `buildTypeId` to disambiguate), `buildTypeId?: string`, `page?: number`, `pageSize?: number`, `startLine?: number`, `lineCount?: number`, `tail?: boolean`, `encoding?: 'text'|'stream'` (default `'text'`), `outputPath?: string` (required when `encoding === 'stream'` if you need a specific destination)
 - `get_build_results` — Rich results (tests, artifacts, stats, changes, deps)
   - Args: `buildId: string`, `includeArtifacts?: boolean`, `includeStatistics?: boolean`, `includeChanges?: boolean`, `includeDependencies?: boolean`, `artifactFilter?: string`, `maxArtifactSize?: number`
 - `download_build_artifact` — Download a single artifact (base64/text or stream-to-file)
