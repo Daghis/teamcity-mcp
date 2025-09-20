@@ -6,7 +6,7 @@ import type {
   BuildRef,
   TriggerBuildResult,
 } from '../types/tool-results';
-import { callTool } from './lib/mcp-runner';
+import { callTool, callToolsBatch } from './lib/mcp-runner';
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
@@ -30,32 +30,56 @@ describe('Build results and logs: full writes + dev reads', () => {
       expect(true).toBe(true);
     }
   });
-  it('creates project and build config (full)', async () => {
+  it('creates project, build config, and step (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const cproj = await callTool<ActionResult>('full', 'create_project', {
-      id: PROJECT_ID,
-      name: PROJECT_NAME,
-    });
+    const batch = await callToolsBatch('full', [
+      {
+        tool: 'create_project',
+        args: {
+          id: PROJECT_ID,
+          name: PROJECT_NAME,
+        },
+      },
+      {
+        tool: 'create_build_config',
+        args: {
+          projectId: PROJECT_ID,
+          id: BT_ID,
+          name: BT_NAME,
+          description: 'Build results/logs scenario',
+        },
+      },
+      {
+        tool: 'manage_build_steps',
+        args: {
+          buildTypeId: BT_ID,
+          action: 'add',
+          name: 'log-output',
+          type: 'simpleRunner',
+          properties: { 'script.content': 'echo "line1" && echo "line2" && echo "line3"' },
+        },
+      },
+    ]);
+
+    expect(batch.results).toHaveLength(3);
+    expect(batch.completed).toBe(true);
+    const [projectStep, configStep, stepStep] = batch.results;
+    const cproj = projectStep?.result as ActionResult | undefined;
+    const cbt = configStep?.result as ActionResult | undefined;
+    const step = stepStep?.result as ActionResult | undefined;
+
+    expect(projectStep?.ok).toBe(true);
     expect(cproj).toMatchObject({ success: true, action: 'create_project' });
-    const cbt = await callTool<ActionResult>('full', 'create_build_config', {
-      projectId: PROJECT_ID,
-      id: BT_ID,
-      name: BT_NAME,
-      description: 'Build results/logs scenario',
-    });
+
+    expect(configStep?.ok).toBe(true);
     expect(cbt).toMatchObject({ success: true, action: 'create_build_config' });
+
+    expect(stepStep?.ok).toBe(true);
+    expect(step).toMatchObject({ success: true, action: 'add_build_step' });
   }, 60000);
 
-  it('adds a step and triggers a build (full add, dev trigger)', async () => {
+  it('triggers a build (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const step = await callTool('full', 'manage_build_steps', {
-      buildTypeId: BT_ID,
-      action: 'add',
-      name: 'log-output',
-      type: 'simpleRunner',
-      properties: { 'script.content': 'echo "line1" && echo "line2" && echo "line3"' },
-    });
-    expect(step).toMatchObject({ success: true, action: 'add_build_step' });
     const trig = await callTool<TriggerBuildResult>('dev', 'trigger_build', {
       buildTypeId: BT_ID,
       comment: 'e2e-results',

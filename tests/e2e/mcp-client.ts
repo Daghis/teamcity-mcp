@@ -12,6 +12,26 @@ export interface MCPClientOptions {
   env?: NodeJS.ProcessEnv;
 }
 
+export interface ToolCallDefinition {
+  tool: string;
+  args?: Record<string, unknown>;
+}
+
+export interface ToolCallStepResult {
+  index: number;
+  tool: string;
+  args: Record<string, unknown>;
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+}
+
+export interface ToolCallBatchResult {
+  results: ToolCallStepResult[];
+  completed: boolean;
+  failureIndex?: number;
+}
+
 export class MCPTestClient {
   private client: Client;
   private transport: StdioClientTransport;
@@ -63,11 +83,52 @@ export class MCPTestClient {
     return {} as T;
   }
 
+  async callToolsBatch(steps: ToolCallDefinition[]): Promise<ToolCallBatchResult> {
+    const results: ToolCallStepResult[] = [];
+    let failureIndex: number | undefined;
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i]!;
+      const args = step.args ?? {};
+      try {
+        const result = await this.callTool(step.tool, args);
+        const ok = this.isSuccessfulResult(result);
+        results.push({ index: i, tool: step.tool, args, ok, result });
+        if (!ok) {
+          failureIndex = i;
+          break;
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        results.push({ index: i, tool: step.tool, args, ok: false, error: message });
+        failureIndex = i;
+        break;
+      }
+    }
+
+    return {
+      results,
+      completed: failureIndex === undefined && results.length === steps.length,
+      failureIndex,
+    };
+  }
+
   async close(): Promise<void> {
     await this.transport.close();
   }
 
   getMode(): Mode {
     return this.mode;
+  }
+
+  private isSuccessfulResult(result: unknown): boolean {
+    if (
+      typeof result === 'object' &&
+      result !== null &&
+      'success' in (result as Record<string, unknown>)
+    ) {
+      return Boolean((result as { success?: unknown }).success);
+    }
+    return true;
   }
 }

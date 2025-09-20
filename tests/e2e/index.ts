@@ -1,11 +1,12 @@
 #!/usr/bin/env node
+import type { ToolCallDefinition } from './mcp-client';
 import { MCPTestClient } from './mcp-client';
 
 type Mode = 'dev' | 'full' | 'both';
 
 interface CLIArgs {
   mode: Mode;
-  cmd: 'smoke' | 'tools' | 'call';
+  cmd: 'smoke' | 'tools' | 'call' | 'batch';
   tool?: string;
   json?: string;
 }
@@ -22,7 +23,7 @@ function parseArgs(argv: string[]): CLIArgs {
     if (a === '--mode' && i + 1 < args.length) {
       const m = args[++i] as Mode;
       mode = m;
-    } else if (a === 'smoke' || a === 'tools' || a === 'call') {
+    } else if (a === 'smoke' || a === 'tools' || a === 'call' || a === 'batch') {
       cmd = a;
     } else if (!tool) {
       tool = a;
@@ -58,6 +59,60 @@ async function runCall(mode: Exclude<Mode, 'both'>, tool: string, json?: string)
     console.log(JSON.stringify({ mode, tool, args, res }));
   } catch (e) {
     console.error(JSON.stringify({ mode, tool, args, error: String(e) }, null, 2));
+    throw e;
+  } finally {
+    await client.close();
+  }
+}
+
+async function runBatch(mode: Exclude<Mode, 'both'>, payload?: string): Promise<void> {
+  if (!payload) {
+    console.error(
+      'Usage: e2e batch "[ { \"tool\": \"name\", \"args\": {...} } ]" [--mode dev|full]'
+    );
+    process.exit(2);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload) as unknown;
+  } catch (e) {
+    console.error('Invalid JSON array for batch payload:', e);
+    process.exit(2);
+  }
+
+  if (!Array.isArray(parsed)) {
+    console.error('Batch payload must be a JSON array of tool call definitions.');
+    process.exit(2);
+  }
+
+  const steps: ToolCallDefinition[] = parsed.map((step, index) => {
+    if (!step || typeof step !== 'object') {
+      console.error(`Invalid step at index ${index}: expected object.`);
+      process.exit(2);
+    }
+    const { tool, args } = step as { tool?: unknown; args?: unknown };
+    if (typeof tool !== 'string' || tool.length === 0) {
+      console.error(`Invalid step at index ${index}: missing tool name.`);
+      process.exit(2);
+    }
+    if (args !== undefined && (typeof args !== 'object' || args === null || Array.isArray(args))) {
+      console.error(`Invalid step at index ${index}: args must be an object if provided.`);
+      process.exit(2);
+    }
+    return {
+      tool,
+      args: (args as Record<string, unknown>) ?? {},
+    } satisfies ToolCallDefinition;
+  });
+
+  const client = new MCPTestClient({ mode });
+  await client.connect();
+  try {
+    const result = await client.callToolsBatch(steps);
+    console.log(JSON.stringify({ mode, ...result }));
+  } catch (e) {
+    console.error(JSON.stringify({ mode, error: String(e) }));
     throw e;
   } finally {
     await client.close();
@@ -148,6 +203,9 @@ async function main(): Promise<void> {
         process.exit(2);
       }
       return runCall(m, tool, json);
+    }
+    if (cmd === 'batch') {
+      return runBatch(m, tool);
     }
     return runSmoke(m);
   };
