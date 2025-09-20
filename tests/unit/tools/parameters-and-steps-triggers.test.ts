@@ -123,6 +123,12 @@ describe('tools: parameters, steps, triggers', () => {
                   { name: 'b', value: '2' },
                 ]),
               },
+            }),
+            expect.objectContaining({
+              headers: expect.objectContaining({
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              }),
             })
           );
 
@@ -147,6 +153,12 @@ describe('tools: parameters, steps, triggers', () => {
                   { name: 'script.type', value: 'customScript' },
                 ]),
               },
+            }),
+            expect.objectContaining({
+              headers: expect.objectContaining({
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              }),
             })
           );
 
@@ -161,6 +173,83 @@ describe('tools: parameters, steps, triggers', () => {
             action: 'delete_build_step',
             buildTypeId: 'bt',
             stepId: 'S1',
+          });
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('manage_build_steps surfaces TeamCity errors with context', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const { TeamCityAPIError } = await import('@/teamcity/errors');
+          const replaceBuildStep = jest
+            .fn()
+            .mockRejectedValue(new TeamCityAPIError('Bad payload', 'VALIDATION_ERROR', 400));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                buildTypes: {
+                  addBuildStepToBuildType: jest.fn(),
+                  replaceBuildStep,
+                  deleteBuildStep: jest.fn(),
+                },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('manage_build_steps').handler({
+            buildTypeId: 'bt',
+            action: 'update',
+            stepId: 'S9',
+            properties: { 'script.content': 'echo hi' },
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: false,
+            error: {
+              code: 'TEAMCITY_ERROR',
+              message: 'Bad payload',
+            },
+          });
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('manage_build_steps validates required identifiers', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                buildTypes: {
+                  addBuildStepToBuildType: jest.fn(),
+                  replaceBuildStep: jest.fn(),
+                  deleteBuildStep: jest.fn(),
+                },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('manage_build_steps').handler({
+            buildTypeId: 'bt',
+            action: 'update',
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+            },
           });
           resolve();
         })().catch(reject);
