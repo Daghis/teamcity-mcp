@@ -167,6 +167,16 @@ describe('BuildStepManager', () => {
         })
       ).rejects.toThrow(PermissionDeniedError);
     });
+
+    it('throws when TeamCity returns a malformed step list', async () => {
+      http.get.mockResolvedValue({ data: { step: 'invalid' } });
+
+      await expect(
+        manager.listBuildSteps({
+          configId: 'MyProject_Build',
+        })
+      ).rejects.toThrow(TeamCityAPIError);
+    });
   });
 
   describe('createBuildStep', () => {
@@ -218,6 +228,19 @@ describe('BuildStepManager', () => {
       });
 
       expect(result.success).toBe(true);
+    });
+
+    it('throws when TeamCity returns a malformed step payload', async () => {
+      http.post.mockResolvedValue({ data: { name: 'Deploy' } });
+
+      await expect(
+        manager.createBuildStep({
+          configId: 'MyProject_Build',
+          name: 'Deploy',
+          type: 'simpleRunner',
+          properties: { 'script.content': 'echo ok' },
+        })
+      ).rejects.toThrow(TeamCityAPIError);
     });
 
     it('should validate required parameters for runner type', async () => {

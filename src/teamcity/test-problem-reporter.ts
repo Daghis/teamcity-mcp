@@ -5,6 +5,7 @@
 import { error } from '@/utils';
 
 import type { TeamCityClientAdapter } from './client-adapter';
+import { TeamCityAPIError } from './errors';
 import { toBuildLocator } from './utils/build-locator';
 
 /**
@@ -79,6 +80,10 @@ export interface SummaryOptions {
 export class TestProblemReporter {
   constructor(private readonly client: TeamCityClientAdapter) {}
 
+  private readonly isRecord = (value: unknown): value is Record<string, unknown> => {
+    return typeof value === 'object' && value !== null;
+  };
+
   /**
    * Get test statistics for a build
    */
@@ -87,23 +92,17 @@ export class TestProblemReporter {
       toBuildLocator(buildId),
       'testOccurrences(count,passed,failed,ignored,muted,newFailed)'
     );
-    const build = response.data;
+    const build = this.ensureTestStatisticsPayload(response.data, buildId);
+    const testOccurrences = this.ensureTestOccurrences(build.testOccurrences, buildId);
 
-    const testOccurrences = build?.testOccurrences ?? {
-      count: 0,
-      passed: 0,
-      failed: 0,
-      ignored: 0,
-      muted: 0,
-      newFailed: 0,
-    };
-
-    const totalTests = testOccurrences.count ?? 0;
-    const passedTests = testOccurrences.passed ?? 0;
-    const failedTests = testOccurrences.failed ?? 0;
-    const ignoredTests = testOccurrences.ignored ?? 0;
-    const mutedTests = testOccurrences.muted ?? 0;
-    const newFailedTests = testOccurrences.newFailed ?? 0;
+    const {
+      count: totalTests,
+      passed: passedTests,
+      failed: failedTests,
+      ignored: ignoredTests,
+      muted: mutedTests,
+      newFailed: newFailedTests,
+    } = testOccurrences;
 
     // Calculate success rate
     let successRate = 100;
@@ -133,42 +132,18 @@ export class TestProblemReporter {
       }
       const locator = locatorParts.join(',');
       const response = await this.client.modules.tests.getAllTestOccurrences(locator);
-      const data = response.data as {
-        testOccurrence?: Array<{
-          status: string;
-          id: string;
-          name: string;
-          test?: { className: string };
-          duration: number;
-          details: string;
-        }>;
-      };
+      const occurrences = this.ensureFailedTestsResponse(response.data, buildId, locator);
 
-      if (data.testOccurrence == null || !Array.isArray(data.testOccurrence)) {
-        return [];
-      }
-
-      // Filter only FAILURE status tests (in case API returns other statuses)
-      return data.testOccurrence
-        .filter((test: unknown) => (test as { status: string }).status === 'FAILURE')
-        .map((test: unknown) => {
-          const testObj = test as {
-            id: string;
-            name: string;
-            test?: { className: string };
-            status: string;
-            duration: number;
-            details: string;
-          };
-          return {
-            id: testObj.id,
-            name: testObj.name,
-            className: testObj.test?.className,
-            status: 'FAILURE',
-            duration: testObj.duration,
-            details: testObj.details,
-          };
-        });
+      return occurrences
+        .filter((test) => test.status === 'FAILURE')
+        .map((test) => ({
+          id: test.id,
+          name: test.name,
+          className: test.test?.className,
+          status: 'FAILURE' as const,
+          duration: test.duration,
+          details: test.details,
+        }));
     } catch (err) {
       error('Failed to get failed tests', err as Error, { buildId });
       return [];
@@ -186,39 +161,18 @@ export class TestProblemReporter {
       const response = await this.client.modules.problemOccurrences.getAllBuildProblemOccurrences(
         `build:(id:${buildId})`
       );
-      const data = response.data as {
-        problemOccurrence?: Array<{
-          id: string;
-          type: string;
-          identity: string;
-          details: string;
-          additionalData: string;
-        }>;
-      };
+      const occurrences = this.ensureProblemOccurrencesResponse(response.data, buildId);
 
-      if (data.problemOccurrence == null || !Array.isArray(data.problemOccurrence)) {
-        return categorize ? { all: [], categorized: {} } : [];
-      }
-
-      const problems: BuildProblem[] = data.problemOccurrence.map((problem: unknown) => {
-        const problemObj = problem as {
-          id: string;
-          type: string;
-          identity: string;
-          details: string;
-          additionalData?: Record<string, string> | string;
-        };
-        return {
-          id: problemObj.id,
-          type: problemObj.type,
-          identity: problemObj.identity,
-          details: problemObj.details,
-          additionalData:
-            typeof problemObj.additionalData === 'object' && problemObj.additionalData !== null
-              ? problemObj.additionalData
-              : {},
-        };
-      });
+      const problems: BuildProblem[] = occurrences.map((problem) => ({
+        id: problem.id,
+        type: problem.type,
+        identity: problem.identity,
+        details: problem.details,
+        additionalData:
+          typeof problem.additionalData === 'object' && problem.additionalData !== null
+            ? (problem.additionalData as Record<string, string>)
+            : {},
+      }));
 
       if (!categorize) {
         return problems;
@@ -240,6 +194,319 @@ export class TestProblemReporter {
       error('Failed to get build problems', err as Error, { buildId });
       return categorize ? { all: [], categorized: {} } : [];
     }
+  }
+
+  private ensureTestStatisticsPayload(
+    data: unknown,
+    buildId: string
+  ): Record<string, unknown> & { testOccurrences?: unknown } {
+    if (!this.isRecord(data)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned invalid test statistics payload',
+        'INVALID_RESPONSE',
+        undefined,
+        {
+          buildId,
+        }
+      );
+    }
+    return data as Record<string, unknown> & { testOccurrences?: unknown };
+  }
+
+  private ensureTestOccurrences(
+    occurrences: unknown,
+    buildId: string
+  ): {
+    count: number;
+    passed: number;
+    failed: number;
+    ignored: number;
+    muted: number;
+    newFailed: number;
+  } {
+    if (occurrences == null) {
+      return {
+        count: 0,
+        passed: 0,
+        failed: 0,
+        ignored: 0,
+        muted: 0,
+        newFailed: 0,
+      };
+    }
+
+    if (!this.isRecord(occurrences)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned malformed test occurrences payload',
+        'INVALID_RESPONSE',
+        undefined,
+        {
+          buildId,
+        }
+      );
+    }
+
+    const { count, passed, failed, ignored, muted, newFailed } = occurrences as Record<
+      string,
+      unknown
+    >;
+
+    return {
+      count: this.coerceCountField(count, 'count', buildId),
+      passed: this.coerceCountField(passed, 'passed', buildId),
+      failed: this.coerceCountField(failed, 'failed', buildId),
+      ignored: this.coerceCountField(ignored, 'ignored', buildId),
+      muted: this.coerceCountField(muted, 'muted', buildId),
+      newFailed: this.coerceCountField(newFailed, 'newFailed', buildId),
+    };
+  }
+
+  private coerceCountField(value: unknown, field: string, buildId: string): number {
+    if (value === undefined) {
+      return 0;
+    }
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = Number.parseInt(value, 10);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+
+    throw new TeamCityAPIError(
+      'TeamCity test statistics field is not numeric',
+      'INVALID_RESPONSE',
+      undefined,
+      {
+        buildId,
+        field,
+        receivedType: typeof value,
+      }
+    );
+  }
+
+  private ensureFailedTestsResponse(
+    data: unknown,
+    buildId: string,
+    locator: string
+  ): Array<{
+    status: string;
+    id: string;
+    name: string;
+    test?: { className?: string };
+    duration?: number;
+    details?: string;
+  }> {
+    if (!this.isRecord(data)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned invalid failed tests payload',
+        'INVALID_RESPONSE',
+        undefined,
+        {
+          buildId,
+          locator,
+        }
+      );
+    }
+
+    const { testOccurrence } = data as { testOccurrence?: unknown };
+
+    if (testOccurrence === undefined) {
+      return [];
+    }
+
+    if (!Array.isArray(testOccurrence)) {
+      throw new TeamCityAPIError(
+        'TeamCity failed tests payload is not an array',
+        'INVALID_RESPONSE',
+        undefined,
+        {
+          buildId,
+          locator,
+        }
+      );
+    }
+
+    return testOccurrence.map((entry, index) => {
+      if (!this.isRecord(entry)) {
+        throw new TeamCityAPIError(
+          'TeamCity failed test entry is not an object',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            buildId,
+            locator,
+            index,
+          }
+        );
+      }
+
+      const { status, id, name, test, duration, details } = entry as Record<string, unknown>;
+
+      if (typeof status !== 'string' || typeof id !== 'string' || typeof name !== 'string') {
+        throw new TeamCityAPIError(
+          'TeamCity failed test entry is missing required fields',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            buildId,
+            locator,
+            index,
+            receivedKeys: Object.keys(entry),
+          }
+        );
+      }
+
+      if (test !== undefined && test !== null && !this.isRecord(test)) {
+        throw new TeamCityAPIError(
+          'TeamCity failed test entry has invalid test metadata',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            buildId,
+            locator,
+            index,
+          }
+        );
+      }
+
+      if (duration !== undefined && typeof duration !== 'number') {
+        throw new TeamCityAPIError(
+          'TeamCity failed test entry has non-numeric duration',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            buildId,
+            locator,
+            index,
+            receivedType: typeof duration,
+          }
+        );
+      }
+
+      if (details !== undefined && typeof details !== 'string') {
+        throw new TeamCityAPIError(
+          'TeamCity failed test entry has non-string details',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            buildId,
+            locator,
+            index,
+            receivedType: typeof details,
+          }
+        );
+      }
+
+      return {
+        status,
+        id,
+        name,
+        test: test as { className?: string } | undefined,
+        duration: duration as number | undefined,
+        details: details as string | undefined,
+      };
+    });
+  }
+
+  private ensureProblemOccurrencesResponse(
+    data: unknown,
+    buildId: string
+  ): Array<{
+    id: string;
+    type: string;
+    identity: string;
+    details: string;
+    additionalData?: Record<string, string> | string;
+  }> {
+    if (!this.isRecord(data)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned invalid problem occurrences payload',
+        'INVALID_RESPONSE',
+        undefined,
+        {
+          buildId,
+        }
+      );
+    }
+
+    const { problemOccurrence } = data as { problemOccurrence?: unknown };
+
+    if (problemOccurrence === undefined) {
+      return [];
+    }
+
+    if (!Array.isArray(problemOccurrence)) {
+      throw new TeamCityAPIError(
+        'TeamCity problem occurrences payload is not an array',
+        'INVALID_RESPONSE',
+        undefined,
+        {
+          buildId,
+        }
+      );
+    }
+
+    return problemOccurrence.map((entry, index) => {
+      if (!this.isRecord(entry)) {
+        throw new TeamCityAPIError(
+          'TeamCity problem occurrence entry is not an object',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            buildId,
+            index,
+          }
+        );
+      }
+
+      const { id, type, identity, details, additionalData } = entry as Record<string, unknown>;
+
+      if (
+        typeof id !== 'string' ||
+        typeof type !== 'string' ||
+        typeof identity !== 'string' ||
+        typeof details !== 'string'
+      ) {
+        throw new TeamCityAPIError(
+          'TeamCity problem occurrence entry is missing required fields',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            buildId,
+            index,
+            receivedKeys: Object.keys(entry),
+          }
+        );
+      }
+
+      if (
+        additionalData !== undefined &&
+        additionalData !== null &&
+        typeof additionalData !== 'string' &&
+        !this.isRecord(additionalData)
+      ) {
+        throw new TeamCityAPIError(
+          'TeamCity problem occurrence entry has invalid additionalData',
+          'INVALID_RESPONSE',
+          undefined,
+          {
+            buildId,
+            index,
+          }
+        );
+      }
+
+      return {
+        id,
+        type,
+        identity,
+        details,
+        additionalData: additionalData as Record<string, string> | string | undefined,
+      };
+    });
   }
 
   /**

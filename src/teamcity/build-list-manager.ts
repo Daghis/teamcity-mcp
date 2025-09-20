@@ -4,6 +4,7 @@
 import { errorLogger } from '@/utils/error-logger';
 
 import { BuildQueryBuilder, type BuildStatus } from './build-query-builder';
+import { TeamCityAPIError } from './errors';
 import type { TeamCityUnifiedClient } from './types/client';
 
 export interface BuildListParams {
@@ -55,6 +56,16 @@ interface CacheEntry {
   timestamp: number;
 }
 
+interface TeamCityBuildListResponse {
+  build: unknown[];
+  nextHref?: unknown;
+  count?: unknown;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
 export class BuildListManager {
   private client: TeamCityUnifiedClient;
   private cache: Map<string, CacheEntry> = new Map();
@@ -83,18 +94,19 @@ export class BuildListManager {
       }
     }
 
-    try {
-      // Build locator string
-      const locator = this.buildLocator(params);
+    const locator = this.buildLocator(params);
 
+    try {
       // Fetch builds from API
       const response = await this.client.modules.builds.getMultipleBuilds(
         locator,
         BuildListManager.fields
       );
 
+      const payload = this.ensureBuildListResponse(response.data, locator);
+
       // Parse response
-      const builds = this.parseBuilds(response.data);
+      const builds = this.parseBuilds(payload.build, locator);
 
       // Get total count if requested
       let totalCount: number | undefined;
@@ -109,7 +121,7 @@ export class BuildListManager {
           count: builds.length,
           offset: params.offset ?? 0,
           limit: params.limit ?? BuildListManager.defaultLimit,
-          hasMore: this.hasMoreResults(response.data),
+          hasMore: this.hasMoreResults(payload.nextHref),
           totalCount,
         },
       };
@@ -119,6 +131,9 @@ export class BuildListManager {
 
       return result;
     } catch (error: unknown) {
+      if (error instanceof TeamCityAPIError) {
+        throw error;
+      }
       // Enhance error messages
       const errorMessage = error instanceof Error ? error.message : '';
       if (errorMessage.includes('Invalid date format')) {
@@ -128,7 +143,14 @@ export class BuildListManager {
         throw error;
       }
       const finalMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to fetch builds: ${finalMessage}`);
+      throw new TeamCityAPIError(
+        `Failed to fetch builds: ${finalMessage}`,
+        'BUILD_LIST_ERROR',
+        undefined,
+        {
+          locator,
+        }
+      );
     }
   }
 
@@ -170,48 +192,95 @@ export class BuildListManager {
   /**
    * Parse builds from API response
    */
-  private parseBuilds(data: unknown): BuildInfo[] {
-    const dataObj = data as { build?: unknown[] } | null;
-    if (dataObj?.build == null || !Array.isArray(dataObj.build)) {
-      return [];
-    }
+  private parseBuilds(builds: unknown[], locator: string): BuildInfo[] {
+    return builds.map((build, index) => {
+      if (!isRecord(build)) {
+        throw new TeamCityAPIError(
+          'TeamCity returned a non-object build entry',
+          'INVALID_RESPONSE',
+          undefined,
+          { locator, index }
+        );
+      }
 
-    return dataObj.build.map((build: unknown) => {
-      const buildObj = build as {
-        id: string | number;
-        buildTypeId: string;
-        number: string;
-        status: string;
-        state: string;
-        branchName?: string;
-        startDate?: string;
-        finishDate?: string;
-        queuedDate?: string;
-        statusText?: string;
-        webUrl: string;
-      };
+      const {
+        id,
+        buildTypeId,
+        number,
+        status,
+        state,
+        branchName,
+        startDate,
+        finishDate,
+        queuedDate,
+        statusText,
+        webUrl,
+      } = build as Record<string, unknown>;
+
+      if (
+        (typeof id !== 'number' && typeof id !== 'string') ||
+        typeof buildTypeId !== 'string' ||
+        typeof number !== 'string' ||
+        typeof status !== 'string' ||
+        typeof state !== 'string' ||
+        typeof webUrl !== 'string'
+      ) {
+        throw new TeamCityAPIError(
+          'TeamCity build entry is missing required fields',
+          'INVALID_RESPONSE',
+          undefined,
+          { locator, index, receivedKeys: Object.keys(build) }
+        );
+      }
+
       return {
-        id: typeof buildObj.id === 'string' ? parseInt(buildObj.id, 10) : buildObj.id,
-        buildTypeId: buildObj.buildTypeId,
-        number: buildObj.number,
-        status: buildObj.status,
-        state: buildObj.state,
-        branchName: buildObj.branchName,
-        startDate: buildObj.startDate,
-        finishDate: buildObj.finishDate,
-        queuedDate: buildObj.queuedDate,
-        statusText: buildObj.statusText ?? '',
-        webUrl: buildObj.webUrl,
+        id: typeof id === 'string' ? parseInt(id, 10) : id,
+        buildTypeId,
+        number,
+        status,
+        state,
+        branchName: typeof branchName === 'string' ? branchName : undefined,
+        startDate: typeof startDate === 'string' ? startDate : undefined,
+        finishDate: typeof finishDate === 'string' ? finishDate : undefined,
+        queuedDate: typeof queuedDate === 'string' ? queuedDate : undefined,
+        statusText: typeof statusText === 'string' ? statusText : '',
+        webUrl,
       };
     });
+  }
+
+  private ensureBuildListResponse(data: unknown, locator: string): TeamCityBuildListResponse {
+    if (!isRecord(data)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned a non-object build list response',
+        'INVALID_RESPONSE',
+        undefined,
+        { locator, receivedType: typeof data }
+      );
+    }
+
+    const record = data as Record<string, unknown>;
+    const build = record['build'];
+    const nextHref = record['nextHref'];
+    const count = record['count'];
+
+    if (!Array.isArray(build)) {
+      throw new TeamCityAPIError(
+        'TeamCity build list response is missing a build array',
+        'INVALID_RESPONSE',
+        undefined,
+        { locator, expected: 'build[]', receivedKeys: Object.keys(data) }
+      );
+    }
+
+    return { build, nextHref, count } as TeamCityBuildListResponse;
   }
 
   /**
    * Check if there are more results available
    */
-  private hasMoreResults(data: unknown): boolean {
-    const dataObj = data as { nextHref?: string } | null;
-    return Boolean(dataObj?.nextHref);
+  private hasMoreResults(nextHref: unknown): boolean {
+    return typeof nextHref === 'string' && nextHref.length > 0;
   }
 
   /**
@@ -230,8 +299,7 @@ export class BuildListManager {
         'count'
       );
 
-      const total = response.data?.count;
-      return typeof total === 'number' ? total : Number.parseInt(String(total ?? 0), 10);
+      return this.extractCount(response.data, countLocator || '<none>');
     } catch (error: unknown) {
       // Total count is optional, don't fail the main request
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -241,6 +309,43 @@ export class BuildListManager {
       });
       return 0;
     }
+  }
+
+  private extractCount(data: unknown, locator: string): number {
+    if (!isRecord(data)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned a non-object count response',
+        'INVALID_RESPONSE',
+        undefined,
+        { locator, expected: 'object with count:number', receivedType: typeof data }
+      );
+    }
+
+    const { count } = data as { count?: unknown };
+
+    if (count === undefined) {
+      throw new TeamCityAPIError(
+        'TeamCity count response is missing the count field',
+        'INVALID_RESPONSE',
+        undefined,
+        { locator, expected: 'count:number' }
+      );
+    }
+
+    if (typeof count === 'number') {
+      return count;
+    }
+
+    if (typeof count === 'string' && count.trim() !== '' && Number.isFinite(Number(count))) {
+      return Number.parseInt(count, 10);
+    }
+
+    throw new TeamCityAPIError(
+      'TeamCity count response contains a non-numeric count value',
+      'INVALID_RESPONSE',
+      undefined,
+      { locator, receivedType: typeof count }
+    );
   }
 
   /**
