@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { Readable } from 'node:stream';
 
 // Mock config to keep tools in dev mode without reading env
@@ -208,6 +208,94 @@ describe('tools: download_build_artifacts', () => {
     expect(second.encoding).toBe('stream');
     expect(first.outputPath.startsWith(tempRoot)).toBe(true);
     expect(second.outputPath.startsWith(tempRoot)).toBe(true);
+
+    const firstContent = await fs.readFile(first.outputPath, 'utf8');
+    const secondContent = await fs.readFile(second.outputPath, 'utf8');
+    expect(firstContent).toBe(firstChunks.join(''));
+    expect(secondContent).toBe(secondChunks.join(''));
+
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  });
+
+  it('sanitizes unsafe artifact paths when streaming to an output directory', async () => {
+    const firstChunks = ['alpha'];
+    const secondChunks = ['omega'];
+    const downloadArtifact = jest
+      .fn()
+      .mockResolvedValueOnce({
+        name: '../secrets.env',
+        path: '../secrets.env',
+        size: 5,
+        content: Readable.from(firstChunks),
+        mimeType: 'text/plain',
+      })
+      .mockResolvedValueOnce({
+        name: '/absolute.log',
+        path: '/absolute.log',
+        size: 5,
+        content: Readable.from(secondChunks),
+        mimeType: 'text/plain',
+      });
+
+    const ArtifactManager = jest.fn().mockImplementation(() => ({ downloadArtifact }));
+    const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue({});
+    const getInstance = jest.fn().mockReturnValue({});
+
+    jest.doMock('@/teamcity/artifact-manager', () => ({
+      ArtifactManager,
+    }));
+    jest.doMock('@/teamcity/client-adapter', () => ({ createAdapterFromTeamCityAPI }));
+    jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance } }));
+
+    const tempRoot = await mkdtemp(join(tmpdir(), 'artifact-sanitize-'));
+
+    let handler:
+      | ((args: unknown) => Promise<{ content?: Array<{ text?: string }>; success?: boolean }>)
+      | undefined;
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { getRequiredTool } = require('@/tools');
+      handler = getRequiredTool('download_build_artifacts').handler;
+    });
+
+    if (!handler) {
+      await fs.rm(tempRoot, { recursive: true, force: true });
+      throw new Error('download_build_artifacts handler not found');
+    }
+
+    const response = await handler({
+      buildId: '789',
+      artifactPaths: ['../secrets.env', '/absolute.log'],
+      encoding: 'stream',
+      outputDir: tempRoot,
+    });
+
+    const payload = JSON.parse(response.content?.[0]?.text ?? '{}');
+    const artifacts = payload.artifacts as Array<{
+      path?: string;
+      outputPath?: string;
+      encoding?: string;
+      success?: boolean;
+    }>;
+
+    const [first, second] = artifacts ?? [];
+
+    if (!first || !second || !first.outputPath || !second.outputPath) {
+      await fs.rm(tempRoot, { recursive: true, force: true });
+      throw new Error('Expected sanitized streamed artifacts with output paths');
+    }
+
+    expect(first.success).toBe(true);
+    expect(second.success).toBe(true);
+    expect(first.encoding).toBe('stream');
+    expect(second.encoding).toBe('stream');
+
+    const firstRelative = relative(tempRoot, first.outputPath);
+    const secondRelative = relative(tempRoot, second.outputPath);
+    expect(firstRelative.startsWith('..')).toBe(false);
+    expect(secondRelative.startsWith('..')).toBe(false);
+    expect(firstRelative.includes('..')).toBe(false);
+    expect(secondRelative.includes('..')).toBe(false);
 
     const firstContent = await fs.readFile(first.outputPath, 'utf8');
     const secondContent = await fs.readFile(second.outputPath, 'utf8');

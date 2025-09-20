@@ -5,7 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import { createWriteStream, promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, extname, isAbsolute, join } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
@@ -114,12 +114,14 @@ const ensureUniquePath = async (candidate: string): Promise<string> => {
   const probe = async (attempt: number): Promise<string> => {
     const next = attempt === 0 ? candidate : `${stem}-${attempt}${ext}`;
     try {
-      await fs.access(next);
-      return probe(attempt + 1);
+      // Reserve the path atomically so subsequent writers do not win the race
+      const handle = await fs.open(next, 'wx');
+      await handle.close();
+      return next;
     } catch (error) {
       const err = error as NodeJS.ErrnoException | undefined;
-      if (err?.code === 'ENOENT') {
-        return next;
+      if (err?.code === 'EEXIST') {
+        return probe(attempt + 1);
       }
       throw error;
     }
@@ -142,7 +144,12 @@ const resolveStreamOutputPath = async (
     const segments = sanitizePathSegments(artifact.path, artifact.name);
     const parts = segments.slice(0, -1);
     const fileName = segments[segments.length - 1] ?? sanitizeFileName(artifact.name).sanitizedBase;
-    const candidate = join(options.outputDir, ...parts, fileName);
+    const baseDir = resolve(options.outputDir);
+    const candidate = resolve(baseDir, ...parts, fileName);
+    const relativePath = relative(baseDir, candidate);
+    if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+      throw new Error('Resolved artifact path escapes the configured output directory');
+    }
     await fs.mkdir(dirname(candidate), { recursive: true });
     return ensureUniquePath(candidate);
   }
