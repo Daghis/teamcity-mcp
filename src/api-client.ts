@@ -2,7 +2,7 @@
  * Simple TeamCity API Client
  * Direct API wrapper without dependency injection or complex abstractions
  */
-import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
+import axios, { type AxiosInstance, type AxiosResponse, type RawAxiosRequestConfig } from 'axios';
 import axiosRetry from 'axios-retry';
 
 import { getTeamCityToken, getTeamCityUrl } from '@/config';
@@ -426,19 +426,24 @@ export class TeamCityAPI {
     );
   }
 
-  async downloadBuildArtifact(
+  async downloadBuildArtifact<T = ArrayBuffer>(
     buildId: string,
-    artifactPath: string
-  ): Promise<AxiosResponse<ArrayBuffer>> {
+    artifactPath: string,
+    options?: RawAxiosRequestConfig
+  ): Promise<AxiosResponse<T>> {
     const normalizedPath = artifactPath
       .split('/')
       .map((segment) => encodeURIComponent(segment))
       .join('/');
-    return this.axiosInstance.get(
+    const requestOptions = {
+      ...(options ?? {}),
+      responseType: (options?.responseType ??
+        'arraybuffer') as RawAxiosRequestConfig['responseType'],
+    } as RawAxiosRequestConfig<T>;
+
+    return this.axiosInstance.get<T>(
       `/app/rest/builds/id:${buildId}/artifacts/content/${normalizedPath}`,
-      {
-        responseType: 'arraybuffer',
-      }
+      requestOptions
     );
   }
 

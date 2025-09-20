@@ -1,6 +1,8 @@
 /**
  * ArtifactManager - Advanced artifact management for TeamCity builds
  */
+import type { Readable } from 'node:stream';
+
 import type { AxiosResponse } from 'axios';
 
 import type { TeamCityClientAdapter } from './client-adapter';
@@ -28,7 +30,7 @@ export interface ArtifactListOptions {
 }
 
 export interface ArtifactDownloadOptions {
-  encoding?: 'base64' | 'text' | 'buffer';
+  encoding?: 'base64' | 'text' | 'buffer' | 'stream';
   maxSize?: number;
 }
 
@@ -36,7 +38,7 @@ export interface ArtifactContent {
   name: string;
   path: string;
   size: number;
-  content?: string | Buffer;
+  content?: string | Buffer | Readable;
   mimeType?: string;
   error?: string;
 }
@@ -159,21 +161,21 @@ export class ArtifactManager {
     }
 
     try {
-      const responseType = options.encoding === 'text' ? 'text' : 'arraybuffer';
+      const encoding = options.encoding ?? 'buffer';
       const normalizedPath = artifact.path
         .split('/')
         .map((segment) => encodeURIComponent(segment))
         .join('/');
       const buildLocator = toBuildLocator(buildId);
-      const artifactPath = `content/${normalizedPath}`;
+      const artifactRequestPath = `content/${normalizedPath}`;
 
-      if (responseType === 'text') {
+      if (encoding === 'text') {
         const response = await this.client.modules.builds.downloadFileOfBuild(
-          artifactPath,
+          artifactRequestPath,
           buildLocator,
           undefined,
           undefined,
-          { responseType }
+          { responseType: 'text' }
         );
 
         const axiosResponse = response as AxiosResponse<unknown>;
@@ -195,19 +197,51 @@ export class ArtifactManager {
         };
       }
 
+      if (encoding === 'stream') {
+        const response = await this.client.modules.builds.downloadFileOfBuild(
+          artifactRequestPath,
+          buildLocator,
+          undefined,
+          undefined,
+          { responseType: 'stream' }
+        );
+
+        const axiosResponse = response as AxiosResponse<unknown>;
+        const stream = axiosResponse.data;
+
+        if (!this.isReadableStream(stream)) {
+          throw new Error(
+            'Artifact download returned a non-stream payload when stream was requested'
+          );
+        }
+
+        const mimeType =
+          typeof axiosResponse.headers?.['content-type'] === 'string'
+            ? axiosResponse.headers['content-type']
+            : undefined;
+
+        return {
+          name: artifact.name,
+          path: artifact.path,
+          size: artifact.size,
+          content: stream,
+          mimeType,
+        };
+      }
+
       const response = await this.client.modules.builds.downloadFileOfBuild(
-        artifactPath,
+        artifactRequestPath,
         buildLocator,
         undefined,
         undefined,
-        { responseType }
+        { responseType: 'arraybuffer' }
       );
 
       const axiosResponse = response as AxiosResponse<unknown>;
       const buffer = this.ensureBinaryBuffer(axiosResponse.data);
 
       let content: string | Buffer;
-      if (options.encoding === 'base64') {
+      if (encoding === 'base64') {
         content = buffer.toString('base64');
       } else {
         content = buffer;
@@ -237,6 +271,10 @@ export class ArtifactManager {
     artifactPaths: string[],
     options: ArtifactDownloadOptions = {}
   ): Promise<ArtifactContent[]> {
+    if (options.encoding === 'stream') {
+      throw new Error('Streaming downloads are only supported when requesting a single artifact');
+    }
+
     // Default to base64 encoding if not specified
     const downloadOptions = { encoding: 'base64' as const, ...options };
 
@@ -304,6 +342,15 @@ export class ArtifactManager {
     }
 
     throw new Error('Artifact download returned unexpected binary payload type');
+  }
+
+  private isReadableStream(value: unknown): value is Readable {
+    if (value == null || typeof value !== 'object') {
+      return false;
+    }
+
+    const candidate = value as Readable;
+    return typeof candidate.pipe === 'function';
   }
 
   /**

@@ -176,7 +176,12 @@ describe('createAdapterFromTeamCityAPI', () => {
     expect(listBuildArtifacts).toHaveBeenCalledWith('42', undefined);
 
     await adapter.downloadArtifactContent('42', 'foo.zip');
-    expect(downloadBuildArtifact).toHaveBeenCalledWith('42', 'foo.zip');
+    expect(downloadBuildArtifact).toHaveBeenCalledWith('42', 'foo.zip', undefined);
+
+    await adapter.downloadArtifactContent('42', 'foo.zip', { responseType: 'stream' });
+    expect(downloadBuildArtifact).toHaveBeenCalledWith('42', 'foo.zip', {
+      responseType: 'stream',
+    });
 
     await adapter.getBuildStatistics('42', 'data');
     expect(getBuildStatistics).toHaveBeenCalledWith('42', 'data');

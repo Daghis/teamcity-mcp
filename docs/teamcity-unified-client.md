@@ -90,6 +90,16 @@ When adding or updating a manager:
    payloads.
 5. Log recoverable failures with `warn`/`error` from `@/utils/logger`.
 
+### Artifact downloads
+
+- `ArtifactManager.downloadArtifact` now accepts `encoding: 'stream'` to return a Node
+  `Readable` without buffering the full payload. This is opt-in; the default path still
+  buffers responses as `Buffer`/`base64` to preserve existing behaviour.
+- Streaming is limited to single-artifact downloads. `downloadMultipleArtifacts` will throw when
+  `encoding: 'stream'` is requested so callers can fall back to sequential handling.
+- Consumers should document whether they expect buffered or streaming content when exposing the
+  option through new APIs or tools.
+
 ## Testing the Contract
 
 The `tests/test-utils/mock-teamcity-client.ts` helper provides a typed

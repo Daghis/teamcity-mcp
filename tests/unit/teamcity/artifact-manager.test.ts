@@ -1,6 +1,10 @@
 /**
  * Tests for ArtifactManager
  */
+import { Readable } from 'node:stream';
+
+import type { RawAxiosRequestConfig } from 'axios';
+
 import { ArtifactManager } from '@/teamcity/artifact-manager';
 
 import {
@@ -24,8 +28,14 @@ describe('ArtifactManager', () => {
     buildsApi.getFilesListOfBuild.mockImplementation((buildLocator: string) =>
       http.get(`/app/rest/builds/${buildLocator}/artifacts`)
     );
-    buildsApi.downloadFileOfBuild.mockImplementation((path: string, buildLocator: string) =>
-      http.get(`/app/rest/builds/${buildLocator}/artifacts/${path}`)
+    buildsApi.downloadFileOfBuild.mockImplementation(
+      (
+        path: string,
+        buildLocator: string,
+        _locatorFields?: unknown,
+        _options?: unknown,
+        config?: RawAxiosRequestConfig
+      ) => http.get(`/app/rest/builds/${buildLocator}/artifacts/${path}`, config)
     );
     mockClient.request.mockImplementation(async (fn) => fn({ axios: http, baseUrl: BASE_URL }));
     mockClient.getApiConfig.mockReturnValue({
@@ -311,6 +321,52 @@ describe('ArtifactManager', () => {
       expect(result.mimeType).toBe('image/png');
     });
 
+    it('should download artifact content as a stream when requested', async () => {
+      const stream = Readable.from(['chunk-1', 'chunk-2']);
+
+      http.get
+        .mockResolvedValueOnce({
+          data: {
+            file: [{ name: 'log.txt', fullName: 'logs/log.txt', size: 8 }],
+          },
+        })
+        .mockResolvedValueOnce({
+          data: stream,
+          headers: { 'content-type': 'text/plain' },
+        });
+
+      const result = await manager.downloadArtifact('12345', 'logs/log.txt', {
+        encoding: 'stream',
+      });
+
+      expect(result.content).toBe(stream);
+      expect(result.mimeType).toBe('text/plain');
+      expect(result.size).toBe(8);
+
+      expect(http.get).toHaveBeenLastCalledWith(
+        '/app/rest/builds/id:12345/artifacts/content/logs/log.txt',
+        expect.objectContaining({ responseType: 'stream' })
+      );
+    });
+
+    it('throws when stream downloads return non-stream payloads', async () => {
+      http.get
+        .mockResolvedValueOnce({
+          data: {
+            file: [{ name: 'log.txt', fullName: 'logs/log.txt', size: 8 }],
+          },
+        })
+        .mockResolvedValueOnce({
+          data: { not: 'a stream' },
+        });
+
+      await expect(
+        manager.downloadArtifact('12345', 'logs/log.txt', {
+          encoding: 'stream',
+        })
+      ).rejects.toThrow('non-stream payload');
+    });
+
     it('throws when binary downloads return unsupported payloads', async () => {
       http.get
         .mockResolvedValueOnce({
@@ -347,6 +403,12 @@ describe('ArtifactManager', () => {
   describe('Batch Operations', () => {
     beforeEach(() => {
       configureClient();
+    });
+
+    it('rejects streaming encoding for multi-artifact downloads', async () => {
+      await expect(
+        manager.downloadMultipleArtifacts('12345', ['foo'], { encoding: 'stream' })
+      ).rejects.toThrow('Streaming downloads are only supported when requesting a single artifact');
     });
 
     it('should download multiple artifacts', async () => {
