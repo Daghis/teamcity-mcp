@@ -447,6 +447,33 @@ export class TeamCityAPI {
     );
   }
 
+  async downloadBuildLog<T = string>(
+    buildId: string,
+    options?: RawAxiosRequestConfig<T>
+  ): Promise<AxiosResponse<T>> {
+    const rawParams = (options?.params ?? undefined) as Record<string, unknown> | undefined;
+    const params = rawParams ? { ...rawParams } : {};
+    if (!Object.prototype.hasOwnProperty.call(params, 'plain')) {
+      params['plain'] = true;
+    }
+
+    const rawHeaders = (options?.headers ?? undefined) as Record<string, unknown> | undefined;
+    const headers = rawHeaders ? { ...rawHeaders } : {};
+
+    const requestOptions: RawAxiosRequestConfig<T> = {
+      ...options,
+      params,
+      headers: {
+        Accept: 'text/plain',
+        ...headers,
+      },
+      responseType: (options?.responseType ?? 'text') as RawAxiosRequestConfig['responseType'],
+      transformResponse: options?.transformResponse ?? [(data) => data],
+    };
+
+    return this.axiosInstance.get<T>(`/app/rest/builds/id:${buildId}/log`, requestOptions);
+  }
+
   async getBuildStatistics(buildId: string, fields?: string): Promise<AxiosResponse<unknown>> {
     return this.builds.getBuildStatisticValues(toBuildLocator(buildId), fields);
   }

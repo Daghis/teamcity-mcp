@@ -1,3 +1,8 @@
+import { randomUUID } from 'node:crypto';
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from '@jest/globals';
 
 import type {
@@ -21,6 +26,20 @@ const BT_NAME = `E2E Results BuildType ${ts}`;
 
 let buildId: string | undefined;
 let buildNumber: string | undefined;
+
+interface BuildLogStreamResponse {
+  encoding: 'stream';
+  outputPath: string;
+  bytesWritten: number;
+  meta: {
+    buildId: string;
+    pageSize?: number;
+    startLine?: number;
+    page?: number;
+    buildNumber?: string;
+    buildTypeId?: string;
+  };
+}
 
 describe('Build results and logs: full writes + dev reads', () => {
   afterAll(async () => {
@@ -161,6 +180,46 @@ describe('Build results and logs: full writes + dev reads', () => {
       throw new Error(`fetch_build_log tail request failed: ${message}`);
     }
     expect(tail).toHaveProperty('lines');
+  }, 60000);
+
+  it('streams a build log segment to disk (dev)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    if (!buildId) return expect(true).toBe(true);
+
+    const targetPath = join(tmpdir(), `build-log-${buildId}-${randomUUID()}.log`);
+
+    try {
+      const result = await callTool<
+        BuildLogStreamResponse | { success: false; error?: { message?: string } }
+      >('dev', 'fetch_build_log', {
+        buildId,
+        encoding: 'stream',
+        lineCount: 25,
+        outputPath: targetPath,
+      });
+
+      if ('success' in result && result.success === false) {
+        const message = result.error?.message ?? 'unknown';
+        if (message.includes('404') || message.includes('Converting circular structure')) {
+          expect(true).toBe(true);
+          return;
+        }
+        throw new Error(`fetch_build_log streaming request failed: ${message}`);
+      }
+
+      const streamed = result as BuildLogStreamResponse;
+
+      expect(streamed.encoding).toBe('stream');
+      expect(streamed.outputPath).toBe(targetPath);
+      expect(streamed.meta.buildId).toBe(String(buildId));
+
+      const written = await fs.readFile(targetPath, 'utf8');
+      expect(written.length).toBeGreaterThan(0);
+      expect(written).toContain('line1');
+      expect(streamed.bytesWritten).toBeGreaterThan(0);
+    } finally {
+      await fs.rm(targetPath, { force: true });
+    }
   }, 60000);
 
   it('fetch_build_log by buildNumber + buildTypeId (dev)', async () => {

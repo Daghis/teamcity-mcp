@@ -157,6 +157,10 @@ export function createAdapterFromTeamCityAPI(
       artifactPath: string,
       requestOptions?: RawAxiosRequestConfig
     ) => api.downloadBuildArtifact<T>(buildId, artifactPath, requestOptions),
+    downloadBuildLogContent: <T = string>(
+      buildId: string,
+      requestOptions?: RawAxiosRequestConfig<T>
+    ) => api.downloadBuildLog<T>(buildId, requestOptions),
     getBuildStatistics: (buildId, fields) => api.getBuildStatistics(buildId, fields),
     listChangesForBuild: (buildId, fields) => api.listChangesForBuild(buildId, fields),
     listSnapshotDependencies: (buildId) => api.listSnapshotDependencies(buildId),

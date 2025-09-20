@@ -212,14 +212,22 @@ Complete infrastructure management including creation, modification, and deletio
 **Mode**: Dev
 **Key Capabilities**:
 
-- Paginated retrieval by line range
+- Paginated retrieval by line range or explicit `startLine`/`lineCount`
+- Optional streaming mode that writes the response directly to disk
 
 **Parameters**:
 
-- `buildId` (required): Build identifier
-- `startLine`: Starting line number
-- `maxLines`: Maximum lines to retrieve
-- `format`: raw, formatted, errors-only
+- `buildId` **or** `buildNumber` (+ optional `buildTypeId`): Identify the build to read
+- `page` / `pageSize`: Paged access when you do not supply `startLine`
+- `startLine` / `lineCount`: Explicit range when you know the offsets you need
+- `tail`: Return the last N lines (buffered mode only)
+- `encoding`: `'text'` (default) to buffer in-memory, `'stream'` to pipe to disk
+- `outputPath`: Destination path when streaming (defaults to a temp file)
+
+**Usage Notes**:
+
+- Streaming mode mirrors `download_build_artifact`: the tool returns metadata (`outputPath`, `bytesWritten`) instead of the log lines.
+- Tail mode is only available in buffered (`'text'`) encoding.
 
 ### 2. Test Analysis Tools
 

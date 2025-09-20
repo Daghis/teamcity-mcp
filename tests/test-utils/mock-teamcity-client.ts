@@ -191,6 +191,9 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
   public readonly downloadArtifactContent: jest.MockedFunction<
     TeamCityClientAdapter['downloadArtifactContent']
   >;
+  public readonly downloadBuildLogContent: jest.MockedFunction<
+    TeamCityClientAdapter['downloadBuildLogContent']
+  >;
   public readonly getBuildStatistics: jest.Mock;
   public readonly listChangesForBuild: jest.Mock;
   public readonly listSnapshotDependencies: jest.Mock;
@@ -296,6 +299,9 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
     this.downloadArtifactContent = jest.fn() as jest.MockedFunction<
       TeamCityClientAdapter['downloadArtifactContent']
     >;
+    this.downloadBuildLogContent = jest.fn() as jest.MockedFunction<
+      TeamCityClientAdapter['downloadBuildLogContent']
+    >;
     this.getBuildStatistics = jest.fn();
     this.listChangesForBuild = jest.fn();
     this.listSnapshotDependencies = jest.fn();
@@ -334,6 +340,7 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
       this.listTestFailures,
       this.listBuildArtifacts,
       this.downloadArtifactContent,
+      this.downloadBuildLogContent,
       this.getBuildStatistics,
       this.listChangesForBuild,
       this.listSnapshotDependencies,
