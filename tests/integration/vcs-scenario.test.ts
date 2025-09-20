@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import type { ActionResult, ListResult, VcsRootRef } from '../types/tool-results';
-import { callTool } from './lib/mcp-runner';
+import { callTool, callToolsBatch, callToolsBatchExpect } from './lib/mcp-runner';
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
@@ -26,38 +26,63 @@ describe('VCS roots: full writes + dev reads', () => {
   });
   it('creates project and build config (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const cproj = await callTool<ActionResult>('full', 'create_project', {
-      id: PROJECT_ID,
-      name: PROJECT_NAME,
-    });
-    expect(cproj).toMatchObject({ success: true, action: 'create_project' });
-    const cbt = await callTool<ActionResult>('full', 'create_build_config', {
-      projectId: PROJECT_ID,
-      id: BT_ID,
-      name: BT_NAME,
-    });
-    expect(cbt).toMatchObject({ success: true, action: 'create_build_config' });
+    const results = await callToolsBatchExpect('full', [
+      {
+        tool: 'create_project',
+        args: { id: PROJECT_ID, name: PROJECT_NAME },
+      },
+      {
+        tool: 'create_build_config',
+        args: { projectId: PROJECT_ID, id: BT_ID, name: BT_NAME },
+      },
+    ]);
+
+    const projectResult = results[0]?.result as ActionResult | undefined;
+    const buildConfigResult = results[1]?.result as ActionResult | undefined;
+
+    expect(projectResult).toMatchObject({ success: true, action: 'create_project' });
+    expect(buildConfigResult).toMatchObject({ success: true, action: 'create_build_config' });
   }, 60000);
 
   it('creates VCS root and verifies with get/list (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const createVcs = await callTool<ActionResult>('full', 'create_vcs_root', {
-      projectId: PROJECT_ID,
-      id: VCS_ID,
-      name: VCS_NAME,
-      vcsName: 'jetbrains.git',
-      url: 'https://example.com/repo.git',
-      branch: 'refs/heads/main',
-    });
+    const createBatch = await callToolsBatchExpect('full', [
+      {
+        tool: 'create_vcs_root',
+        args: {
+          projectId: PROJECT_ID,
+          id: VCS_ID,
+          name: VCS_NAME,
+          vcsName: 'jetbrains.git',
+          url: 'https://example.com/repo.git',
+          branch: 'refs/heads/main',
+        },
+      },
+    ]);
+    const createVcs = createBatch[0]?.result as ActionResult | undefined;
     expect(createVcs).toMatchObject({ success: true, action: 'create_vcs_root' });
 
-    const get = await callTool<VcsRootRef>('dev', 'get_vcs_root', { id: VCS_ID });
-    expect(get.id).toBe(VCS_ID);
-    const list = await callTool<ListResult<VcsRootRef>>('dev', 'list_vcs_roots', {
-      projectId: PROJECT_ID,
-    });
-    const found = (list.items ?? []).some((r) => r.id === VCS_ID);
-    expect(found).toBe(true);
+    const devBatch = await callToolsBatch('dev', [
+      { tool: 'get_vcs_root', args: { id: VCS_ID } },
+      { tool: 'list_vcs_roots', args: { projectId: PROJECT_ID } },
+    ]);
+
+    const getResult = devBatch.results[0];
+    if (getResult?.ok) {
+      const payload = getResult.result as VcsRootRef | undefined;
+      expect(payload?.id).toBe(VCS_ID);
+    } else {
+      throw new Error(`get_vcs_root failed: ${getResult?.error}`);
+    }
+
+    const listResult = devBatch.results[1];
+    if (listResult?.ok) {
+      const payload = listResult.result as ListResult<VcsRootRef> | undefined;
+      const found = (payload?.items ?? []).some((r) => r.id === VCS_ID);
+      expect(found).toBe(true);
+    } else {
+      throw new Error(`list_vcs_roots failed: ${listResult?.error}`);
+    }
   }, 60000);
 
   it('attaches VCS root to build config (full)', async () => {

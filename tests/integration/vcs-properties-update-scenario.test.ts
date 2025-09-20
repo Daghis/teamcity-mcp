@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from '@jest/globals';
 
 import type { ActionResult, ListResult } from '../types/tool-results';
-import { callTool } from './lib/mcp-runner';
+import { callTool, callToolsBatch, callToolsBatchExpect } from './lib/mcp-runner';
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
@@ -26,20 +26,28 @@ describe('VCS root property updates: full writes + dev reads', () => {
 
   it('creates project and VCS root (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const cproj = await callTool<ActionResult>('full', 'create_project', {
-      id: PROJECT_ID,
-      name: PROJECT_NAME,
-    });
-    expect(cproj).toMatchObject({ success: true, action: 'create_project' });
+    const results = await callToolsBatchExpect('full', [
+      {
+        tool: 'create_project',
+        args: { id: PROJECT_ID, name: PROJECT_NAME },
+      },
+      {
+        tool: 'create_vcs_root',
+        args: {
+          projectId: PROJECT_ID,
+          id: VCS_ID,
+          name: VCS_NAME,
+          vcsName: 'jetbrains.git',
+          url: 'https://example.com/repo.git',
+          branch: 'refs/heads/main',
+        },
+      },
+    ]);
 
-    const createVcs = await callTool<ActionResult>('full', 'create_vcs_root', {
-      projectId: PROJECT_ID,
-      id: VCS_ID,
-      name: VCS_NAME,
-      vcsName: 'jetbrains.git',
-      url: 'https://example.com/repo.git',
-      branch: 'refs/heads/main',
-    });
+    const projectResult = results[0]?.result as ActionResult | undefined;
+    const createVcs = results[1]?.result as ActionResult | undefined;
+
+    expect(projectResult).toMatchObject({ success: true, action: 'create_project' });
     expect(createVcs).toMatchObject({ success: true, action: 'create_vcs_root' });
   }, 60000);
 
@@ -53,7 +61,16 @@ describe('VCS root property updates: full writes + dev reads', () => {
     });
     expect(update).toMatchObject({ success: true, action: 'update_vcs_root_properties' });
 
-    const get = (await callTool('dev', 'get_vcs_root', { id: VCS_ID })) as unknown as {
+    const devBatch = await callToolsBatch('dev', [
+      { tool: 'get_vcs_root', args: { id: VCS_ID } },
+      { tool: 'list_vcs_roots', args: { projectId: PROJECT_ID } },
+    ]);
+
+    const getStep = devBatch.results[0];
+    if (!getStep?.ok) {
+      throw new Error(`get_vcs_root failed: ${getStep?.error}`);
+    }
+    const get = getStep.result as {
       id: string;
       properties?: { property?: Array<{ name?: string; value?: string }> };
     };
@@ -65,9 +82,11 @@ describe('VCS root property updates: full writes + dev reads', () => {
     expect(branchSpec?.value?.includes('+:refs/heads/*')).toBe(true);
     expect(branchSpec?.value?.includes('+:refs/pull/*/head')).toBe(true);
 
-    const list = (await callTool('dev', 'list_vcs_roots', {
-      projectId: PROJECT_ID,
-    })) as unknown as ListResult<{ id: string }>;
+    const listStep = devBatch.results[1];
+    if (!listStep?.ok) {
+      throw new Error(`list_vcs_roots failed: ${listStep?.error}`);
+    }
+    const list = listStep.result as ListResult<{ id: string }>;
     const found = (list.items ?? []).some((r) => r.id === VCS_ID);
     expect(found).toBe(true);
   }, 60000);

@@ -37,6 +37,7 @@ interface DownloadArtifactResponse {
 
 async function waitForBuildCompletion(id: string, timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
+  let promoted = false;
   // eslint-disable-next-line no-constant-condition
   while (true) {
     if (Date.now() > deadline) {
@@ -66,8 +67,20 @@ async function waitForBuildCompletion(id: string, timeoutMs = 60_000): Promise<v
       return;
     }
 
+    if (state === 'queued' && !promoted) {
+      try {
+        await callTool('full', 'move_queued_build_to_top', { buildId: id });
+      } catch (error) {
+        // Non-fatal: servers may restrict queue operations or build may have started already.
+        // eslint-disable-next-line no-console
+        console.warn(`move_queued_build_to_top failed (non-fatal): ${error}`);
+      } finally {
+        promoted = true;
+      }
+    }
+
     // eslint-disable-next-line no-await-in-loop
-    await wait(5_000);
+    await wait(2_000);
   }
 }
 
@@ -156,6 +169,14 @@ describe('download_build_artifact tool (integration)', () => {
     buildId = trigger.buildId;
     expect(typeof buildId).toBe('string');
     if (!buildId) return expect(true).toBe(true);
+
+    try {
+      await callTool('full', 'move_queued_build_to_top', { buildId });
+    } catch (error) {
+      // Non-fatal: queue manipulation may not be permitted or build already running.
+      // eslint-disable-next-line no-console
+      console.warn(`Initial move_queued_build_to_top failed (non-fatal): ${error}`);
+    }
 
     // Ensure build number is fetched (also waits briefly before polling status)
     const buildRef = await callTool<BuildRef>('dev', 'get_build', { buildId });

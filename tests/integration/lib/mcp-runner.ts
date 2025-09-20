@@ -52,6 +52,27 @@ export async function callToolsBatch(mode: Mode, steps: ToolBatchStep[]): Promis
   return { results, completed, failureIndex: res.failureIndex };
 }
 
+export async function callToolsBatchExpect(
+  mode: Mode,
+  steps: ToolBatchStep[]
+): Promise<ToolBatchStepResult[]> {
+  const batch = await callToolsBatch(mode, steps);
+  if (!batch.completed) {
+    const failureIndex = batch.failureIndex ?? batch.results.findIndex((step) => !step.ok);
+    const failure = batch.results[failureIndex] ?? null;
+    const errorMessage = failure?.error ?? 'unknown batch failure';
+    const toolName = failure?.tool ?? 'unknown_tool';
+    throw new Error(`Batch ${mode} call failed at #${failureIndex}: ${toolName} → ${errorMessage}`);
+  }
+  const failed = batch.results.find((step) => !step.ok);
+  if (failed) {
+    throw new Error(
+      `Batch ${mode} call reported failure: ${failed.tool} → ${failed.error ?? 'unknown error'}`
+    );
+  }
+  return batch.results;
+}
+
 async function runE2E(args: string[]): Promise<unknown> {
   const tsx = path.resolve(process.cwd(), 'node_modules/tsx/dist/cli.cjs');
   const entry = path.resolve(process.cwd(), 'tests/e2e/index.ts');

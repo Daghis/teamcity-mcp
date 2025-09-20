@@ -6,7 +6,12 @@ import type {
   QueuedBuildList,
   TriggerBuildResult,
 } from '../types/tool-results';
-import { callTool } from './lib/mcp-runner';
+import {
+  type ToolBatchStepResult,
+  callTool,
+  callToolsBatch,
+  callToolsBatchExpect,
+} from './lib/mcp-runner';
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
@@ -30,31 +35,47 @@ describe('Branches and queue operations', () => {
       expect(true).toBe(true);
     }
   });
-  it('creates project and build config (full)', async () => {
+  it('creates project, build config, and adds step (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const cproj = await callTool<ActionResult>('full', 'create_project', {
-      id: PROJECT_ID,
-      name: PROJECT_NAME,
-    });
-    expect(cproj).toMatchObject({ success: true, action: 'create_project' });
-    const cbt = await callTool<ActionResult>('full', 'create_build_config', {
-      projectId: PROJECT_ID,
-      id: BT_ID,
-      name: BT_NAME,
-    });
-    expect(cbt).toMatchObject({ success: true, action: 'create_build_config' });
+    const batch = await callToolsBatchExpect('full', [
+      {
+        tool: 'create_project',
+        args: {
+          id: PROJECT_ID,
+          name: PROJECT_NAME,
+        },
+      },
+      {
+        tool: 'create_build_config',
+        args: {
+          projectId: PROJECT_ID,
+          id: BT_ID,
+          name: BT_NAME,
+        },
+      },
+      {
+        tool: 'manage_build_steps',
+        args: {
+          buildTypeId: BT_ID,
+          action: 'add',
+          name: 'echo-step',
+          type: 'simpleRunner',
+          properties: { 'script.content': 'echo "branches scenario"' },
+        },
+      },
+    ]);
+
+    const projectResult = batch[0]?.result as ActionResult | undefined;
+    const buildConfigResult = batch[1]?.result as ActionResult | undefined;
+    const stepResult = batch[2]?.result as ActionResult | undefined;
+
+    expect(projectResult).toMatchObject({ success: true, action: 'create_project' });
+    expect(buildConfigResult).toMatchObject({ success: true, action: 'create_build_config' });
+    expect(stepResult).toMatchObject({ success: true, action: 'add_build_step' });
   }, 60000);
 
-  it('adds step and triggers a build on non-default branch (dev)', async () => {
+  it('triggers a build on non-default branch (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const step = await callTool<ActionResult>('full', 'manage_build_steps', {
-      buildTypeId: BT_ID,
-      action: 'add',
-      name: 'echo-step',
-      type: 'simpleRunner',
-      properties: { 'script.content': 'echo "branches scenario"' },
-    });
-    expect(step).toMatchObject({ success: true, action: 'add_build_step' });
     const trig = await callTool<TriggerBuildResult>('dev', 'trigger_build', {
       buildTypeId: BT_ID,
       branchName: BRANCH_NAME,
@@ -64,21 +85,30 @@ describe('Branches and queue operations', () => {
 
   it('lists branches for project and build type (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    try {
-      const projBranches = await callTool<BranchList>('dev', 'list_branches', {
-        projectId: PROJECT_ID,
-      });
-      expect(projBranches).toHaveProperty('branches');
-    } catch (e) {
-      // list_branches may not be available on some servers; non-fatal
-      expect(true).toBe(true);
-    }
-    try {
-      const btBranches = await callTool<BranchList>('dev', 'list_branches', { buildTypeId: BT_ID });
-      expect(btBranches).toHaveProperty('branches');
-    } catch (e) {
-      expect(true).toBe(true);
-    }
+    const batch = await callToolsBatch('dev', [
+      {
+        tool: 'list_branches',
+        args: { projectId: PROJECT_ID },
+      },
+      {
+        tool: 'list_branches',
+        args: { buildTypeId: BT_ID },
+      },
+    ]);
+
+    batch.results.forEach((step: ToolBatchStepResult, index: number) => {
+      if (!step.ok) {
+        const errorMsg = step.error ?? '';
+        if (errorMsg.includes('404') || errorMsg.length === 0) {
+          expect(true).toBe(true);
+        } else {
+          throw new Error(`list_branches batch step ${index} failed: ${errorMsg}`);
+        }
+        return;
+      }
+      const payload = step.result as BranchList | undefined;
+      expect(payload).toHaveProperty('branches');
+    });
   }, 60000);
 
   it('lists queued builds and cancels one if present (dev cancel)', async () => {
