@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/Daghis/teamcity-mcp/compare/v1.8.0...v1.8.1) (2025-09-20)
+
+
+### Bug Fixes
+
+* **tools:** stabilize batch artifact downloads ([#175](https://github.com/Daghis/teamcity-mcp/issues/175)) ([91a0ec3](https://github.com/Daghis/teamcity-mcp/commit/91a0ec33ac61e680dd34393fca46914e2ba3fe7f))
+
 ## [1.8.0](https://github.com/Daghis/teamcity-mcp/compare/v1.7.0...v1.8.0) (2025-09-20)
 
 
