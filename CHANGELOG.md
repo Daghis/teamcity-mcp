@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/Daghis/teamcity-mcp/compare/v1.6.0...v1.7.0) (2025-09-20)
+
+
+### Features
+
+* **tools:** add streaming mode to fetch_build_log ([#171](https://github.com/Daghis/teamcity-mcp/issues/171)) ([1abce69](https://github.com/Daghis/teamcity-mcp/commit/1abce69b7fa3866ac289501e2369d5d06d57d57f))
+
 ## [1.6.0](https://github.com/Daghis/teamcity-mcp/compare/v1.5.0...v1.6.0) (2025-09-20)
 
 
