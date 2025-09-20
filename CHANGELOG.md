@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.2](https://github.com/Daghis/teamcity-mcp/compare/v1.8.1...v1.8.2) (2025-09-20)
+
+
+### Bug Fixes
+
+* **tools:** harden batch artifact streaming outputs ([#177](https://github.com/Daghis/teamcity-mcp/issues/177)) ([0874325](https://github.com/Daghis/teamcity-mcp/commit/0874325c77aa2a79050cff57fced0aeec5a55ba0))
+
 ## [1.8.1](https://github.com/Daghis/teamcity-mcp/compare/v1.8.0...v1.8.1) (2025-09-20)
 
 
