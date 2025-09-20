@@ -53,7 +53,7 @@
 
 ## Implementation considerations for #151
 - Extend the public API to distinguish between buffered encodings (`base64`, `text`, `buffer`) and streaming (`Readable`).
-- Update `downloadMultipleArtifacts` to reject/short-circuit when a streamed artifact is requested alongside buffered ones (or convert to sequential processing).
+- Update `downloadMultipleArtifacts` so that streaming requests share the same sequential helper used by single downloads, keeping behaviour consistent across both paths.
 - Decide whether `BuildResultsManager` should remain buffered (to continue embedding base64 data) or expose a new helper dedicated to streaming downloads.
 - Tests:
   - Unit tests can stub streams via `Readable.from(['chunk'])` when the streaming flag is enabled.

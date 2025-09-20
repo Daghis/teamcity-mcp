@@ -5,7 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import { createWriteStream, promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, extname, join } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
@@ -15,10 +15,13 @@ import { z } from 'zod';
 import { getMCPMode as getMCPModeFromConfig } from '@/config';
 import { type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import type { Step } from '@/teamcity-client/models/step';
-import { ArtifactManager } from '@/teamcity/artifact-manager';
+import { type ArtifactContent, ArtifactManager } from '@/teamcity/artifact-manager';
 import { BuildConfigurationUpdateManager } from '@/teamcity/build-configuration-update-manager';
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
-import { createAdapterFromTeamCityAPI } from '@/teamcity/client-adapter';
+import {
+  type TeamCityClientAdapter,
+  createAdapterFromTeamCityAPI,
+} from '@/teamcity/client-adapter';
 import { TeamCityAPIError, isRetryableError } from '@/teamcity/errors';
 import { createPaginatedFetcher, fetchAllPages } from '@/teamcity/pagination';
 import { debug } from '@/utils/logger';
@@ -28,6 +31,322 @@ import { TeamCityAPI } from './api-client';
 
 const isReadableStream = (value: unknown): value is Readable =>
   typeof value === 'object' && value !== null && typeof (value as Readable).pipe === 'function';
+
+interface ArtifactPayloadBase {
+  name: string;
+  path: string;
+  size: number;
+  mimeType?: string;
+}
+
+interface StreamOptions {
+  explicitOutputPath?: string;
+  outputDir?: string;
+}
+
+interface ArtifactStreamPayload extends ArtifactPayloadBase {
+  encoding: 'stream';
+  outputPath: string;
+  bytesWritten: number;
+}
+
+interface ArtifactContentPayload extends ArtifactPayloadBase {
+  encoding: 'base64' | 'text';
+  content: string;
+}
+
+type ArtifactToolPayload = ArtifactStreamPayload | ArtifactContentPayload;
+
+type ArtifactPathInput =
+  | string
+  | {
+      path: string;
+      buildId?: string;
+      downloadUrl?: string;
+    };
+
+interface NormalizedArtifactRequest {
+  path: string;
+  buildId: string;
+  downloadUrl?: string;
+}
+
+const sanitizeFileName = (
+  artifactName: string
+): {
+  sanitizedBase: string;
+  stem: string;
+  ext: string;
+} => {
+  const base = basename(artifactName || 'artifact');
+  const safeBase = base.replace(/[^a-zA-Z0-9._-]/g, '_') || 'artifact';
+  const ext = extname(safeBase);
+  const stemCandidate = ext ? safeBase.slice(0, -ext.length) : safeBase;
+  const stem = stemCandidate || 'artifact';
+  const sanitizedBase = ext ? `${stem}${ext}` : stem;
+  return { sanitizedBase, stem, ext };
+};
+
+const buildRandomFileName = (artifactName: string): string => {
+  const { stem, ext } = sanitizeFileName(artifactName);
+  return `${stem}-${randomUUID()}${ext}`;
+};
+
+const sanitizePathSegments = (artifactPath: string | undefined, fallbackName: string): string[] => {
+  const rawSegments = artifactPath?.split('/') ?? [];
+  const sanitizedSegments = rawSegments
+    .map((segment) => segment.trim())
+    .filter((segment) => segment && segment !== '.' && segment !== '..')
+    .map((segment) => segment.replace(/[^a-zA-Z0-9._-]/g, '_'));
+
+  if (sanitizedSegments.length === 0) {
+    const { sanitizedBase } = sanitizeFileName(fallbackName);
+    sanitizedSegments.push(sanitizedBase);
+  }
+
+  return sanitizedSegments;
+};
+
+const ensureUniquePath = async (candidate: string): Promise<string> => {
+  const ext = extname(candidate);
+  const stem = ext ? candidate.slice(0, -ext.length) : candidate;
+
+  const probe = async (attempt: number): Promise<string> => {
+    const next = attempt === 0 ? candidate : `${stem}-${attempt}${ext}`;
+    try {
+      await fs.access(next);
+      return probe(attempt + 1);
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException | undefined;
+      if (err?.code === 'ENOENT') {
+        return next;
+      }
+      throw error;
+    }
+  };
+
+  return probe(0);
+};
+
+const resolveStreamOutputPath = async (
+  artifact: ArtifactContent,
+  options: StreamOptions
+): Promise<string> => {
+  if (options.explicitOutputPath) {
+    const target = options.explicitOutputPath;
+    await fs.mkdir(dirname(target), { recursive: true });
+    return target;
+  }
+
+  if (options.outputDir) {
+    const segments = sanitizePathSegments(artifact.path, artifact.name);
+    const parts = segments.slice(0, -1);
+    const fileName = segments[segments.length - 1] ?? sanitizeFileName(artifact.name).sanitizedBase;
+    const candidate = join(options.outputDir, ...parts, fileName);
+    await fs.mkdir(dirname(candidate), { recursive: true });
+    return ensureUniquePath(candidate);
+  }
+
+  const tempFilePath = join(tmpdir(), buildRandomFileName(artifact.name));
+  await fs.mkdir(dirname(tempFilePath), { recursive: true });
+  return tempFilePath;
+};
+
+const writeArtifactStreamToDisk = async (
+  artifact: ArtifactContent,
+  stream: Readable,
+  options: StreamOptions
+): Promise<{ outputPath: string; bytesWritten: number }> => {
+  const targetPath = await resolveStreamOutputPath(artifact, options);
+  await pipeline(stream, createWriteStream(targetPath));
+  const stats = await fs.stat(targetPath);
+  return { outputPath: targetPath, bytesWritten: stats.size };
+};
+
+const buildArtifactPayload = async (
+  artifact: ArtifactContent,
+  encoding: 'base64' | 'text' | 'stream',
+  options: StreamOptions
+): Promise<ArtifactToolPayload> => {
+  if (encoding === 'stream') {
+    const contentStream = artifact.content;
+    if (!isReadableStream(contentStream)) {
+      throw new Error('Streaming download did not return a readable stream');
+    }
+
+    const { outputPath, bytesWritten } = await writeArtifactStreamToDisk(
+      artifact,
+      contentStream,
+      options
+    );
+
+    return {
+      name: artifact.name,
+      path: artifact.path,
+      size: artifact.size,
+      mimeType: artifact.mimeType,
+      encoding: 'stream',
+      outputPath,
+      bytesWritten,
+    };
+  }
+
+  const payloadContent = artifact.content;
+  if (typeof payloadContent !== 'string') {
+    throw new Error(`Expected ${encoding} artifact content as string`);
+  }
+
+  return {
+    name: artifact.name,
+    path: artifact.path,
+    size: artifact.size,
+    mimeType: artifact.mimeType,
+    encoding,
+    content: payloadContent,
+  };
+};
+
+const toNormalizedArtifactRequests = (
+  inputs: ArtifactPathInput[],
+  defaultBuildId: string
+): NormalizedArtifactRequest[] =>
+  inputs.map((entry) => {
+    if (typeof entry === 'string') {
+      return { path: entry, buildId: defaultBuildId };
+    }
+
+    const path = entry.path.trim();
+    const buildId = (entry.buildId ?? defaultBuildId).trim();
+
+    if (!buildId) {
+      throw new Error(`Artifact request for path "${path}" is missing a buildId`);
+    }
+
+    return {
+      path,
+      buildId,
+      downloadUrl: entry.downloadUrl?.trim(),
+    };
+  });
+
+const getErrorMessage = (error: unknown): string => {
+  if (isAxiosError(error)) {
+    const status = error.response?.status;
+    const data = error.response?.data;
+    let detail: string | undefined;
+    if (typeof data === 'string') {
+      detail = data;
+    } else if (data !== undefined && data !== null && typeof data === 'object') {
+      try {
+        detail = JSON.stringify(data);
+      } catch {
+        detail = '[unserializable response body]';
+      }
+    }
+    return `HTTP ${status ?? 'unknown'}${detail ? `: ${detail}` : ''}`;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    return String((error as { message?: unknown }).message);
+  }
+  return String(error ?? 'Unknown error');
+};
+
+const downloadArtifactByUrl = async (
+  adapter: TeamCityClientAdapter,
+  request: NormalizedArtifactRequest & { downloadUrl: string },
+  encoding: 'base64' | 'text' | 'stream',
+  options: StreamOptions & { maxSize?: number }
+): Promise<ArtifactToolPayload> => {
+  const axios = adapter.getAxios();
+  const responseType =
+    encoding === 'stream' ? 'stream' : encoding === 'text' ? 'text' : 'arraybuffer';
+
+  const response = await axios.get(request.downloadUrl, { responseType });
+  const mimeType =
+    typeof response.headers?.['content-type'] === 'string'
+      ? response.headers['content-type']
+      : undefined;
+  const contentLengthHeader = response.headers?.['content-length'];
+  const contentLength =
+    typeof contentLengthHeader === 'string' ? Number.parseInt(contentLengthHeader, 10) : undefined;
+
+  if (options.maxSize && typeof contentLength === 'number' && contentLength > options.maxSize) {
+    throw new Error(
+      `Artifact size exceeds maximum allowed size: ${contentLength} > ${options.maxSize}`
+    );
+  }
+
+  if (encoding === 'stream') {
+    const stream = response.data;
+    if (!isReadableStream(stream)) {
+      throw new Error('Streaming download did not return a readable stream');
+    }
+
+    const artifact: ArtifactContent = {
+      name: request.path.split('/').pop() ?? request.path,
+      path: request.path,
+      size: contentLength ?? 0,
+      content: stream,
+      mimeType,
+    };
+
+    return buildArtifactPayload(artifact, 'stream', options);
+  }
+
+  const rawPayload = response.data;
+  if (encoding === 'text') {
+    if (typeof rawPayload !== 'string') {
+      throw new Error('Artifact download returned a non-text payload when text was expected');
+    }
+
+    const textSize = Buffer.byteLength(rawPayload, 'utf8');
+    if (options.maxSize && textSize > options.maxSize) {
+      throw new Error(
+        `Artifact size exceeds maximum allowed size: ${textSize} > ${options.maxSize}`
+      );
+    }
+
+    const artifact: ArtifactContent = {
+      name: request.path.split('/').pop() ?? request.path,
+      path: request.path,
+      size: textSize,
+      content: rawPayload,
+      mimeType,
+    };
+
+    return buildArtifactPayload(artifact, 'text', options);
+  }
+
+  let buffer: Buffer;
+  if (Buffer.isBuffer(rawPayload)) {
+    buffer = rawPayload;
+  } else if (rawPayload instanceof ArrayBuffer) {
+    buffer = Buffer.from(rawPayload);
+  } else if (ArrayBuffer.isView(rawPayload)) {
+    buffer = Buffer.from(rawPayload.buffer);
+  } else {
+    throw new Error('Artifact download returned unexpected binary payload type');
+  }
+
+  if (options.maxSize && buffer.byteLength > options.maxSize) {
+    throw new Error(
+      `Artifact size exceeds maximum allowed size: ${buffer.byteLength} > ${options.maxSize}`
+    );
+  }
+
+  const artifact: ArtifactContent = {
+    name: request.path.split('/').pop() ?? request.path,
+    path: request.path,
+    size: buffer.byteLength,
+    content: buffer.toString('base64'),
+    mimeType,
+  };
+
+  return buildArtifactPayload(artifact, 'base64', options);
+};
 
 // Tool response type
 export interface ToolResponse {
@@ -1928,63 +2247,220 @@ const DEV_TOOLS: ToolDefinition[] = [
         outputPath: z.string().min(1).optional(),
       });
 
-      const toTempFilePath = (artifactName: string): string => {
-        const base = basename(artifactName || 'artifact');
-        const safeStem = base.replace(/[^a-zA-Z0-9._-]/g, '_') || 'artifact';
-        const ext = extname(safeStem);
-        const stemWithoutExt = ext ? safeStem.slice(0, -ext.length) : safeStem;
-        const finalStem = stemWithoutExt || 'artifact';
-        const fileName = `${finalStem}-${randomUUID()}${ext}`;
-        return join(tmpdir(), fileName);
-      };
-
       return runTool(
         'download_build_artifact',
         schema,
         async (typed) => {
+          const encoding = typed.encoding ?? 'base64';
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          debug('tools.download_build_artifact.start', {
+            buildId: typed.buildId,
+            encoding,
+            artifactPath: typed.artifactPath,
+            maxSize: typed.maxSize,
+            outputPath: typed.outputPath,
+          });
+
+          const manager = new ArtifactManager(adapter);
+          const artifact = await manager.downloadArtifact(typed.buildId, typed.artifactPath, {
+            encoding,
+            maxSize: typed.maxSize,
+          });
+          const payload = await buildArtifactPayload(artifact, encoding, {
+            explicitOutputPath: typed.outputPath,
+          });
+
+          return json(payload);
+        },
+        args
+      );
+    },
+  },
+
+  {
+    name: 'download_build_artifacts',
+    description: 'Download multiple artifacts with optional streaming output',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildId: { type: 'string', description: 'Build ID' },
+        artifactPaths: {
+          type: 'array',
+          description: 'Artifact paths or names to download',
+          items: {
+            anyOf: [
+              { type: 'string' },
+              {
+                type: 'object',
+                properties: {
+                  path: { type: 'string' },
+                  buildId: { type: 'string' },
+                  downloadUrl: { type: 'string' },
+                },
+                required: ['path'],
+              },
+            ],
+          },
+        },
+        encoding: {
+          type: 'string',
+          description: "Response encoding: 'base64' (default), 'text', or 'stream'",
+          enum: ['base64', 'text', 'stream'],
+          default: 'base64',
+        },
+        maxSize: {
+          type: 'number',
+          description: 'Maximum artifact size (bytes) allowed before aborting',
+        },
+        outputDir: {
+          type: 'string',
+          description:
+            'Optional absolute directory to write streamed artifacts; defaults to temp files when streaming',
+        },
+      },
+      required: ['buildId', 'artifactPaths'],
+    },
+    handler: async (args: unknown) => {
+      const artifactInputSchema = z.union([
+        z.string().min(1),
+        z.object({
+          path: z.string().min(1),
+          buildId: z.string().min(1).optional(),
+          downloadUrl: z.string().url().optional(),
+        }),
+      ]);
+
+      const schema = z
+        .object({
+          buildId: z.string().min(1),
+          artifactPaths: z.array(artifactInputSchema).min(1),
+          encoding: z.enum(['base64', 'text', 'stream']).default('base64'),
+          maxSize: z.number().int().positive().optional(),
+          outputDir: z
+            .string()
+            .min(1)
+            .optional()
+            .refine((value) => value == null || isAbsolute(value), {
+              message: 'outputDir must be an absolute path',
+            }),
+        })
+        .superRefine((value, ctx) => {
+          if (value.encoding !== 'stream' && value.outputDir) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'outputDir can only be provided when encoding is set to "stream"',
+              path: ['outputDir'],
+            });
+          }
+        });
+
+      return runTool(
+        'download_build_artifacts',
+        schema,
+        async (typed) => {
+          const encoding = typed.encoding ?? 'base64';
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const manager = new ArtifactManager(adapter);
 
-          const artifact = await manager.downloadArtifact(typed.buildId, typed.artifactPath, {
-            encoding: typed.encoding,
-            maxSize: typed.maxSize,
-          });
+          type ArtifactBatchResult =
+            | (ArtifactToolPayload & { success: true })
+            | (ArtifactPayloadBase & {
+                success: false;
+                encoding: 'base64' | 'text' | 'stream';
+                error: string;
+              });
 
-          if (typed.encoding === 'stream') {
-            const stream = artifact.content;
-            if (!isReadableStream(stream)) {
-              throw new Error('Streaming download did not return a readable stream');
+          const requests = toNormalizedArtifactRequests(typed.artifactPaths, typed.buildId);
+          const results: ArtifactBatchResult[] = [];
+
+          for (const request of requests) {
+            try {
+              let payload: ArtifactToolPayload;
+              if (request.downloadUrl) {
+                // eslint-disable-next-line no-await-in-loop
+                payload = await downloadArtifactByUrl(
+                  adapter,
+                  { ...request, downloadUrl: request.downloadUrl },
+                  encoding,
+                  {
+                    outputDir: encoding === 'stream' ? typed.outputDir : undefined,
+                    maxSize: typed.maxSize,
+                  }
+                );
+              } else {
+                // eslint-disable-next-line no-await-in-loop
+                const artifact = await manager.downloadArtifact(request.buildId, request.path, {
+                  encoding,
+                  maxSize: typed.maxSize,
+                });
+                // eslint-disable-next-line no-await-in-loop
+                payload = await buildArtifactPayload(artifact, encoding, {
+                  outputDir: encoding === 'stream' ? typed.outputDir : undefined,
+                });
+              }
+
+              results.push({ ...payload, success: true });
+              debug('tools.download_build_artifacts.success', {
+                path: request.path,
+                encoding: payload.encoding,
+                outputPath:
+                  payload.encoding === 'stream'
+                    ? (payload as ArtifactStreamPayload).outputPath
+                    : undefined,
+              });
+              if (payload.encoding === 'stream') {
+                const streamPayload = payload as ArtifactStreamPayload;
+                debug('tools.download_build_artifacts.stream', {
+                  path: request.path,
+                  outputPath: streamPayload.outputPath,
+                  bytesWritten: streamPayload.bytesWritten,
+                });
+              } else {
+                debug('tools.download_build_artifacts.buffered', {
+                  path: request.path,
+                  encoding: payload.encoding,
+                  size: payload.size,
+                });
+              }
+            } catch (error) {
+              results.push({
+                name: request.path,
+                path: request.path,
+                size: 0,
+                encoding,
+                success: false,
+                error: getErrorMessage(error),
+              });
+              debug('tools.download_build_artifacts.failure', {
+                path: request.path,
+                encoding,
+                error: getErrorMessage(error),
+                downloadUrl: request.downloadUrl,
+                buildId: request.buildId,
+              });
             }
-
-            const targetPath = typed.outputPath ?? toTempFilePath(artifact.name);
-            await fs.mkdir(dirname(targetPath), { recursive: true });
-            await pipeline(stream, createWriteStream(targetPath));
-            const stats = await fs.stat(targetPath);
-
-            return json({
-              name: artifact.name,
-              path: artifact.path,
-              size: artifact.size,
-              mimeType: artifact.mimeType,
-              encoding: 'stream',
-              outputPath: targetPath,
-              bytesWritten: stats.size,
-            });
           }
 
-          const payloadContent = artifact.content;
-          if (typeof payloadContent !== 'string') {
-            throw new Error(`Expected ${typed.encoding} artifact content as string`);
-          }
-
-          return json({
-            name: artifact.name,
-            path: artifact.path,
-            size: artifact.size,
-            mimeType: artifact.mimeType,
-            encoding: typed.encoding,
-            content: payloadContent,
+          debug('tools.download_build_artifacts.complete', {
+            buildId: typed.buildId,
+            successCount: results.filter((item) => item.success).length,
+            failureCount: results.filter((item) => !item.success).length,
           });
+          debug('tools.download_build_artifacts.complete', {
+            buildId: typed.buildId,
+            successCount: results.filter((item) => item.success).length,
+            failureCount: results.filter((item) => !item.success).length,
+          });
+
+          const failures = results.filter((item) => !item.success);
+          if (results.length > 0 && failures.length === results.length) {
+            const reason = failures
+              .map((item) => `${item.path}: ${item.error ?? 'unknown error'}`)
+              .join('; ');
+            throw new Error(`All artifact downloads failed: ${reason}`);
+          }
+
+          return json({ artifacts: results });
         },
         args
       );

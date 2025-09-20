@@ -23,6 +23,7 @@ const EXPECTED_DEV_TOOLS = new Set([
   'fetch_build_log',
   'get_build_results',
   'download_build_artifact',
+  'download_build_artifacts',
   'analyze_build_problems',
   // Changes & diagnostics
   'list_changes',

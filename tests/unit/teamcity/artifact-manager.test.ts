@@ -37,6 +37,10 @@ describe('ArtifactManager', () => {
         config?: RawAxiosRequestConfig
       ) => http.get(`/app/rest/builds/${buildLocator}/artifacts/${path}`, config)
     );
+    mockClient.downloadArtifactContent.mockImplementation(
+      async (buildId: string, artifactPath: string, requestConfig?: RawAxiosRequestConfig) =>
+        http.get(`/app/rest/builds/id:${buildId}/artifacts/content/${artifactPath}`, requestConfig)
+    );
     mockClient.request.mockImplementation(async (fn) => fn({ axios: http, baseUrl: BASE_URL }));
     mockClient.getApiConfig.mockReturnValue({
       baseUrl: BASE_URL,
@@ -405,12 +409,6 @@ describe('ArtifactManager', () => {
       configureClient();
     });
 
-    it('rejects streaming encoding for multi-artifact downloads', async () => {
-      await expect(
-        manager.downloadMultipleArtifacts('12345', ['foo'], { encoding: 'stream' })
-      ).rejects.toThrow('Streaming downloads are only supported when requesting a single artifact');
-    });
-
     it('should download multiple artifacts', async () => {
       const mockArtifacts = {
         file: [
@@ -420,12 +418,9 @@ describe('ArtifactManager', () => {
         ],
       };
 
-      // Since Promise.allSettled runs in parallel, all listArtifacts calls happen first,
-      // then all download calls happen
+      // The manager now downloads sequentially, caching the initial artifact list
       http.get
-        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file1
-        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file2
-        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file3
+        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts (cached for subsequent downloads)
         .mockResolvedValueOnce({ data: Buffer.from('content1'), headers: {} }) // download file1
         .mockResolvedValueOnce({ data: Buffer.from('content2'), headers: {} }) // download file2
         .mockResolvedValueOnce({ data: Buffer.from('content3'), headers: {} }); // download file3
@@ -445,6 +440,38 @@ describe('ArtifactManager', () => {
       expect(result[2]?.content).toBe(Buffer.from('content3').toString('base64'));
     });
 
+    it('should stream multiple artifacts when requested', async () => {
+      const mockArtifacts = {
+        file: [
+          { name: 'logs/app.log', fullName: 'logs/app.log', size: 10 },
+          { name: 'metrics.json', fullName: 'metrics.json', size: 20 },
+        ],
+      };
+
+      const streamOne = Readable.from(['chunk-1']);
+      const streamTwo = Readable.from(['chunk-2']);
+
+      http.get
+        .mockResolvedValueOnce({ data: mockArtifacts })
+        .mockResolvedValueOnce({ data: streamOne, headers: { 'content-type': 'text/plain' } })
+        .mockResolvedValueOnce({
+          data: streamTwo,
+          headers: { 'content-type': 'application/json' },
+        });
+
+      const result = await manager.downloadMultipleArtifacts(
+        '12345',
+        ['logs/app.log', 'metrics.json'],
+        { encoding: 'stream' }
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]?.content).toBe(streamOne);
+      expect(result[0]?.mimeType).toBe('text/plain');
+      expect(result[1]?.content).toBe(streamTwo);
+      expect(result[1]?.mimeType).toBe('application/json');
+    });
+
     it('should handle partial batch download failures', async () => {
       const mockArtifacts = {
         file: [
@@ -453,10 +480,8 @@ describe('ArtifactManager', () => {
         ],
       };
 
-      // Since Promise.allSettled runs in parallel, all listArtifacts calls happen first
       http.get
-        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file1
-        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file2
+        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts cached for both downloads
         .mockResolvedValueOnce({ data: Buffer.from('content1'), headers: {} }) // download file1
         .mockRejectedValueOnce(new Error('Download failed')); // download file2 fails
 
@@ -497,9 +522,9 @@ describe('ArtifactManager', () => {
     });
 
     it('should handle artifact not found during download', async () => {
-      http.get.mockResolvedValueOnce({
+      http.get.mockImplementation(async () => ({
         data: { file: [] },
-      });
+      }));
 
       await expect(manager.downloadArtifact('12345', 'nonexistent.txt')).rejects.toThrow(
         'Artifact not found'

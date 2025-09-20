@@ -10,20 +10,39 @@ jest.mock('@/config', () => ({
   getMCPMode: () => 'dev',
 }));
 
-jest.mock('@/utils/logger/index', () => ({
-  getLogger: () => ({
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+jest.mock('@/utils/logger/index', () => {
+  const debug = jest.fn();
+  const info = jest.fn();
+  const warn = jest.fn();
+  const error = jest.fn();
+  const logToolExecution = jest.fn();
+  const logTeamCityRequest = jest.fn();
+  const logLifecycle = jest.fn();
+  const child = jest.fn();
+
+  const mockLoggerInstance = {
+    debug,
+    info,
+    warn,
+    error,
+    logToolExecution,
+    logTeamCityRequest,
+    logLifecycle,
+    child,
     generateRequestId: () => 'test-request',
-    logToolExecution: jest.fn(),
-  }),
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-}));
+  };
+
+  child.mockReturnValue(mockLoggerInstance);
+
+  return {
+    getLogger: () => mockLoggerInstance,
+    logger: mockLoggerInstance,
+    debug,
+    info,
+    warn,
+    error,
+  };
+});
 
 describe('tools: download_build_artifact', () => {
   afterEach(() => {

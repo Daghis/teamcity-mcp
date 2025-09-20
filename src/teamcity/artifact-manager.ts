@@ -3,7 +3,9 @@
  */
 import type { Readable } from 'node:stream';
 
-import type { AxiosResponse } from 'axios';
+import { type AxiosResponse, isAxiosError } from 'axios';
+
+import { debug as logDebug } from '@/utils/logger';
 
 import type { TeamCityClientAdapter } from './client-adapter';
 import { toBuildLocator } from './utils/build-locator';
@@ -67,6 +69,8 @@ export class ArtifactManager {
   private static readonly cacheTtlMs = 60000; // 1 minute
   private static readonly defaultLimit = 100;
   private static readonly maxLimit = 1000;
+  private static readonly artifactRetryAttempts = 10;
+  private static readonly artifactRetryDelayMs = 1000;
 
   constructor(client: TeamCityClientAdapter) {
     this.client = client;
@@ -145,11 +149,54 @@ export class ArtifactManager {
     artifactPath: string,
     options: ArtifactDownloadOptions = {}
   ): Promise<ArtifactContent> {
-    // First, get artifact info to check size
-    const artifacts = await this.listArtifacts(buildId);
-    const artifact = artifacts.find((a) => a.path === artifactPath || a.name === artifactPath);
+    let artifact: ArtifactInfo | undefined;
+    for (let attempt = 1; attempt <= ArtifactManager.artifactRetryAttempts; attempt += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const artifacts = await this.listArtifacts(buildId, { forceRefresh: attempt > 1 });
+      const listSample = artifacts.slice(0, 5).map((entry) => entry.path);
+      logDebug('artifact-manager.downloadArtifact.list', {
+        buildId,
+        requested: artifactPath,
+        availableCount: artifacts.length,
+        sample: listSample,
+        includeNested: false,
+        attempt,
+      });
+      artifact = artifacts.find((a) => a.path === artifactPath || a.name === artifactPath);
+
+      if (!artifact) {
+        // eslint-disable-next-line no-await-in-loop
+        const nestedArtifacts = await this.listArtifacts(buildId, {
+          includeNested: true,
+          forceRefresh: true,
+        });
+        const nestedSample = nestedArtifacts.slice(0, 5).map((entry) => entry.path);
+        logDebug('artifact-manager.downloadArtifact.listNested', {
+          buildId,
+          requested: artifactPath,
+          availableCount: nestedArtifacts.length,
+          sample: nestedSample,
+          attempt,
+        });
+        artifact = nestedArtifacts.find((a) => a.path === artifactPath || a.name === artifactPath);
+      }
+
+      if (artifact) {
+        break;
+      }
+
+      if (attempt < ArtifactManager.artifactRetryAttempts) {
+        // eslint-disable-next-line no-await-in-loop
+        await this.delay(ArtifactManager.artifactRetryDelayMs);
+      }
+    }
 
     if (!artifact) {
+      logDebug('artifact-manager.downloadArtifact.miss', {
+        buildId,
+        requested: artifactPath,
+        attempts: ArtifactManager.artifactRetryAttempts,
+      });
       throw new Error(`Artifact not found: ${artifactPath}`);
     }
 
@@ -162,21 +209,11 @@ export class ArtifactManager {
 
     try {
       const encoding = options.encoding ?? 'buffer';
-      const normalizedPath = artifact.path
-        .split('/')
-        .map((segment) => encodeURIComponent(segment))
-        .join('/');
-      const buildLocator = toBuildLocator(buildId);
-      const artifactRequestPath = `content/${normalizedPath}`;
 
       if (encoding === 'text') {
-        const response = await this.client.modules.builds.downloadFileOfBuild(
-          artifactRequestPath,
-          buildLocator,
-          undefined,
-          undefined,
-          { responseType: 'text' }
-        );
+        const response = await this.client.downloadArtifactContent<string>(buildId, artifact.path, {
+          responseType: 'text',
+        });
 
         const axiosResponse = response as AxiosResponse<unknown>;
         const { data, headers } = axiosResponse;
@@ -198,12 +235,12 @@ export class ArtifactManager {
       }
 
       if (encoding === 'stream') {
-        const response = await this.client.modules.builds.downloadFileOfBuild(
-          artifactRequestPath,
-          buildLocator,
-          undefined,
-          undefined,
-          { responseType: 'stream' }
+        const response = await this.client.downloadArtifactContent<Readable>(
+          buildId,
+          artifact.path,
+          {
+            responseType: 'stream',
+          }
         );
 
         const axiosResponse = response as AxiosResponse<unknown>;
@@ -229,12 +266,12 @@ export class ArtifactManager {
         };
       }
 
-      const response = await this.client.modules.builds.downloadFileOfBuild(
-        artifactRequestPath,
-        buildLocator,
-        undefined,
-        undefined,
-        { responseType: 'arraybuffer' }
+      const response = await this.client.downloadArtifactContent<ArrayBuffer>(
+        buildId,
+        artifact.path,
+        {
+          responseType: 'arraybuffer',
+        }
       );
 
       const axiosResponse = response as AxiosResponse<unknown>;
@@ -258,7 +295,24 @@ export class ArtifactManager {
             : undefined,
       };
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      let errMsg: string;
+      if (isAxiosError(error)) {
+        const status = error.response?.status;
+        const data = error.response?.data;
+        let detail: string | undefined;
+        if (typeof data === 'string') {
+          detail = data;
+        } else if (data !== undefined && data !== null && typeof data === 'object') {
+          try {
+            detail = JSON.stringify(data);
+          } catch {
+            detail = '[unserializable response body]';
+          }
+        }
+        errMsg = `HTTP ${status ?? 'unknown'}${detail ? `: ${detail}` : ''}`;
+      } else {
+        errMsg = error instanceof Error ? error.message : 'Unknown error';
+      }
       throw new Error(`Failed to download artifact: ${errMsg}`);
     }
   }
@@ -271,31 +325,42 @@ export class ArtifactManager {
     artifactPaths: string[],
     options: ArtifactDownloadOptions = {}
   ): Promise<ArtifactContent[]> {
-    if (options.encoding === 'stream') {
-      throw new Error('Streaming downloads are only supported when requesting a single artifact');
-    }
+    const downloadOptions = {
+      encoding: (options.encoding ?? 'base64') as ArtifactDownloadOptions['encoding'],
+      maxSize: options.maxSize,
+    };
+    const results: ArtifactContent[] = [];
 
-    // Default to base64 encoding if not specified
-    const downloadOptions = { encoding: 'base64' as const, ...options };
-
-    const results = await Promise.allSettled(
-      artifactPaths.map((path) => this.downloadArtifact(buildId, path, downloadOptions))
-    );
-
-    return results.map((result, index) => {
-      if (result.status === 'fulfilled') {
-        return result.value;
-      } else {
-        // Return partial result with error
-        const fallbackName = artifactPaths[index] ?? 'unknown';
-        return {
+    for (const path of artifactPaths) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const artifact = await this.downloadArtifact(buildId, path, downloadOptions);
+        results.push(artifact);
+      } catch (error) {
+        const reason = error as { message?: string } | Error | string;
+        const message =
+          reason instanceof Error
+            ? reason.message
+            : typeof reason === 'object' && reason?.message
+              ? String(reason.message)
+              : String(reason ?? 'Unknown error');
+        const fallbackName = path ?? 'unknown';
+        logDebug('artifact-manager.downloadMultipleArtifacts.error', {
+          buildId,
+          requested: fallbackName,
+          encoding: downloadOptions.encoding,
+          error: message,
+        });
+        results.push({
           name: fallbackName,
           path: fallbackName,
           size: 0,
-          error: result.reason.message,
-        };
+          error: message,
+        });
       }
-    });
+    }
+
+    return results;
   }
 
   /**
@@ -464,5 +529,9 @@ export class ArtifactManager {
     for (const key of expired) {
       this.cache.delete(key);
     }
+  }
+
+  private async delay(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

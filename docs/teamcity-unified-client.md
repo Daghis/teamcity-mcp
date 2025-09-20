@@ -95,8 +95,9 @@ When adding or updating a manager:
 - `ArtifactManager.downloadArtifact` now accepts `encoding: 'stream'` to return a Node
   `Readable` without buffering the full payload. This is opt-in; the default path still
   buffers responses as `Buffer`/`base64` to preserve existing behaviour.
-- Streaming is limited to single-artifact downloads. `downloadMultipleArtifacts` will throw when
-  `encoding: 'stream'` is requested so callers can fall back to sequential handling.
+- `downloadMultipleArtifacts` mirrors the single-artifact method and now supports
+  `encoding: 'stream'`, returning a `Readable` for each artifact so batch-oriented tools can
+  reuse the same streaming pipeline.
 - Consumers should document whether they expect buffered or streaming content when exposing the
   option through new APIs or tools.
 
