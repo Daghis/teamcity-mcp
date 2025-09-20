@@ -108,7 +108,10 @@ The `tests/test-utils/mock-teamcity-client.ts` helper provides a typed
   calls.
 
 For integration tests, rely on the real adapter through `initializeTeamCity` and the MCP tooling
-entrypoints.
+entrypoints. The e2e harness (`tests/e2e/index.ts`) now supports a `batch` command that reuses a
+single MCP server instance for sequential tool calls (via `callToolsBatch` in
+`tests/integration/lib/mcp-runner`). Prefer batching setup/teardown flows - such as the streaming
+artifact scenario - to cut process spawn time while keeping existing single-call helpers available.
 
 ## Adding New API Surface
 

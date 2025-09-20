@@ -3,6 +3,26 @@ import path from 'path';
 
 export type Mode = 'dev' | 'full';
 
+export interface ToolBatchStep {
+  tool: string;
+  args?: Record<string, unknown>;
+}
+
+export interface ToolBatchStepResult {
+  index: number;
+  tool: string;
+  args: Record<string, unknown>;
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+}
+
+export interface ToolBatchResult {
+  results: ToolBatchStepResult[];
+  completed: boolean;
+  failureIndex?: number;
+}
+
 export async function listTools(mode: Mode): Promise<string[]> {
   const res = (await runE2E(['tools', '--mode', mode])) as { tools?: string[] };
   return res.tools ?? [];
@@ -17,6 +37,19 @@ export async function callTool<T = unknown>(
     res: T;
   };
   return res.res;
+}
+
+export async function callToolsBatch(mode: Mode, steps: ToolBatchStep[]): Promise<ToolBatchResult> {
+  const res = (await runE2E(['batch', JSON.stringify(steps), '--mode', mode])) as {
+    results?: ToolBatchStepResult[];
+    completed?: boolean;
+    failureIndex?: number;
+  };
+  const results = res.results ?? [];
+  const completed =
+    res.completed ?? (results.length === steps.length && results.every((step) => step.ok));
+
+  return { results, completed, failureIndex: res.failureIndex };
 }
 
 async function runE2E(args: string[]): Promise<unknown> {
