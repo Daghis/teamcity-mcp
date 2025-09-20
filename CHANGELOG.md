@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/Daghis/teamcity-mcp/compare/v1.7.0...v1.8.0) (2025-09-20)
+
+
+### Features
+
+* **tools:** support streaming artifacts in get_build_results ([#173](https://github.com/Daghis/teamcity-mcp/issues/173)) ([f95c5e4](https://github.com/Daghis/teamcity-mcp/commit/f95c5e4da9ffa80adc8b8f322c127a440c4524b5)), closes [#169](https://github.com/Daghis/teamcity-mcp/issues/169)
+
 ## [1.7.0](https://github.com/Daghis/teamcity-mcp/compare/v1.6.0...v1.7.0) (2025-09-20)
 
 
