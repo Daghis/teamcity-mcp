@@ -60,6 +60,8 @@ This document lists all Model Context Protocol (MCP) tools exposed by the TeamCi
   - Args: `buildId: string`, `includeArtifacts?: boolean`, `includeStatistics?: boolean`, `includeChanges?: boolean`, `includeDependencies?: boolean`, `artifactFilter?: string`, `maxArtifactSize?: number`, `artifactEncoding?: 'base64'|'stream'`
 - `download_build_artifact` — Download a single artifact (base64/text or stream-to-file)
   - Args: `buildId: string`, `artifactPath: string`, `encoding?: 'base64'|'text'|'stream'`, `maxSize?: number`, `outputPath?: string`
+- `download_build_artifacts` — Download multiple artifacts in one call
+  - Args: `buildId: string`, `artifactPaths: string[]`, `encoding?: 'base64'|'text'|'stream'`, `maxSize?: number`, `outputDir?: string` (streaming only)
 - `analyze_build_problems` — Problems + failing tests summary
   - Args: `buildId: string`
 

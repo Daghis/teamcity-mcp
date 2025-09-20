@@ -405,12 +405,6 @@ describe('ArtifactManager', () => {
       configureClient();
     });
 
-    it('rejects streaming encoding for multi-artifact downloads', async () => {
-      await expect(
-        manager.downloadMultipleArtifacts('12345', ['foo'], { encoding: 'stream' })
-      ).rejects.toThrow('Streaming downloads are only supported when requesting a single artifact');
-    });
-
     it('should download multiple artifacts', async () => {
       const mockArtifacts = {
         file: [
@@ -443,6 +437,36 @@ describe('ArtifactManager', () => {
       expect(result[1]?.content).toBe(Buffer.from('content2').toString('base64'));
       expect(result[2]?.name).toBe('file3.txt');
       expect(result[2]?.content).toBe(Buffer.from('content3').toString('base64'));
+    });
+
+    it('should stream multiple artifacts when requested', async () => {
+      const mockArtifacts = {
+        file: [
+          { name: 'logs/app.log', fullName: 'logs/app.log', size: 10 },
+          { name: 'metrics.json', fullName: 'metrics.json', size: 20 },
+        ],
+      };
+
+      const streamOne = Readable.from(['chunk-1']);
+      const streamTwo = Readable.from(['chunk-2']);
+
+      http.get
+        .mockResolvedValueOnce({ data: mockArtifacts })
+        .mockResolvedValueOnce({ data: mockArtifacts })
+        .mockResolvedValueOnce({ data: streamOne, headers: { 'content-type': 'text/plain' } })
+        .mockResolvedValueOnce({ data: streamTwo, headers: { 'content-type': 'application/json' } });
+
+      const result = await manager.downloadMultipleArtifacts(
+        '12345',
+        ['logs/app.log', 'metrics.json'],
+        { encoding: 'stream' }
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]?.content).toBe(streamOne);
+      expect(result[0]?.mimeType).toBe('text/plain');
+      expect(result[1]?.content).toBe(streamTwo);
+      expect(result[1]?.mimeType).toBe('application/json');
     });
 
     it('should handle partial batch download failures', async () => {

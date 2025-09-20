@@ -19,6 +19,8 @@ const BT_ID = `E2E_ARTIFACT_BT_${ts}`;
 const BT_NAME = `E2E Artifact BuildType ${ts}`;
 
 let buildId: string | undefined;
+let multiBuildId: string | undefined;
+let multiArtifactRequests: Array<{ path: string; downloadUrl?: string }> | undefined;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -31,6 +33,25 @@ interface DownloadArtifactResponse {
   content?: string;
   outputPath?: string;
   bytesWritten?: number;
+  success?: boolean;
+  error?: { message?: string } | string;
+}
+
+interface BatchArtifactItem {
+  name?: string;
+  path?: string;
+  size?: number;
+  mimeType?: string;
+  encoding?: string;
+  content?: string;
+  outputPath?: string;
+  bytesWritten?: number;
+  success?: boolean;
+  error?: { message?: string } | string;
+}
+
+interface DownloadArtifactsResponse {
+  artifacts?: BatchArtifactItem[];
   success?: boolean;
   error?: { message?: string } | string;
 }
@@ -69,6 +90,8 @@ async function waitForBuildCompletion(id: string, timeoutMs = 60_000): Promise<v
 
     if (state === 'queued' && !promoted) {
       try {
+        // Queue promotion must remain sequential to respect TeamCity API semantics
+        // eslint-disable-next-line no-await-in-loop
         await callTool('full', 'move_queued_build_to_top', { buildId: id });
       } catch (error) {
         // Non-fatal: servers may restrict queue operations or build may have started already.
@@ -97,6 +120,13 @@ describe('download_build_artifact tool (integration)', () => {
   it('creates project and build configuration (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
 
+    const artifactStepScript = [
+      "echo artifact-content > artifact.txt",
+      "echo artifact-extra > artifact-extra.txt",
+      "echo \"##teamcity[publishArtifacts 'artifact.txt']\"",
+      "echo \"##teamcity[publishArtifacts 'artifact-extra.txt']\"",
+    ].join('\n');
+
     const batch = await callToolsBatch('full', [
       {
         tool: 'create_project',
@@ -122,8 +152,8 @@ describe('download_build_artifact tool (integration)', () => {
           name: 'create-artifact',
           type: 'simpleRunner',
           properties: {
-            'script.content':
-              "echo artifact-content > artifact.txt && echo ##teamcity[publishArtifacts 'artifact.txt']",
+            'script.content': artifactStepScript,
+            'use.custom.script': 'true',
           },
         },
       },
@@ -149,7 +179,7 @@ describe('download_build_artifact tool (integration)', () => {
     try {
       const update = await callTool<ActionResult>('full', 'update_build_config', {
         buildTypeId: BT_ID,
-        artifactRules: 'artifact.txt',
+        artifactRules: '*.txt',
       });
       expect(update).toMatchObject({ success: true });
     } catch (_err) {
@@ -208,9 +238,93 @@ describe('download_build_artifact tool (integration)', () => {
     }
 
     expect(result.encoding).toBe('base64');
+    expect(result.path).toBe('artifact.txt');
     const content = String(result.content ?? '');
     const decoded = Buffer.from(content, 'base64').toString('utf8').trim();
     expect(decoded).toBe('artifact-content');
+    // eslint-disable-next-line no-console
+    console.log('single artifact path', result.path);
+  }, 60_000);
+
+  it('downloads secondary artifact as base64 payload (dev)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    if (!buildId) return expect(true).toBe(true);
+
+    const result = await callTool<DownloadArtifactResponse>('dev', 'download_build_artifact', {
+      buildId,
+      artifactPath: 'artifact-extra.txt',
+      encoding: 'base64',
+    });
+
+    if (result.success === false) {
+      const message =
+        typeof result.error === 'object' && result.error?.message
+          ? String(result.error.message)
+          : String(result.error ?? '');
+      if (message.includes('Artifact not found') || message.includes('Failed to fetch artifacts')) {
+        expect(true).toBe(true);
+        return;
+      }
+      throw new Error(`download_build_artifact (base64 extra) failed: ${message}`);
+    }
+
+    expect(result.encoding).toBe('base64');
+    const content = String(result.content ?? '');
+    const decoded = Buffer.from(content, 'base64').toString('utf8').trim();
+    expect(decoded).toBe('artifact-extra');
+  }, 60_000);
+
+  it('downloads multiple artifacts as base64 payloads (dev)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    if (!buildId) return expect(true).toBe(true);
+
+    multiBuildId = buildId;
+    multiArtifactRequests = undefined;
+
+    await wait(3000);
+
+    const result = await callTool<DownloadArtifactsResponse>('dev', 'download_build_artifacts', {
+      buildId,
+      artifactPaths: ['artifact.txt', 'artifact-extra.txt'],
+      encoding: 'base64',
+    });
+
+    if (result.success === false) {
+      const message =
+        typeof result.error === 'object' && result.error?.message
+          ? String(result.error.message)
+          : String(result.error ?? '');
+      if (message.includes('Artifact not found') || message.includes('Failed to fetch artifacts')) {
+        expect(true).toBe(true);
+        return;
+      }
+      throw new Error(`download_build_artifacts (base64) failed: ${message}`);
+    }
+
+    const artifacts = result.artifacts ?? [];
+    expect(artifacts.length).toBeGreaterThanOrEqual(2);
+
+    const first = artifacts.find((entry) => entry?.path === 'artifact.txt');
+    const second = artifacts.find((entry) => entry?.path === 'artifact-extra.txt');
+
+    if (!first || !second || first.success === false || second.success === false) {
+      const summary = (result.artifacts ?? []).map((entry) => ({
+        path: entry?.path,
+        success: entry?.success,
+        error: entry?.error,
+      }));
+      throw new Error(`download_build_artifacts (base64) entries: ${JSON.stringify(summary)}`);
+    }
+
+    expect(first?.encoding).toBe('base64');
+    expect(
+      Buffer.from(String(first?.content ?? ''), 'base64').toString('utf8').trim()
+    ).toBe('artifact-content');
+
+    expect(second?.encoding).toBe('base64');
+    expect(
+      Buffer.from(String(second?.content ?? ''), 'base64').toString('utf8').trim()
+    ).toBe('artifact-extra');
   }, 60_000);
 
   it('streams artifact to disk (dev)', async () => {
@@ -247,5 +361,81 @@ describe('download_build_artifact tool (integration)', () => {
     expect(written.trim()).toBe('artifact-content');
 
     await fs.rm(outputPath, { force: true });
+  }, 60_000);
+
+  it('streams multiple artifacts to disk (dev)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    const targetBuildId = multiBuildId ?? buildId;
+    if (!targetBuildId) return expect(true).toBe(true);
+    const requests = multiArtifactRequests ?? ['artifact.txt', 'artifact-extra.txt'];
+
+    const outputDir = join(tmpdir(), `artifact-batch-${Date.now()}`);
+    await fs.mkdir(outputDir, { recursive: true });
+
+    let result: DownloadArtifactsResponse;
+    try {
+      await wait(3000);
+      result = await callTool<DownloadArtifactsResponse>(
+        'dev',
+        'download_build_artifacts',
+        {
+          buildId: targetBuildId,
+          artifactPaths: requests,
+          encoding: 'stream',
+          outputDir,
+        }
+      );
+    } catch (error) {
+      await fs.rm(outputDir, { recursive: true, force: true });
+      throw error;
+    }
+
+    if (result.success === false) {
+      const message =
+        typeof result.error === 'object' && result.error?.message
+          ? String(result.error.message)
+          : String(result.error ?? '');
+      if (message.includes('Artifact not found') || message.includes('Failed to fetch artifacts')) {
+        await fs.rm(outputDir, { recursive: true, force: true });
+        expect(true).toBe(true);
+        return;
+      }
+      await fs.rm(outputDir, { recursive: true, force: true });
+      throw new Error(`download_build_artifacts (stream) failed: ${message}`);
+    }
+
+    const artifacts = result.artifacts ?? [];
+    expect(artifacts.length).toBeGreaterThanOrEqual(2);
+
+    const first = artifacts.find((entry) => entry?.path === 'artifact.txt');
+    const second = artifacts.find((entry) => entry?.path === 'artifact-extra.txt');
+
+    if (!first || !second || first.success === false || second.success === false) {
+      const summary = (result.artifacts ?? []).map((entry) => ({
+        path: entry?.path,
+        success: entry?.success,
+        error: entry?.error,
+      }));
+      await fs.rm(outputDir, { recursive: true, force: true });
+      throw new Error(`download_build_artifacts (stream) entries: ${JSON.stringify(summary)}`);
+    }
+
+    if (!first.outputPath || !second.outputPath) {
+      await fs.rm(outputDir, { recursive: true, force: true });
+      throw new Error('Expected streamed artifacts to include output paths');
+    }
+
+    expect(first.encoding).toBe('stream');
+    expect(second.encoding).toBe('stream');
+    expect(first.outputPath.startsWith(outputDir)).toBe(true);
+    expect(second.outputPath.startsWith(outputDir)).toBe(true);
+
+    const firstContent = await fs.readFile(first.outputPath, 'utf8');
+    const secondContent = await fs.readFile(second.outputPath, 'utf8');
+
+    expect(firstContent.trim()).toBe('artifact-content');
+    expect(secondContent.trim()).toBe('artifact-extra');
+
+    await fs.rm(outputDir, { recursive: true, force: true });
   }, 60_000);
 });

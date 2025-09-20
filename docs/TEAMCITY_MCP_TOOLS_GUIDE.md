@@ -57,6 +57,7 @@ Complete infrastructure management including creation, modification, and deletio
 | `list_builds`                | Search and list builds with filtering          | ✅  |  ✅  |
 | `get_build_results`          | Get detailed build results                     | ✅  |  ✅  |
 | `download_build_artifact`    | Download artifact content (base64/text/stream) | ✅  |  ✅  |
+| `download_build_artifacts`   | Download multiple artifacts (base64/text/stream) | ✅  |  ✅  |
 | `fetch_build_log`            | Retrieve build logs                            | ✅  |  ✅  |
 | `get_build_config`           | Get build configuration details                | ✅  |  ✅  |
 | `list_build_configs`         | List build configurations in project           | ✅  |  ✅  |
@@ -187,7 +188,7 @@ Complete infrastructure management including creation, modification, and deletio
 - `includeChanges`: Include associated VCS changes
 - `includeDependencies`: Include snapshot dependency builds
 
-When `artifactEncoding` is set to `'stream'`, artifacts still list metadata (`name`, `path`, `size`, `downloadUrl`) but also add a `downloadHandle` payload you can pass directly to `download_build_artifact` to retrieve the file without embedding base64 in the response.
+When `artifactEncoding` is set to `'stream'`, artifacts still list metadata (`name`, `path`, `size`, `downloadUrl`) but also add a `downloadHandle` payload you can pass directly to `download_build_artifact` (or collect the `path` values for `download_build_artifacts`) to retrieve the files without embedding base64 in the response.
 
 #### `download_build_artifact`
 
@@ -211,6 +212,30 @@ When `artifactEncoding` is set to `'stream'`, artifacts still list metadata (`na
 
 - In `stream` mode the tool writes the artifact to disk and returns metadata (`outputPath`, `bytesWritten`).
 - Base64/text modes embed content directly in the JSON response for easy scripting.
+
+#### `download_build_artifacts`
+
+**Description**: Download multiple artifacts in a single request
+**Mode**: Dev
+**Key Capabilities**:
+
+- Batch artifact downloads to avoid repeating authentication and path resolution
+- Supports `'base64'`, `'text'`, and `'stream'` encodings per artifact
+- Shares the same streaming writer as `download_build_artifact` for consistent metadata and temp-file handling
+
+**Parameters**:
+
+- `buildId` (required): Build identifier
+- `artifactPaths` (required): Array of artifact paths or names to download
+- `encoding`: `'base64'` (default), `'text'`, or `'stream'`
+- `maxSize`: Abort individual downloads whose size exceeds this byte limit
+- `outputDir`: Absolute directory for streamed artifacts (defaults to unique temp files)
+
+**Usage Notes**:
+
+- The response contains an `artifacts` array with per-item success, encoding, and either `content` (for buffered modes) or `outputPath`/`bytesWritten` (for streaming).
+- Streaming mode preserves relative artifact paths under `outputDir` and will generate unique filenames when collisions occur.
+- Failures for individual artifacts are reported inline with `success: false` and an `error` message so callers can retry or surface partial results.
 
 #### `fetch_build_log`
 
