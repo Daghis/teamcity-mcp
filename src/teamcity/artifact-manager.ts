@@ -8,6 +8,7 @@ import { type AxiosResponse, isAxiosError } from 'axios';
 import { debug as logDebug } from '@/utils/logger';
 
 import type { TeamCityClientAdapter } from './client-adapter';
+import { TeamCityAPIError } from './errors';
 import { toBuildLocator } from './utils/build-locator';
 
 export interface ArtifactInfo {
@@ -63,6 +64,10 @@ interface ArtifactFileResponse {
   file?: ArtifactFile[];
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
 export class ArtifactManager {
   private readonly client: TeamCityClientAdapter;
   private cache: Map<string, CacheEntry> = new Map();
@@ -105,12 +110,8 @@ export class ArtifactManager {
       );
 
       const baseUrl = this.getBaseUrl();
-      let artifacts = this.parseArtifacts(
-        (response.data as ArtifactFileResponse) ?? {},
-        buildId,
-        options.includeNested,
-        baseUrl
-      );
+      const artifactPayload = this.ensureArtifactListingResponse(response.data, buildId);
+      let artifacts = this.parseArtifacts(artifactPayload, buildId, options.includeNested, baseUrl);
 
       // Apply filters
       artifacts = this.applyFilters(artifacts, options);
@@ -366,6 +367,44 @@ export class ArtifactManager {
   /**
    * Parse artifacts from API response
    */
+  private ensureArtifactListingResponse(data: unknown, buildId: string): ArtifactFileResponse {
+    if (!isRecord(data)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned a non-object artifact listing response',
+        'INVALID_RESPONSE',
+        undefined,
+        { buildId }
+      );
+    }
+
+    const payload = data as ArtifactFileResponse;
+    const { file } = payload;
+
+    if (file !== undefined && !Array.isArray(file)) {
+      throw new TeamCityAPIError(
+        'TeamCity artifact listing response contains a non-array file field',
+        'INVALID_RESPONSE',
+        undefined,
+        { buildId }
+      );
+    }
+
+    if (Array.isArray(file)) {
+      file.forEach((entry, index) => {
+        if (!isRecord(entry)) {
+          throw new TeamCityAPIError(
+            'TeamCity artifact listing response contains a non-object file entry',
+            'INVALID_RESPONSE',
+            undefined,
+            { buildId, index }
+          );
+        }
+      });
+    }
+
+    return payload;
+  }
+
   private parseArtifacts(
     data: ArtifactFileResponse,
     buildId: string,

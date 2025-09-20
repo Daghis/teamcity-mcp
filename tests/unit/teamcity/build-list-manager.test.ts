@@ -190,5 +190,11 @@ describe('BuildListManager', () => {
         'Invalid date format'
       );
     });
+
+    it('throws when TeamCity omits the build array', async () => {
+      stub.builds.getMultipleBuilds.mockResolvedValue({ data: { count: 1 } });
+
+      await expect(manager.listBuilds({})).rejects.toThrow('build array');
+    });
   });
 });

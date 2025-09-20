@@ -157,6 +157,12 @@ describe('ArtifactManager', () => {
       expect(result[0]?.name).toBe('file0.txt');
       expect(result[99]?.name).toBe('file99.txt');
     });
+
+    it('throws when artifact listing payload is malformed', async () => {
+      http.get.mockResolvedValue({ data: { file: 'oops' } });
+
+      await expect(manager.listArtifacts('12345')).rejects.toThrow('non-array file field');
+    });
   });
 
   describe('Artifact Filtering', () => {

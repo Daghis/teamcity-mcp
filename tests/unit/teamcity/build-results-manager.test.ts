@@ -1,5 +1,10 @@
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
 import type { TeamCityUnifiedClient } from '@/teamcity/types/client';
+import { warn } from '@/utils/logger';
+
+jest.mock('@/utils/logger', () => ({
+  warn: jest.fn(),
+}));
 
 const BASE_URL = 'https://teamcity.example.com';
 
@@ -79,6 +84,7 @@ describe('BuildResultsManager', () => {
   };
 
   beforeEach(() => {
+    jest.mocked(warn).mockReset();
     stub = createStubClient();
     stub.modules.builds.getBuild.mockResolvedValue({ data: basicBuildPayload() });
 
@@ -197,6 +203,19 @@ describe('BuildResultsManager', () => {
       });
       expect(artifacts?.[0]).not.toHaveProperty('content');
     });
+
+    it('returns an empty array and logs when artifact payload is malformed', async () => {
+      stub.modules.builds.getFilesListOfBuild.mockResolvedValue({ data: { file: 'oops' } });
+
+      const artifacts = (await managerInternals.fetchArtifacts('12345', {})) as unknown[];
+
+      expect(artifacts).toEqual([]);
+      expect(warn).toHaveBeenCalledWith('Failed to fetch artifacts', {
+        buildId: '12345',
+        error: expect.stringContaining('non-array'),
+        expected: 'file[]',
+      });
+    });
   });
 
   describe('fetchStatistics', () => {
@@ -225,6 +244,19 @@ describe('BuildResultsManager', () => {
         passedTests: 198,
         failedTests: 1,
         codeCoverage: 85.5,
+      });
+    });
+
+    it('returns empty statistics and logs when payload is malformed', async () => {
+      stub.modules.builds.getBuildStatisticValues.mockResolvedValue({ data: { property: 'oops' } });
+
+      const statistics = await managerInternals.fetchStatistics('12345');
+
+      expect(statistics).toEqual({});
+      expect(warn).toHaveBeenCalledWith('Failed to fetch statistics', {
+        buildId: '12345',
+        error: expect.stringContaining('non-array'),
+        expected: 'property[]',
       });
     });
   });
@@ -256,6 +288,19 @@ describe('BuildResultsManager', () => {
       expect(changes?.[0]?.revision).toBe('abc123');
       expect(changes?.[0]?.files).toHaveLength(2);
     });
+
+    it('returns empty array and logs when change payload is malformed', async () => {
+      stub.modules.changes.getAllChanges.mockResolvedValue({ data: { change: 'oops' } });
+
+      const changes = await managerInternals.fetchChanges('12345');
+
+      expect(changes).toEqual([]);
+      expect(warn).toHaveBeenCalledWith('Failed to fetch changes', {
+        buildId: '12345',
+        error: expect.stringContaining('non-array'),
+        expected: 'change[]',
+      });
+    });
   });
 
   describe('fetchDependencies', () => {
@@ -284,6 +329,19 @@ describe('BuildResultsManager', () => {
         { buildId: 1, buildNumber: '100', buildTypeId: 'Cfg_A', status: 'SUCCESS' },
         { buildId: 2, buildNumber: '101', buildTypeId: 'Cfg_B', status: 'FAILURE' },
       ]);
+    });
+
+    it('returns empty array and logs when dependencies payload is malformed', async () => {
+      stub.modules.builds.getAllBuilds.mockResolvedValueOnce({ data: { build: 'oops' } });
+
+      const dependencies = await managerInternals.fetchDependencies('12345');
+
+      expect(dependencies).toEqual([]);
+      expect(warn).toHaveBeenCalledWith('Failed to fetch dependencies', {
+        buildId: '12345',
+        error: expect.stringContaining('non-array'),
+        expected: 'build[]',
+      });
     });
   });
 });

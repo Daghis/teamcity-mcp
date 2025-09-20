@@ -129,6 +129,14 @@ const RUNNER_REQUIRED_PARAMS: Record<string, string[]> = {
   kotlinScript: ['kotlinScript.content'],
 };
 
+interface StepListResponse {
+  step?: unknown;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
 /**
  * Manages build steps in TeamCity configurations
  */
@@ -144,12 +152,12 @@ export class BuildStepManager {
         options.configId,
         'count,step(id,name,type,disabled,properties(property(name,value)),parameters(property(name,value)))'
       );
-
-      if (response.data == null) {
-        throw new TeamCityAPIError('Invalid response from TeamCity API', 'INVALID_RESPONSE', 500);
-      }
-
-      const steps = this.parseStepList(response.data);
+      const payload = this.ensureStepListResponse(
+        response.data,
+        options.configId,
+        'list build steps'
+      );
+      const steps = this.parseStepList(payload.step, options.configId, 'list build steps');
 
       return {
         success: true,
@@ -186,7 +194,10 @@ export class BuildStepManager {
         stepData as Step
       );
 
-      const step = this.parseStep(response.data);
+      const step = this.parseStep(response.data, {
+        configId: options.configId,
+        operation: 'create build step',
+      });
 
       return {
         success: true,
@@ -238,7 +249,11 @@ export class BuildStepManager {
         updateData as Step
       );
 
-      const step = this.parseStep(response.data);
+      const step = this.parseStep(response.data, {
+        configId: options.configId,
+        operation: 'update build step',
+        stepId: options.stepId,
+      });
 
       return {
         success: true,
@@ -297,8 +312,12 @@ export class BuildStepManager {
         undefined,
         reorderData
       );
-
-      const steps = this.parseStepList(response.data);
+      const payload = this.ensureStepListResponse(
+        response.data,
+        options.configId,
+        'reorder build steps'
+      );
+      const steps = this.parseStepList(payload.step, options.configId, 'reorder build steps');
 
       return {
         success: true,
@@ -313,42 +332,114 @@ export class BuildStepManager {
   /**
    * Parse step list from API response
    */
-  private parseStepList(data: unknown): BuildStep[] {
-    const stepData = data as { step?: unknown };
-    if (stepData.step == null) {
+  private ensureStepListResponse(
+    data: unknown,
+    configId: string,
+    operation: string
+  ): StepListResponse {
+    if (!isRecord(data)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned a non-object step list response',
+        'INVALID_RESPONSE',
+        undefined,
+        { configId, operation }
+      );
+    }
+
+    const response = data as StepListResponse;
+    const { step } = response;
+
+    if (step !== undefined && !Array.isArray(step) && !isRecord(step)) {
+      throw new TeamCityAPIError(
+        'TeamCity step list response contains an invalid step payload',
+        'INVALID_RESPONSE',
+        undefined,
+        { configId, operation }
+      );
+    }
+
+    return response;
+  }
+
+  private parseStepList(stepNode: unknown, configId: string, operation: string): BuildStep[] {
+    if (stepNode == null) {
       return [];
     }
 
-    const steps = Array.isArray(stepData.step) ? stepData.step : [stepData.step];
-    return steps.map((step) => this.parseStep(step));
+    const steps = Array.isArray(stepNode) ? stepNode : [stepNode];
+    return steps.map((step, index) =>
+      this.parseStep(step, {
+        configId,
+        operation,
+        index,
+      })
+    );
   }
 
   /**
    * Parse individual step from API response
    */
-  private parseStep(step: unknown): BuildStep {
-    const stepData = step as {
-      id: string;
-      name?: string;
-      type: string;
-      disabled?: boolean;
-      properties?: unknown;
-      executionMode?: string;
-    };
+  private parseStep(
+    step: unknown,
+    context: { configId: string; operation: string; stepId?: string; index?: number }
+  ): BuildStep {
+    if (!isRecord(step)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned a non-object build step entry',
+        'INVALID_RESPONSE',
+        undefined,
+        { ...context }
+      );
+    }
+
+    const stepData = step as Record<string, unknown>;
+    const { id, name, type, disabled, properties, executionMode } = stepData;
+
+    if (typeof id !== 'string' || typeof type !== 'string') {
+      throw new TeamCityAPIError(
+        'TeamCity build step entry is missing required identifiers',
+        'INVALID_RESPONSE',
+        undefined,
+        { ...context, receivedKeys: Object.keys(stepData) }
+      );
+    }
+
     return {
-      id: stepData.id,
-      name: stepData.name ?? 'Unnamed Step',
-      type: stepData.type as RunnerType,
-      enabled: stepData.disabled !== true,
-      parameters: this.parseRunnerProperties(stepData.type, stepData.properties),
-      executionMode: (stepData.executionMode ?? 'default') as BuildStep['executionMode'],
+      id,
+      name: typeof name === 'string' && name.length > 0 ? name : 'Unnamed Step',
+      type: type as RunnerType,
+      enabled: disabled !== true,
+      parameters: this.parseRunnerProperties(type, properties, {
+        configId: context.configId,
+        operation: context.operation,
+      }),
+      executionMode: (typeof executionMode === 'string'
+        ? executionMode
+        : 'default') as BuildStep['executionMode'],
     };
   }
 
   /**
    * Parse runner properties based on runner type
    */
-  private parseRunnerProperties(type: string, properties: unknown): Record<string, string> {
+  private parseRunnerProperties(
+    type: string,
+    properties: unknown,
+    context: { configId: string; operation: string }
+  ): Record<string, string> {
+    if (properties == null) {
+      return {};
+    }
+
+    if (!isRecord(properties)) {
+      throw new TeamCityAPIError(
+        'TeamCity build step entry contains invalid properties payload',
+        'INVALID_RESPONSE',
+        undefined,
+        context
+      );
+    }
+
     const propsData = properties as { property?: unknown };
     if (propsData.property == null) {
       return {};
@@ -359,14 +450,17 @@ export class BuildStepManager {
     const result: Record<string, string> = {};
 
     for (const prop of props) {
-      const propData = prop as { name?: string; value?: string };
-      if (
-        propData.name !== null &&
-        propData.name !== undefined &&
-        propData.name !== '' &&
-        propData.value !== undefined
-      ) {
-        result[propData.name] = propData.value;
+      if (!isRecord(prop)) {
+        throw new TeamCityAPIError(
+          'TeamCity build step property entry is not an object',
+          'INVALID_RESPONSE',
+          undefined,
+          context
+        );
+      }
+      const { name, value } = prop as { name?: string; value?: string };
+      if (typeof name === 'string' && name !== '' && typeof value === 'string') {
+        result[name] = value;
       }
     }
 

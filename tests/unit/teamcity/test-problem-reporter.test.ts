@@ -1,6 +1,8 @@
 /**
  * Tests for TeamCity Test and Problem Reporter
  */
+import { error as logError } from '@/utils';
+
 import {
   type BuildProblem,
   type CategorizedProblems,
@@ -14,6 +16,10 @@ import {
   createMockTeamCityClient,
 } from '../../test-utils/mock-teamcity-client';
 
+jest.mock('@/utils', () => ({
+  error: jest.fn(),
+}));
+
 describe('TestProblemReporter', () => {
   let reporter: TestProblemReporter;
   let mockClient: MockTeamCityClient;
@@ -24,6 +30,7 @@ describe('TestProblemReporter', () => {
   const BASE_URL = 'http://localhost:8111';
 
   beforeEach(() => {
+    jest.mocked(logError).mockReset();
     mockClient = createMockTeamCityClient();
     http = mockClient.http as jest.Mocked<ReturnType<MockTeamCityClient['getAxios']>>;
     http.get.mockReset();
@@ -136,6 +143,12 @@ describe('TestProblemReporter', () => {
 
       expect(stats.successRate).toBe(75); // 75 passed out of 100 total
     });
+
+    it('throws when TeamCity returns malformed statistics payload', async () => {
+      http.get.mockResolvedValue({ data: 'oops' });
+
+      await expect(reporter.getTestStatistics('99999')).rejects.toThrow('test statistics');
+    });
   });
 
   describe('getFailedTests', () => {
@@ -198,6 +211,23 @@ describe('TestProblemReporter', () => {
       const failedTests = await reporter.getFailedTests(buildId);
 
       expect(failedTests).toEqual([]);
+    });
+
+    it('logs and returns empty array when failed test payload is malformed', async () => {
+      const buildId = '12351';
+
+      http.get.mockResolvedValue({
+        data: {
+          testOccurrence: 'oops',
+        },
+      });
+
+      const failedTests = await reporter.getFailedTests(buildId);
+
+      expect(failedTests).toEqual([]);
+      expect(logError).toHaveBeenCalledWith('Failed to get failed tests', expect.any(Error), {
+        buildId,
+      });
     });
 
     it('should filter only failed tests', async () => {
@@ -289,16 +319,53 @@ describe('TestProblemReporter', () => {
       expect(problems).toEqual([]);
     });
 
+    it('logs and returns empty array when problem payload is malformed', async () => {
+      const buildId = '12355';
+
+      http.get.mockResolvedValue({
+        data: {
+          problemOccurrence: 'oops',
+        },
+      });
+
+      const problems = await reporter.getBuildProblems(buildId);
+
+      expect(problems).toEqual([]);
+      expect(logError).toHaveBeenCalledWith('Failed to get build problems', expect.any(Error), {
+        buildId,
+      });
+    });
+
     it('should categorize problems by type', async () => {
       const buildId = '12353';
 
       http.get.mockResolvedValue({
         data: {
           problemOccurrence: [
-            { type: 'TC_COMPILATION_ERROR', details: 'Compilation failed' },
-            { type: 'TC_COMPILATION_ERROR', details: 'Another compilation error' },
-            { type: 'TC_FAILED_TESTS', details: 'Tests failed' },
-            { type: 'TC_EXIT_CODE', details: 'Bad exit code' },
+            {
+              id: 'p1',
+              type: 'TC_COMPILATION_ERROR',
+              identity: 'compilation_error_1',
+              details: 'Compilation failed',
+            },
+            {
+              id: 'p2',
+              type: 'TC_COMPILATION_ERROR',
+              identity: 'compilation_error_2',
+              details: 'Another compilation error',
+            },
+            {
+              id: 'p3',
+              type: 'TC_FAILED_TESTS',
+              identity: 'failed_tests',
+              details: 'Tests failed',
+            },
+            {
+              id: 'p4',
+              type: 'TC_EXIT_CODE',
+              identity: 'exit_code',
+              details: 'Bad exit code',
+            },
           ],
         },
       });

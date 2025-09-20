@@ -5,6 +5,7 @@ import type { AxiosResponse } from 'axios';
 
 import { warn } from '@/utils/logger';
 
+import { TeamCityAPIError } from './errors';
 import type { TeamCityUnifiedClient } from './types/client';
 import { toBuildLocator } from './utils/build-locator';
 
@@ -115,6 +116,51 @@ interface TeamCityChange {
     }>;
   };
 }
+
+interface BuildSummaryResponse {
+  id: number | string;
+  number: string;
+  status: string;
+  state: string;
+  buildTypeId: string;
+  statusText?: string;
+  webUrl: string;
+  projectId?: string;
+  branchName?: string;
+  startDate?: string;
+  finishDate?: string;
+  queuedDate?: string;
+  triggered?: {
+    type: string;
+    date: string;
+    user?: { username?: string; name?: string };
+  };
+}
+
+interface ArtifactListResponse {
+  file?: TeamCityArtifact[];
+}
+
+interface StatisticsResponse {
+  property?: Array<{ name: string; value: string }>;
+}
+
+interface ChangesResponse {
+  change?: TeamCityChange[];
+}
+
+interface DependenciesResponse {
+  build?: Array<{
+    id?: unknown;
+    number?: unknown;
+    buildTypeId?: unknown;
+    status?: unknown;
+  }>;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
 
 export class BuildResultsManager {
   private client: TeamCityUnifiedClient;
@@ -231,39 +277,20 @@ export class BuildResultsManager {
   /**
    * Fetch build summary data
    */
-  private async fetchBuildSummary(buildId: string): Promise<unknown> {
+  private async fetchBuildSummary(buildId: string): Promise<BuildSummaryResponse> {
     const response = await this.client.modules.builds.getBuild(
       toBuildLocator(buildId),
       BuildResultsManager.fields
     );
-    return response.data;
+    return this.ensureBuildSummary(response.data, buildId);
   }
 
   /**
    * Transform build data to result format
    */
-  private transformBuildData(data: unknown): BuildResult['build'] {
-    const buildData = data as {
-      id: number;
-      number: string;
-      status: string;
-      state: string;
-      buildTypeId: string;
-      statusText?: string;
-      webUrl: string;
-      projectId?: string;
-      branchName?: string;
-      startDate?: string;
-      finishDate?: string;
-      queuedDate?: string;
-      triggered?: {
-        type: string;
-        date: string;
-        user?: { username?: string; name?: string };
-      };
-    };
+  private transformBuildData(buildData: BuildSummaryResponse): BuildResult['build'] {
     const build: BuildResult['build'] = {
-      id: buildData.id,
+      id: typeof buildData.id === 'string' ? Number.parseInt(buildData.id, 10) : buildData.id,
       number: buildData.number,
       status: buildData.status,
       state: buildData.state,
@@ -298,17 +325,135 @@ export class BuildResultsManager {
 
     // Add trigger information
     if (buildData.triggered) {
-      build.triggered = {
+      const triggered: BuildResult['build']['triggered'] = {
         type: buildData.triggered.type,
         date: buildData.triggered.date,
       };
 
-      if (buildData.triggered.user) {
-        build.triggered.user = buildData.triggered.user.username ?? buildData.triggered.user.name;
+      const triggeredUser = buildData.triggered.user;
+      if (triggeredUser) {
+        const username = triggeredUser.username ?? triggeredUser.name;
+        if (username) {
+          triggered.user = username;
+        }
       }
+
+      build.triggered = triggered;
     }
 
     return build;
+  }
+
+  private ensureBuildSummary(data: unknown, buildId: string): BuildSummaryResponse {
+    if (!isRecord(data)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned a non-object build summary response',
+        'INVALID_RESPONSE',
+        undefined,
+        { buildId, expected: 'object with build fields', receivedType: typeof data }
+      );
+    }
+
+    const summary = data as Record<string, unknown>;
+    const { id, number, status, state, buildTypeId, webUrl, triggered } = summary;
+
+    if (
+      (typeof id !== 'number' && typeof id !== 'string') ||
+      typeof number !== 'string' ||
+      typeof status !== 'string' ||
+      typeof state !== 'string' ||
+      typeof buildTypeId !== 'string' ||
+      typeof webUrl !== 'string'
+    ) {
+      throw new TeamCityAPIError(
+        'TeamCity build summary response is missing required fields',
+        'INVALID_RESPONSE',
+        undefined,
+        { buildId, receivedKeys: Object.keys(summary) }
+      );
+    }
+
+    let normalizedTriggered: BuildSummaryResponse['triggered'];
+
+    if (triggered !== undefined && triggered !== null) {
+      if (!isRecord(triggered)) {
+        throw new TeamCityAPIError(
+          'TeamCity build summary response contains an invalid triggered payload',
+          'INVALID_RESPONSE',
+          undefined,
+          { buildId, receivedType: typeof triggered }
+        );
+      }
+
+      const { type, date, user } = triggered as Record<string, unknown>;
+      if (typeof type !== 'string' || typeof date !== 'string') {
+        throw new TeamCityAPIError(
+          'TeamCity build summary response contains an invalid triggered payload',
+          'INVALID_RESPONSE',
+          undefined,
+          { buildId }
+        );
+      }
+
+      if (user !== undefined && user !== null && !isRecord(user)) {
+        throw new TeamCityAPIError(
+          'TeamCity build summary response contains an invalid trigger user payload',
+          'INVALID_RESPONSE',
+          undefined,
+          { buildId }
+        );
+      }
+
+      let normalizedUser: { username?: string; name?: string } | undefined;
+      if (user !== undefined && user !== null) {
+        const userRecord = user as Record<string, unknown>;
+        const username = userRecord['username'];
+        const name = userRecord['name'];
+
+        const normalizedUsername = typeof username === 'string' ? username : undefined;
+        const normalizedName = typeof name === 'string' ? name : undefined;
+
+        if (normalizedUsername !== undefined || normalizedName !== undefined) {
+          normalizedUser = {};
+          if (normalizedUsername) {
+            normalizedUser.username = normalizedUsername;
+          }
+          if (normalizedName) {
+            normalizedUser.name = normalizedName;
+          }
+        }
+      }
+
+      normalizedTriggered = {
+        type,
+        date,
+        ...(normalizedUser ? { user: normalizedUser } : {}),
+      };
+    }
+
+    const normalized: BuildSummaryResponse = {
+      id: id as number | string,
+      number: number as string,
+      status: status as string,
+      state: state as string,
+      buildTypeId: buildTypeId as string,
+      statusText:
+        typeof summary['statusText'] === 'string' ? (summary['statusText'] as string) : undefined,
+      webUrl: webUrl as string,
+      projectId:
+        typeof summary['projectId'] === 'string' ? (summary['projectId'] as string) : undefined,
+      branchName:
+        typeof summary['branchName'] === 'string' ? (summary['branchName'] as string) : undefined,
+      startDate:
+        typeof summary['startDate'] === 'string' ? (summary['startDate'] as string) : undefined,
+      finishDate:
+        typeof summary['finishDate'] === 'string' ? (summary['finishDate'] as string) : undefined,
+      queuedDate:
+        typeof summary['queuedDate'] === 'string' ? (summary['queuedDate'] as string) : undefined,
+      triggered: normalizedTriggered,
+    };
+
+    return normalized;
   }
 
   /**
@@ -323,7 +468,7 @@ export class BuildResultsManager {
       const response = await this.client.modules.builds.getFilesListOfBuild(
         toBuildLocator(buildId)
       );
-      const artifactListing = response.data as { file?: TeamCityArtifact[] };
+      const artifactListing = this.ensureArtifactListResponse(response.data, buildId);
       let artifacts = artifactListing.file ?? [];
 
       // Filter artifacts if pattern provided
@@ -391,7 +536,11 @@ export class BuildResultsManager {
 
       return result;
     } catch (error) {
-      warn('Failed to fetch artifacts', { error, buildId });
+      warn('Failed to fetch artifacts', {
+        error: error instanceof Error ? error.message : error,
+        buildId,
+        expected: 'file[]',
+      });
       return [];
     }
   }
@@ -408,6 +557,164 @@ export class BuildResultsManager {
     return artifacts.filter((a) => regex.test(a.name));
   }
 
+  private ensureArtifactListResponse(data: unknown, buildId: string): ArtifactListResponse {
+    if (!isRecord(data)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned a non-object artifact list response',
+        'INVALID_RESPONSE',
+        undefined,
+        { buildId, expected: 'object with file[]' }
+      );
+    }
+
+    const { file } = data as ArtifactListResponse;
+
+    if (file !== undefined && !Array.isArray(file)) {
+      throw new TeamCityAPIError(
+        'TeamCity artifact list response contains a non-array file field',
+        'INVALID_RESPONSE',
+        undefined,
+        { buildId, receivedType: typeof file }
+      );
+    }
+
+    return data as ArtifactListResponse;
+  }
+
+  private ensureStatisticsResponse(data: unknown, buildId: string): StatisticsResponse {
+    if (!isRecord(data)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned a non-object statistics response',
+        'INVALID_RESPONSE',
+        undefined,
+        { buildId, expected: 'object with property[]' }
+      );
+    }
+
+    const { property } = data as { property?: unknown };
+
+    if (property === undefined) {
+      return {} as StatisticsResponse;
+    }
+
+    if (!Array.isArray(property)) {
+      throw new TeamCityAPIError(
+        'TeamCity statistics response contains a non-array property field',
+        'INVALID_RESPONSE',
+        undefined,
+        { buildId, receivedType: typeof property }
+      );
+    }
+
+    property.forEach((entry, index) => {
+      if (!isRecord(entry)) {
+        throw new TeamCityAPIError(
+          'TeamCity statistics response contains a non-object property entry',
+          'INVALID_RESPONSE',
+          undefined,
+          { buildId, index }
+        );
+      }
+
+      const { name, value } = entry as Record<string, unknown>;
+      if (typeof name !== 'string' || typeof value !== 'string') {
+        throw new TeamCityAPIError(
+          'TeamCity statistics response property entry is missing required fields',
+          'INVALID_RESPONSE',
+          undefined,
+          { buildId, index, receivedKeys: Object.keys(entry) }
+        );
+      }
+    });
+
+    return { property: property as Array<{ name: string; value: string }> };
+  }
+
+  private ensureChangesResponse(data: unknown, buildId: string): ChangesResponse {
+    if (!isRecord(data)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned a non-object changes response',
+        'INVALID_RESPONSE',
+        undefined,
+        { buildId, expected: 'object with change[]' }
+      );
+    }
+
+    const { change } = data as ChangesResponse;
+
+    if (change !== undefined && !Array.isArray(change)) {
+      throw new TeamCityAPIError(
+        'TeamCity changes response contains a non-array change field',
+        'INVALID_RESPONSE',
+        undefined,
+        { buildId, receivedType: typeof change }
+      );
+    }
+
+    return data as ChangesResponse;
+  }
+
+  private ensureDependenciesResponse(data: unknown, buildId: string): DependenciesResponse {
+    if (!isRecord(data)) {
+      throw new TeamCityAPIError(
+        'TeamCity returned a non-object dependencies response',
+        'INVALID_RESPONSE',
+        undefined,
+        { buildId, expected: 'object with build[]' }
+      );
+    }
+
+    const { build } = data as DependenciesResponse;
+
+    if (build !== undefined && !Array.isArray(build)) {
+      throw new TeamCityAPIError(
+        'TeamCity dependencies response contains a non-array build field',
+        'INVALID_RESPONSE',
+        undefined,
+        { buildId, receivedType: typeof build }
+      );
+    }
+
+    if (Array.isArray(build)) {
+      build.forEach((entry, index) => {
+        if (!isRecord(entry)) {
+          throw new TeamCityAPIError(
+            'TeamCity dependencies response contains a non-object build entry',
+            'INVALID_RESPONSE',
+            undefined,
+            { buildId, index }
+          );
+        }
+
+        const { id, number, buildTypeId, status } = entry as Record<string, unknown>;
+        if (
+          (typeof id !== 'number' && typeof id !== 'string') ||
+          typeof number !== 'string' ||
+          typeof buildTypeId !== 'string' ||
+          typeof status !== 'string'
+        ) {
+          throw new TeamCityAPIError(
+            'TeamCity dependencies response is missing required fields on build entry',
+            'INVALID_RESPONSE',
+            undefined,
+            { buildId, index, receivedKeys: Object.keys(entry) }
+          );
+        }
+
+        if (typeof id === 'string' && Number.isNaN(Number.parseInt(id, 10))) {
+          throw new TeamCityAPIError(
+            'TeamCity dependencies response contains a non-numeric id value',
+            'INVALID_RESPONSE',
+            undefined,
+            { buildId, index, receivedValue: id }
+          );
+        }
+      });
+    }
+
+    return data as DependenciesResponse;
+  }
+
   /**
    * Fetch build statistics
    */
@@ -416,8 +723,8 @@ export class BuildResultsManager {
       const response = await this.client.modules.builds.getBuildStatisticValues(
         toBuildLocator(buildId)
       );
-      const payload = response.data as { property?: Array<{ name: string; value: string }> };
-      const properties = payload.property ?? [];
+      const payload = this.ensureStatisticsResponse(response.data, buildId);
+      const properties: Array<{ name: string; value: string }> = payload.property ?? [];
       const stats: BuildResult['statistics'] = {};
 
       for (const prop of properties) {
@@ -451,7 +758,11 @@ export class BuildResultsManager {
 
       return stats;
     } catch (error) {
-      warn('Failed to fetch statistics', { error, buildId });
+      warn('Failed to fetch statistics', {
+        error: error instanceof Error ? error.message : error,
+        buildId,
+        expected: 'property[]',
+      });
       return {};
     }
   }
@@ -462,7 +773,7 @@ export class BuildResultsManager {
   private async fetchChanges(buildId: string): Promise<BuildResult['changes']> {
     try {
       const response = await this.client.modules.changes.getAllChanges(`build:(id:${buildId})`);
-      const changePayload = response.data as { change?: TeamCityChange[] };
+      const changePayload = this.ensureChangesResponse(response.data, buildId);
       const changes = changePayload.change ?? [];
 
       return changes.map((change: TeamCityChange) => ({
@@ -476,7 +787,11 @@ export class BuildResultsManager {
         })),
       }));
     } catch (error) {
-      warn('Failed to fetch changes', { error, buildId });
+      warn('Failed to fetch changes', {
+        error: error instanceof Error ? error.message : error,
+        buildId,
+        expected: 'change[]',
+      });
       return [];
     }
   }
@@ -490,24 +805,22 @@ export class BuildResultsManager {
         `snapshotDependency:(to:(id:${buildId}))`,
         'build(id,number,buildTypeId,status)'
       );
-      const depsData = response.data as {
-        build?: Array<{
-          id: number;
-          number: string;
-          buildTypeId: string;
-          status: string;
-        }>;
-      };
+      const depsData = this.ensureDependenciesResponse(response.data, buildId);
       const builds = depsData.build ?? [];
 
       return builds.map((build) => ({
-        buildId: build.id,
-        buildNumber: build.number,
-        buildTypeId: build.buildTypeId,
-        status: build.status,
+        buildId:
+          typeof build.id === 'string' ? Number.parseInt(build.id, 10) : (build.id as number),
+        buildNumber: build.number as string,
+        buildTypeId: build.buildTypeId as string,
+        status: build.status as string,
       }));
     } catch (error) {
-      warn('Failed to fetch dependencies', { error, buildId });
+      warn('Failed to fetch dependencies', {
+        error: error instanceof Error ? error.message : error,
+        buildId,
+        expected: 'build[]',
+      });
       return [];
     }
   }
