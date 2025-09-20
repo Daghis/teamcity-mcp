@@ -37,6 +37,13 @@ describe('ArtifactManager', () => {
         config?: RawAxiosRequestConfig
       ) => http.get(`/app/rest/builds/${buildLocator}/artifacts/${path}`, config)
     );
+    mockClient.downloadArtifactContent.mockImplementation(
+      async (
+        buildId: string,
+        artifactPath: string,
+        requestConfig?: RawAxiosRequestConfig
+      ) => http.get(`/app/rest/builds/id:${buildId}/artifacts/content/${artifactPath}`, requestConfig)
+    );
     mockClient.request.mockImplementation(async (fn) => fn({ axios: http, baseUrl: BASE_URL }));
     mockClient.getApiConfig.mockReturnValue({
       baseUrl: BASE_URL,
@@ -414,12 +421,9 @@ describe('ArtifactManager', () => {
         ],
       };
 
-      // Since Promise.allSettled runs in parallel, all listArtifacts calls happen first,
-      // then all download calls happen
+      // The manager now downloads sequentially, caching the initial artifact list
       http.get
-        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file1
-        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file2
-        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file3
+        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts (cached for subsequent downloads)
         .mockResolvedValueOnce({ data: Buffer.from('content1'), headers: {} }) // download file1
         .mockResolvedValueOnce({ data: Buffer.from('content2'), headers: {} }) // download file2
         .mockResolvedValueOnce({ data: Buffer.from('content3'), headers: {} }); // download file3
@@ -452,7 +456,6 @@ describe('ArtifactManager', () => {
 
       http.get
         .mockResolvedValueOnce({ data: mockArtifacts })
-        .mockResolvedValueOnce({ data: mockArtifacts })
         .mockResolvedValueOnce({ data: streamOne, headers: { 'content-type': 'text/plain' } })
         .mockResolvedValueOnce({ data: streamTwo, headers: { 'content-type': 'application/json' } });
 
@@ -477,10 +480,8 @@ describe('ArtifactManager', () => {
         ],
       };
 
-      // Since Promise.allSettled runs in parallel, all listArtifacts calls happen first
       http.get
-        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file1
-        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts for file2
+        .mockResolvedValueOnce({ data: mockArtifacts }) // listArtifacts cached for both downloads
         .mockResolvedValueOnce({ data: Buffer.from('content1'), headers: {} }) // download file1
         .mockRejectedValueOnce(new Error('Download failed')); // download file2 fails
 
@@ -521,9 +522,9 @@ describe('ArtifactManager', () => {
     });
 
     it('should handle artifact not found during download', async () => {
-      http.get.mockResolvedValueOnce({
+      http.get.mockImplementation(async () => ({
         data: { file: [] },
-      });
+      }));
 
       await expect(manager.downloadArtifact('12345', 'nonexistent.txt')).rejects.toThrow(
         'Artifact not found'

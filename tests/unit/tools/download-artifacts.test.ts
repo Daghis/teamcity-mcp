@@ -11,20 +11,39 @@ jest.mock('@/config', () => ({
   getMCPMode: () => 'dev',
 }));
 
-jest.mock('@/utils/logger/index', () => ({
-  getLogger: () => ({
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+jest.mock('@/utils/logger/index', () => {
+  const debug = jest.fn();
+  const info = jest.fn();
+  const warn = jest.fn();
+  const error = jest.fn();
+  const logToolExecution = jest.fn();
+  const logTeamCityRequest = jest.fn();
+  const logLifecycle = jest.fn();
+  const child = jest.fn();
+
+  const mockLoggerInstance = {
+    debug,
+    info,
+    warn,
+    error,
+    logToolExecution,
+    logTeamCityRequest,
+    logLifecycle,
+    child,
     generateRequestId: () => 'test-request',
-    logToolExecution: jest.fn(),
-  }),
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-}));
+  };
+
+  child.mockReturnValue(mockLoggerInstance);
+
+  return {
+    getLogger: () => mockLoggerInstance,
+    logger: mockLoggerInstance,
+    debug,
+    info,
+    warn,
+    error,
+  };
+});
 
 describe('tools: download_build_artifacts', () => {
   afterEach(() => {
@@ -33,24 +52,24 @@ describe('tools: download_build_artifacts', () => {
   });
 
   it('returns base64 content for each artifact', async () => {
-    const downloadMultipleArtifacts = jest.fn().mockResolvedValue([
-      {
+    const downloadArtifact = jest
+      .fn()
+      .mockResolvedValueOnce({
         name: 'first.bin',
         path: 'first.bin',
         size: 6,
         content: Buffer.from('first!').toString('base64'),
         mimeType: 'application/octet-stream',
-      },
-      {
+      })
+      .mockResolvedValueOnce({
         name: 'second.txt',
         path: 'second.txt',
         size: 6,
         content: Buffer.from('second').toString('base64'),
         mimeType: 'text/plain',
-      },
-    ]);
+      });
 
-    const ArtifactManager = jest.fn().mockImplementation(() => ({ downloadMultipleArtifacts }));
+    const ArtifactManager = jest.fn().mockImplementation(() => ({ downloadArtifact }));
     const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue({});
     const getInstance = jest.fn().mockReturnValue({});
 
@@ -79,7 +98,11 @@ describe('tools: download_build_artifacts', () => {
       encoding: 'base64',
     });
 
-    expect(downloadMultipleArtifacts).toHaveBeenCalledWith('123', ['first.bin', 'second.txt'], {
+    expect(downloadArtifact).toHaveBeenNthCalledWith(1, '123', 'first.bin', {
+      encoding: 'base64',
+      maxSize: undefined,
+    });
+    expect(downloadArtifact).toHaveBeenNthCalledWith(2, '123', 'second.txt', {
       encoding: 'base64',
       maxSize: undefined,
     });
@@ -103,24 +126,24 @@ describe('tools: download_build_artifacts', () => {
   it('streams artifacts to disk when requested', async () => {
     const firstChunks = ['hello'];
     const secondChunks = ['world'];
-    const downloadMultipleArtifacts = jest.fn().mockResolvedValue([
-      {
+    const downloadArtifact = jest
+      .fn()
+      .mockResolvedValueOnce({
         name: 'logs/app.log',
         path: 'logs/app.log',
         size: 5,
         content: Readable.from(firstChunks),
         mimeType: 'text/plain',
-      },
-      {
+      })
+      .mockResolvedValueOnce({
         name: 'metrics.json',
         path: 'metrics.json',
         size: 5,
         content: Readable.from(secondChunks),
         mimeType: 'application/json',
-      },
-    ]);
+      });
 
-    const ArtifactManager = jest.fn().mockImplementation(() => ({ downloadMultipleArtifacts }));
+    const ArtifactManager = jest.fn().mockImplementation(() => ({ downloadArtifact }));
     const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue({});
     const getInstance = jest.fn().mockReturnValue({});
 
@@ -152,7 +175,11 @@ describe('tools: download_build_artifacts', () => {
       outputDir: tempRoot,
     });
 
-    expect(downloadMultipleArtifacts).toHaveBeenCalledWith('456', ['logs/app.log', 'metrics.json'], {
+    expect(downloadArtifact).toHaveBeenNthCalledWith(1, '456', 'logs/app.log', {
+      encoding: 'stream',
+      maxSize: undefined,
+    });
+    expect(downloadArtifact).toHaveBeenNthCalledWith(2, '456', 'metrics.json', {
       encoding: 'stream',
       maxSize: undefined,
     });

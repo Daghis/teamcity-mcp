@@ -3,13 +3,44 @@ import { z } from 'zod';
 import { globalErrorHandler } from '@/middleware/global-error-handler';
 import { type ToolResponse, runTool } from '@/utils/mcp';
 
-const sharedLogger = {
-  generateRequestId: jest.fn(() => '123-1'),
-  logToolExecution: jest.fn(),
+const makeMockLogger = () => {
+  const mock = {
+    generateRequestId: jest.fn(() => '123-1'),
+    logToolExecution: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    logTeamCityRequest: jest.fn(),
+    logLifecycle: jest.fn(),
+    child: jest.fn(),
+  };
+  mock.child.mockReturnValue(mock);
+  return mock;
 };
+
+let sharedLogger: ReturnType<typeof makeMockLogger>;
+
 jest.mock('@/utils/logger/index', () => ({
-  getLogger: () => sharedLogger,
+  getLogger: () => {
+    if (sharedLogger === undefined) {
+      sharedLogger = makeMockLogger();
+    }
+    return sharedLogger;
+  },
+  get logger() {
+    if (sharedLogger === undefined) {
+      sharedLogger = makeMockLogger();
+    }
+    return sharedLogger;
+  },
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
 }));
+
+sharedLogger = makeMockLogger();
 
 jest.mock('@/middleware/error', () => ({
   formatError: jest.fn((err: unknown) => ({ kind: 'zod', message: String(err) })),

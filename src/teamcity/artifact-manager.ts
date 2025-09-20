@@ -3,10 +3,12 @@
  */
 import type { Readable } from 'node:stream';
 
-import { isAxiosError, type AxiosResponse } from 'axios';
+import { type AxiosResponse, isAxiosError } from 'axios';
+
+import { debug as logDebug } from '@/utils/logger';
 
 import type { TeamCityClientAdapter } from './client-adapter';
-import { debug as logDebug } from '@/utils/logger';
+import { toBuildLocator } from './utils/build-locator';
 
 export interface ArtifactInfo {
   name: string;
@@ -233,9 +235,13 @@ export class ArtifactManager {
       }
 
       if (encoding === 'stream') {
-        const response = await this.client.downloadArtifactContent<Readable>(buildId, artifact.path, {
-          responseType: 'stream',
-        });
+        const response = await this.client.downloadArtifactContent<Readable>(
+          buildId,
+          artifact.path,
+          {
+            responseType: 'stream',
+          }
+        );
 
         const axiosResponse = response as AxiosResponse<unknown>;
         const stream = axiosResponse.data;
@@ -260,9 +266,13 @@ export class ArtifactManager {
         };
       }
 
-      const response = await this.client.downloadArtifactContent<ArrayBuffer>(buildId, artifact.path, {
-        responseType: 'arraybuffer',
-      });
+      const response = await this.client.downloadArtifactContent<ArrayBuffer>(
+        buildId,
+        artifact.path,
+        {
+          responseType: 'arraybuffer',
+        }
+      );
 
       const axiosResponse = response as AxiosResponse<unknown>;
       const buffer = this.ensureBinaryBuffer(axiosResponse.data);

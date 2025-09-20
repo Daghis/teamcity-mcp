@@ -15,10 +15,13 @@ import { z } from 'zod';
 import { getMCPMode as getMCPModeFromConfig } from '@/config';
 import { type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import type { Step } from '@/teamcity-client/models/step';
-import { ArtifactManager, type ArtifactContent } from '@/teamcity/artifact-manager';
+import { type ArtifactContent, ArtifactManager } from '@/teamcity/artifact-manager';
 import { BuildConfigurationUpdateManager } from '@/teamcity/build-configuration-update-manager';
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
-import { createAdapterFromTeamCityAPI, type TeamCityClientAdapter } from '@/teamcity/client-adapter';
+import {
+  type TeamCityClientAdapter,
+  createAdapterFromTeamCityAPI,
+} from '@/teamcity/client-adapter';
 import { TeamCityAPIError, isRetryableError } from '@/teamcity/errors';
 import { createPaginatedFetcher, fetchAllPages } from '@/teamcity/pagination';
 import { debug } from '@/utils/logger';
@@ -68,7 +71,9 @@ interface NormalizedArtifactRequest {
   downloadUrl?: string;
 }
 
-const sanitizeFileName = (artifactName: string): {
+const sanitizeFileName = (
+  artifactName: string
+): {
   sanitizedBase: string;
   stem: string;
   ext: string;
@@ -256,7 +261,8 @@ const downloadArtifactByUrl = async (
   options: StreamOptions & { maxSize?: number }
 ): Promise<ArtifactToolPayload> => {
   const axios = adapter.getAxios();
-  const responseType = encoding === 'stream' ? 'stream' : encoding === 'text' ? 'text' : 'arraybuffer';
+  const responseType =
+    encoding === 'stream' ? 'stream' : encoding === 'text' ? 'text' : 'arraybuffer';
 
   const response = await axios.get(request.downloadUrl, { responseType });
   const mimeType =
@@ -298,7 +304,9 @@ const downloadArtifactByUrl = async (
 
     const textSize = Buffer.byteLength(rawPayload, 'utf8');
     if (options.maxSize && textSize > options.maxSize) {
-      throw new Error(`Artifact size exceeds maximum allowed size: ${textSize} > ${options.maxSize}`);
+      throw new Error(
+        `Artifact size exceeds maximum allowed size: ${textSize} > ${options.maxSize}`
+      );
     }
 
     const artifact: ArtifactContent = {
@@ -2362,7 +2370,6 @@ const DEV_TOOLS: ToolDefinition[] = [
                 error: string;
               });
 
-
           const requests = toNormalizedArtifactRequests(typed.artifactPaths, typed.buildId);
           const results: ArtifactBatchResult[] = [];
 
@@ -2381,8 +2388,8 @@ const DEV_TOOLS: ToolDefinition[] = [
                   }
                 );
               } else {
-               // eslint-disable-next-line no-await-in-loop
-               const artifact = await manager.downloadArtifact(request.buildId, request.path, {
+                // eslint-disable-next-line no-await-in-loop
+                const artifact = await manager.downloadArtifact(request.buildId, request.path, {
                   encoding,
                   maxSize: typed.maxSize,
                 });
@@ -2396,7 +2403,10 @@ const DEV_TOOLS: ToolDefinition[] = [
               debug('tools.download_build_artifacts.success', {
                 path: request.path,
                 encoding: payload.encoding,
-                outputPath: payload.encoding === 'stream' ? (payload as ArtifactStreamPayload).outputPath : undefined,
+                outputPath:
+                  payload.encoding === 'stream'
+                    ? (payload as ArtifactStreamPayload).outputPath
+                    : undefined,
               });
               if (payload.encoding === 'stream') {
                 const streamPayload = payload as ArtifactStreamPayload;
