@@ -1849,6 +1849,12 @@ const DEV_TOOLS: ToolDefinition[] = [
           type: 'number',
           description: 'Max artifact content size (bytes) when inlining',
         },
+        artifactEncoding: {
+          type: 'string',
+          description: 'Encoding mode for artifacts when includeArtifacts is true',
+          enum: ['base64', 'stream'],
+          default: 'base64',
+        },
       },
       required: ['buildId'],
     },
@@ -1861,6 +1867,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         includeDependencies: z.boolean().optional(),
         artifactFilter: z.string().min(1).optional(),
         maxArtifactSize: z.number().int().min(1).optional(),
+        artifactEncoding: z.enum(['base64', 'stream']).default('base64'),
       });
 
       return runTool(
@@ -1877,6 +1884,7 @@ const DEV_TOOLS: ToolDefinition[] = [
             includeDependencies: typed.includeDependencies,
             artifactFilter: typed.artifactFilter,
             maxArtifactSize: typed.maxArtifactSize,
+            artifactEncoding: typed.artifactEncoding,
           });
           return json(result);
         },

@@ -8,6 +8,18 @@ import { warn } from '@/utils/logger';
 import type { TeamCityUnifiedClient } from './types/client';
 import { toBuildLocator } from './utils/build-locator';
 
+type ArtifactEncoding = 'base64' | 'stream';
+
+interface ArtifactDownloadHandle {
+  tool: 'download_build_artifact';
+  args: {
+    buildId: string;
+    artifactPath: string;
+    encoding?: 'stream';
+    maxSize?: number;
+  };
+}
+
 export interface BuildResultsOptions {
   includeArtifacts?: boolean;
   includeStatistics?: boolean;
@@ -16,6 +28,7 @@ export interface BuildResultsOptions {
   artifactFilter?: string;
   downloadArtifacts?: string[];
   maxArtifactSize?: number;
+  artifactEncoding?: ArtifactEncoding;
 }
 
 export interface BuildResult {
@@ -46,6 +59,7 @@ export interface BuildResult {
     modificationTime: string;
     downloadUrl: string;
     content?: string;
+    downloadHandle?: ArtifactDownloadHandle;
   }>;
   statistics?: {
     buildDuration?: number;
@@ -305,6 +319,7 @@ export class BuildResultsManager {
     options: BuildResultsOptions
   ): Promise<BuildResult['artifacts']> {
     try {
+      const encoding: ArtifactEncoding = options.artifactEncoding ?? 'base64';
       const response = await this.client.modules.builds.getFilesListOfBuild(
         toBuildLocator(buildId)
       );
@@ -323,6 +338,12 @@ export class BuildResultsManager {
           const downloadHref =
             artifact.content?.href ??
             `/app/rest/builds/id:${buildId}/artifacts/content/${artifactPath}`;
+          const shouldInlineContent =
+            encoding === 'base64' &&
+            (options.downloadArtifacts?.length
+              ? options.downloadArtifacts.includes(artifact.name) ||
+                options.downloadArtifacts.includes(artifactPath)
+              : true);
           const artifactData: {
             name: string;
             path: string;
@@ -330,6 +351,7 @@ export class BuildResultsManager {
             modificationTime: string;
             downloadUrl: string;
             content?: string;
+            downloadHandle?: ArtifactDownloadHandle;
           } = {
             name: artifact.name,
             path: artifactPath,
@@ -339,7 +361,7 @@ export class BuildResultsManager {
           };
 
           // Download content if requested and small enough
-          if (options.downloadArtifacts?.includes(artifact.name)) {
+          if (shouldInlineContent) {
             const maxSize = options.maxArtifactSize ?? BuildResultsManager.defaultMaxArtifactSize;
             if ((artifact.size ?? 0) <= maxSize) {
               try {
@@ -351,6 +373,16 @@ export class BuildResultsManager {
                 // Ignore download errors
               }
             }
+          } else if (encoding === 'stream') {
+            artifactData.downloadHandle = {
+              tool: 'download_build_artifact',
+              args: {
+                buildId,
+                artifactPath,
+                encoding: 'stream',
+                ...(options.maxArtifactSize ? { maxSize: options.maxArtifactSize } : {}),
+              },
+            };
           }
 
           return artifactData;

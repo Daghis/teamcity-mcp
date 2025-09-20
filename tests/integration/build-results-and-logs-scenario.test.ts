@@ -131,6 +131,24 @@ describe('Build results and logs: full writes + dev reads', () => {
     expect(res).toBeDefined();
   }, 60000);
 
+  it('get_build_results streaming artifacts returns handles (dev)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    if (!buildId) return expect(true).toBe(true);
+    const res = await callTool<Record<string, unknown>>('dev', 'get_build_results', {
+      buildId,
+      includeArtifacts: true,
+      artifactEncoding: 'stream',
+      maxArtifactSize: 1024,
+    });
+    expect(res).toBeDefined();
+    const artifacts = res?.['artifacts'] as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(artifacts) && artifacts.length > 0) {
+      const first = artifacts[0] ?? {};
+      expect(first).not.toHaveProperty('content');
+      expect(first).toHaveProperty('downloadHandle');
+    }
+  }, 60000);
+
   it('fetch_build_log with paging and tail (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
     if (!buildId) return expect(true).toBe(true);

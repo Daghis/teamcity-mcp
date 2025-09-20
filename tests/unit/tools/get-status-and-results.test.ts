@@ -72,5 +72,36 @@ describe('tools: enhanced status and results', () => {
     const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
     expect(typeof payload).toBe('object');
     expect(payload.build?.id).toBe(99);
+    expect(getBuildResults).toHaveBeenCalledWith(
+      '99',
+      expect.objectContaining({
+        includeArtifacts: true,
+        includeStatistics: true,
+        artifactEncoding: 'base64',
+      })
+    );
+  });
+
+  it('get_build_results allows streaming artifact encoding', async () => {
+    const fakeResults = {
+      build: { id: 77, status: 'SUCCESS', number: '10' },
+    };
+
+    const getBuildResults = jest.fn().mockResolvedValue(fakeResults);
+    const BuildResultsManager = jest.fn().mockImplementation(() => ({ getBuildResults }));
+    jest.doMock('@/teamcity/build-results-manager', () => ({ BuildResultsManager }));
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getRequiredTool } = require('@/tools');
+    await getRequiredTool('get_build_results').handler({
+      buildId: '77',
+      includeArtifacts: true,
+      artifactEncoding: 'stream',
+    });
+
+    expect(getBuildResults).toHaveBeenCalledWith(
+      '77',
+      expect.objectContaining({ artifactEncoding: 'stream' })
+    );
   });
 });
