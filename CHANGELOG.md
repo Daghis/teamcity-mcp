@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/Daghis/teamcity-mcp/compare/v1.8.2...v1.9.0) (2025-09-20)
+
+
+### Features
+
+* **teamcity:** add runtime guards for manager responses ([#179](https://github.com/Daghis/teamcity-mcp/issues/179)) ([9d7eaef](https://github.com/Daghis/teamcity-mcp/commit/9d7eaef161e675246d317603df47f7f39407b7d8))
+
 ## [1.8.2](https://github.com/Daghis/teamcity-mcp/compare/v1.8.1...v1.8.2) (2025-09-20)
 
 
