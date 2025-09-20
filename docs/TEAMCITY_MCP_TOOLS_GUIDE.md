@@ -33,7 +33,7 @@ The live implementation emphasizes a simple, direct architecture. A few practica
 - Pagination arguments (where supported): `pageSize`, `maxPages`, `all`. The legacy `count` on `list_builds` remains for compatibility but `pageSize` is preferred.
 - Tools with pagination: `list_builds`, `list_projects`, `list_build_configs`, `list_vcs_roots`, `list_agents`, `list_agent_pools`, `list_test_failures`.
 - Enhanced results:
-  - `get_build_results` supports options: `includeArtifacts`, `includeStatistics`, `includeChanges`, `includeDependencies`, `artifactFilter`, `maxArtifactSize`.
+  - `get_build_results` supports options: `includeArtifacts`, `includeStatistics`, `includeChanges`, `includeDependencies`, `artifactFilter`, `maxArtifactSize`, `artifactEncoding`.
   - `get_build_status` supports options: `includeTests`, `includeProblems`, `includeQueueTotals`, `includeQueueReason`.
 - Legacy helper exports from `src/teamcity/index.ts` are retained for backwards compatibility but are not updated; use the MCP tools or `TeamCityAPI` for real workflows.
 
@@ -49,50 +49,50 @@ Complete infrastructure management including creation, modification, and deletio
 
 ## Tools Quick Reference
 
-| Tool Name                    | Description                                     | Dev | Full |
-| ---------------------------- | ----------------------------------------------- | :--: | :--: |
-| **Build Management**         |                                                 |      |      |
-| `trigger_build`              | Trigger a build                           |  ✅  |  ✅  |
-| `get_build_status`           | Get detailed build status and progress          |  ✅  |  ✅  |
-| `list_builds`                | Search and list builds with filtering           |  ✅  |  ✅  |
-| `get_build_results`          | Get detailed build results                |  ✅  |  ✅  |
-| `download_build_artifact`    | Download artifact content (base64/text/stream)  |  ✅  |  ✅  |
-| `fetch_build_log`            | Retrieve build logs                       |  ✅  |  ✅  |
-| `get_build_config`           | Get build configuration details                 |  ✅  |  ✅  |
-| `list_build_configs`         | List build configurations in project            |  ✅  |  ✅  |
-| **Test Analysis**            |                                                 |      |      |
-| `list_test_failures`         | Analyze failed tests across builds              |  ✅  |  ✅  |
-| `get_test_details`           | Deep dive into test results                     |  ✅  |  ✅  |
-| `analyze_build_problems`     | Report build problems and test failures   |  ✅  |  ✅  |
-| **Configuration Management** |                                                 |      |      |
-| `create_build_config`        | Create new build configurations                 |  ❌  |  ✅  |
-| `clone_build_config`         | Duplicate existing configurations               |  ❌  |  ✅  |
-| `update_build_config`        | Modify existing configurations                  |  ❌  |  ✅  |
-| `manage_build_steps`         | Add, edit, remove, reorder build steps          |  ❌  |  ✅  |
-| `manage_build_triggers`      | Configure build triggers                        |  ❌  |  ✅  |
-| **VCS Management**           |                                                 |      |      |
-| `list_vcs_roots`             | List version control roots                      |  ✅  |  ✅  |
-| `create_vcs_root`            | Create VCS root configurations                  |  ❌  |  ✅  |
-| **Project Management**       |                                                 |      |      |
-| `list_projects`              | List all projects                               |  ✅  |  ✅  |
-| `list_project_hierarchy`     | Visualize project structure                     |  ✅  |  ✅  |
-| `create_project`             | Create new projects                             |  ❌  |  ✅  |
-| `delete_project`             | Remove projects safely                          |  ❌  |  ✅  |
-| `update_project_settings`    | Modify project settings                         |  ❌  |  ✅  |
-| **Parameter Management**     |                                                 |      |      |
-| `list_parameters`            | List configuration parameters                   |  ✅  |  ✅  |
-| `add_parameter`              | Add new parameters                              |  ❌  |  ✅  |
-| `update_parameter`           | Modify existing parameters                      |  ❌  |  ✅  |
-| `delete_parameter`           | Remove parameters                               |  ❌  |  ✅  |
-| **Agent Management**         |                                                 |      |      |
-| `list_agents`                | List build agents and status                    |  ✅  |  ✅  |
-| `list_agent_pools`           | List agent pools                          |  ✅  |  ✅  |
-| `assign_agent_to_pool`       | Move agents between pools                       |  ❌  |  ✅  |
-| `authorize_agent`            | Manage agent authorization                      |  ❌  |  ✅  |
-| **Branch Management**        |                                                 |      |      |
-| `list_branches`              | List and analyze branches                       |  ✅  |  ✅  |
-| **Utility**                  |                                                 |      |      |
-| `ping`                       | Health check and connection test                |  ✅  |  ✅  |
+| Tool Name                    | Description                                    | Dev | Full |
+| ---------------------------- | ---------------------------------------------- | :-: | :--: |
+| **Build Management**         |                                                |     |      |
+| `trigger_build`              | Trigger a build                                | ✅  |  ✅  |
+| `get_build_status`           | Get detailed build status and progress         | ✅  |  ✅  |
+| `list_builds`                | Search and list builds with filtering          | ✅  |  ✅  |
+| `get_build_results`          | Get detailed build results                     | ✅  |  ✅  |
+| `download_build_artifact`    | Download artifact content (base64/text/stream) | ✅  |  ✅  |
+| `fetch_build_log`            | Retrieve build logs                            | ✅  |  ✅  |
+| `get_build_config`           | Get build configuration details                | ✅  |  ✅  |
+| `list_build_configs`         | List build configurations in project           | ✅  |  ✅  |
+| **Test Analysis**            |                                                |     |      |
+| `list_test_failures`         | Analyze failed tests across builds             | ✅  |  ✅  |
+| `get_test_details`           | Deep dive into test results                    | ✅  |  ✅  |
+| `analyze_build_problems`     | Report build problems and test failures        | ✅  |  ✅  |
+| **Configuration Management** |                                                |     |      |
+| `create_build_config`        | Create new build configurations                | ❌  |  ✅  |
+| `clone_build_config`         | Duplicate existing configurations              | ❌  |  ✅  |
+| `update_build_config`        | Modify existing configurations                 | ❌  |  ✅  |
+| `manage_build_steps`         | Add, edit, remove, reorder build steps         | ❌  |  ✅  |
+| `manage_build_triggers`      | Configure build triggers                       | ❌  |  ✅  |
+| **VCS Management**           |                                                |     |      |
+| `list_vcs_roots`             | List version control roots                     | ✅  |  ✅  |
+| `create_vcs_root`            | Create VCS root configurations                 | ❌  |  ✅  |
+| **Project Management**       |                                                |     |      |
+| `list_projects`              | List all projects                              | ✅  |  ✅  |
+| `list_project_hierarchy`     | Visualize project structure                    | ✅  |  ✅  |
+| `create_project`             | Create new projects                            | ❌  |  ✅  |
+| `delete_project`             | Remove projects safely                         | ❌  |  ✅  |
+| `update_project_settings`    | Modify project settings                        | ❌  |  ✅  |
+| **Parameter Management**     |                                                |     |      |
+| `list_parameters`            | List configuration parameters                  | ✅  |  ✅  |
+| `add_parameter`              | Add new parameters                             | ❌  |  ✅  |
+| `update_parameter`           | Modify existing parameters                     | ❌  |  ✅  |
+| `delete_parameter`           | Remove parameters                              | ❌  |  ✅  |
+| **Agent Management**         |                                                |     |      |
+| `list_agents`                | List build agents and status                   | ✅  |  ✅  |
+| `list_agent_pools`           | List agent pools                               | ✅  |  ✅  |
+| `assign_agent_to_pool`       | Move agents between pools                      | ❌  |  ✅  |
+| `authorize_agent`            | Manage agent authorization                     | ❌  |  ✅  |
+| **Branch Management**        |                                                |     |      |
+| `list_branches`              | List and analyze branches                      | ✅  |  ✅  |
+| **Utility**                  |                                                |     |      |
+| `ping`                       | Health check and connection test               | ✅  |  ✅  |
 
 **Legend:**
 
@@ -179,9 +179,15 @@ Complete infrastructure management including creation, modification, and deletio
 **Parameters**:
 
 - `buildId` (required): Build identifier
-- `includeTests`: Include test details
-- `includeProblems`: Include problems
-- `includeArtifacts`: Include artifacts
+- `includeArtifacts`: Include artifact metadata alongside the build summary
+- `artifactEncoding`: `'base64'` (default) embeds small artifacts up to `maxArtifactSize`; `'stream'` returns a `download_build_artifact` handle instead of inline bytes
+- `artifactFilter`: Glob-style filter applied to artifact names
+- `maxArtifactSize`: Maximum size (bytes) to inline when `artifactEncoding` is `'base64'`
+- `includeStatistics`: Include build statistic values
+- `includeChanges`: Include associated VCS changes
+- `includeDependencies`: Include snapshot dependency builds
+
+When `artifactEncoding` is set to `'stream'`, artifacts still list metadata (`name`, `path`, `size`, `downloadUrl`) but also add a `downloadHandle` payload you can pass directly to `download_build_artifact` to retrieve the file without embedding base64 in the response.
 
 #### `download_build_artifact`
 

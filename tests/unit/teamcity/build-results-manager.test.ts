@@ -132,7 +132,7 @@ describe('BuildResultsManager', () => {
       expect(artifacts?.[0]?.downloadUrl).toContain('/artifacts/content/target/app.jar');
     });
 
-    it('downloads artifact contents when requested and within size limits', async () => {
+    it('downloads artifact contents when base64 encoding is requested and within size limits', async () => {
       const arrayBuffer = new Uint8Array([0xde, 0xad, 0xbe, 0xef]).buffer;
 
       stub.modules.builds.getFilesListOfBuild.mockResolvedValue({
@@ -153,6 +153,7 @@ describe('BuildResultsManager', () => {
       const artifacts = (await managerInternals.fetchArtifacts('12345', {
         downloadArtifacts: ['log.txt'],
         maxArtifactSize: 10,
+        artifactEncoding: 'base64',
       })) as Array<{ content?: string }>;
 
       expect(stub.modules.builds.downloadFileOfBuild).toHaveBeenCalledWith(
@@ -163,6 +164,38 @@ describe('BuildResultsManager', () => {
         { responseType: 'arraybuffer' }
       );
       expect(artifacts?.[0]?.content).toBe(Buffer.from(arrayBuffer).toString('base64'));
+    });
+
+    it('provides streaming download handles when stream encoding is requested', async () => {
+      stub.modules.builds.getFilesListOfBuild.mockResolvedValue({
+        data: {
+          file: [
+            {
+              name: 'artifact.zip',
+              fullName: 'dist/artifact.zip',
+              size: 1024,
+              modificationTime: '20250829T121400+0000',
+            },
+          ],
+        },
+      });
+
+      const artifacts = (await managerInternals.fetchArtifacts('12345', {
+        artifactEncoding: 'stream',
+        maxArtifactSize: 2048,
+      })) as Array<{ downloadHandle?: { tool: string; args: Record<string, unknown> } }>;
+
+      expect(stub.modules.builds.downloadFileOfBuild).not.toHaveBeenCalled();
+      expect(artifacts?.[0]?.downloadHandle).toMatchObject({
+        tool: 'download_build_artifact',
+        args: {
+          buildId: '12345',
+          artifactPath: 'dist/artifact.zip',
+          encoding: 'stream',
+          maxSize: 2048,
+        },
+      });
+      expect(artifacts?.[0]).not.toHaveProperty('content');
     });
   });
 
