@@ -426,14 +426,6 @@ interface AssignAgentToPoolArgs {
   agentId: string;
   poolId: string;
 }
-interface ManageBuildStepsArgs {
-  buildTypeId: string;
-  action: 'add' | 'update' | 'delete';
-  stepId?: string;
-  name?: string;
-  type?: string;
-  properties?: Record<string, unknown>;
-}
 interface ManageBuildTriggersArgs {
   buildTypeId: string;
   action: 'add' | 'delete';
@@ -3826,119 +3818,139 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       required: ['buildTypeId', 'action'],
     },
     handler: async (args: unknown) => {
-      const typedArgs = args as ManageBuildStepsArgs;
-
-      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-
-      switch (typedArgs.action) {
-        case 'add': {
-          const stepProps: Record<string, string> = Object.fromEntries(
-            Object.entries(typedArgs.properties ?? {}).map(([k, v]) => [k, String(v)])
-          );
-          // Ensure command runner uses custom script when script.content is provided
-          if (typedArgs.type === 'simpleRunner' && stepProps['script.content']) {
-            stepProps['use.custom.script'] = stepProps['use.custom.script'] ?? 'true';
-          }
-          const step = {
-            name: typedArgs.name,
-            type: typedArgs.type,
-            properties: {
-              property: Object.entries(stepProps).map(([k, v]) => ({ name: k, value: v })),
-            },
-          };
-          await adapter.modules.buildTypes.addBuildStepToBuildType(
-            typedArgs.buildTypeId,
-            undefined,
-            step,
-            {
-              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      const schema = z
+        .object({
+          buildTypeId: z.string().min(1, 'buildTypeId is required'),
+          action: z.enum(['add', 'update', 'delete']),
+          stepId: z.string().min(1).optional(),
+          name: z.string().optional(),
+          type: z.string().optional(),
+          properties: z.record(z.unknown()).optional(),
+        })
+        .superRefine((value, ctx) => {
+          if (value.action === 'update' || value.action === 'delete') {
+            if (!value.stepId || value.stepId.trim() === '') {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'stepId is required for update or delete actions',
+                path: ['stepId'],
+              });
             }
-          );
-          return json({
-            success: true,
-            action: 'add_build_step',
-            buildTypeId: typedArgs.buildTypeId,
-          });
-        }
-
-        case 'update': {
-          if (typedArgs.stepId == null || typedArgs.stepId === '') {
-            return json({
-              success: false,
-              action: 'update_build_step',
-              error: 'Step ID is required for update action',
-            });
           }
+        });
 
-          const updatePayload: Record<string, unknown> = {};
+      return runTool(
+        'manage_build_steps',
+        schema,
+        async (typedArgs) => {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
 
-          if (typedArgs.name != null) {
-            updatePayload['name'] = typedArgs.name;
+          switch (typedArgs.action) {
+            case 'add': {
+              const stepProps: Record<string, string> = Object.fromEntries(
+                Object.entries(typedArgs.properties ?? {}).map(([k, v]) => [k, String(v)])
+              );
+              // Ensure command runner uses custom script when script.content is provided
+              if (typedArgs.type === 'simpleRunner' && stepProps['script.content']) {
+                stepProps['use.custom.script'] = stepProps['use.custom.script'] ?? 'true';
+              }
+              const step = {
+                name: typedArgs.name,
+                type: typedArgs.type,
+                properties: {
+                  property: Object.entries(stepProps).map(([k, v]) => ({ name: k, value: v })),
+                },
+              };
+              await adapter.modules.buildTypes.addBuildStepToBuildType(
+                typedArgs.buildTypeId,
+                undefined,
+                step,
+                {
+                  headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                }
+              );
+              return json({
+                success: true,
+                action: 'add_build_step',
+                buildTypeId: typedArgs.buildTypeId,
+              });
+            }
+
+            case 'update': {
+              const updatePayload: Record<string, unknown> = {};
+
+              if (typedArgs.name != null) {
+                updatePayload['name'] = typedArgs.name;
+              }
+
+              if (typedArgs.type != null) {
+                updatePayload['type'] = typedArgs.type;
+              }
+
+              const rawProps = typedArgs.properties ?? {};
+              const stepProps: Record<string, string> = Object.fromEntries(
+                Object.entries(rawProps).map(([k, v]) => [k, String(v)])
+              );
+
+              if (stepProps['script.content']) {
+                // Ensure simple runners keep custom script flags when updating script content
+                stepProps['use.custom.script'] = stepProps['use.custom.script'] ?? 'true';
+                stepProps['script.type'] = stepProps['script.type'] ?? 'customScript';
+              }
+
+              if (Object.keys(stepProps).length > 0) {
+                updatePayload['properties'] = {
+                  property: Object.entries(stepProps).map(([name, value]) => ({ name, value })),
+                };
+              }
+
+              if (Object.keys(updatePayload).length === 0) {
+                return json({
+                  success: false,
+                  action: 'update_build_step',
+                  error: 'No update fields provided',
+                });
+              }
+
+              await adapter.modules.buildTypes.replaceBuildStep(
+                typedArgs.buildTypeId,
+                typedArgs.stepId as string,
+                undefined,
+                updatePayload as Step,
+                {
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                  },
+                }
+              );
+
+              return json({
+                success: true,
+                action: 'update_build_step',
+                buildTypeId: typedArgs.buildTypeId,
+                stepId: typedArgs.stepId,
+              });
+            }
+
+            case 'delete':
+              await adapter.modules.buildTypes.deleteBuildStep(
+                typedArgs.buildTypeId,
+                typedArgs.stepId as string
+              );
+              return json({
+                success: true,
+                action: 'delete_build_step',
+                buildTypeId: typedArgs.buildTypeId,
+                stepId: typedArgs.stepId,
+              });
+
+            default:
+              return json({ success: false, error: 'Invalid action' });
           }
-
-          if (typedArgs.type != null) {
-            updatePayload['type'] = typedArgs.type;
-          }
-
-          const rawProps = typedArgs.properties ?? {};
-          const stepProps: Record<string, string> = Object.fromEntries(
-            Object.entries(rawProps).map(([k, v]) => [k, String(v)])
-          );
-
-          if (stepProps['script.content']) {
-            // Ensure simple runners keep custom script flags when updating script content
-            stepProps['use.custom.script'] = stepProps['use.custom.script'] ?? 'true';
-            stepProps['script.type'] = stepProps['script.type'] ?? 'customScript';
-          }
-
-          if (Object.keys(stepProps).length > 0) {
-            updatePayload['properties'] = {
-              property: Object.entries(stepProps).map(([name, value]) => ({ name, value })),
-            };
-          }
-
-          if (Object.keys(updatePayload).length === 0) {
-            return json({
-              success: false,
-              action: 'update_build_step',
-              error: 'No update fields provided',
-            });
-          }
-
-          await adapter.modules.buildTypes.replaceBuildStep(
-            typedArgs.buildTypeId,
-            typedArgs.stepId,
-            undefined,
-            updatePayload as Step
-          );
-
-          return json({
-            success: true,
-            action: 'update_build_step',
-            buildTypeId: typedArgs.buildTypeId,
-            stepId: typedArgs.stepId,
-          });
-        }
-
-        case 'delete':
-          if (typedArgs.stepId == null || typedArgs.stepId === '') {
-            return json({
-              success: false,
-              action: 'delete_build_step',
-              error: 'Step ID is required for delete action',
-            });
-          }
-          await adapter.modules.buildTypes.deleteBuildStep(typedArgs.buildTypeId, typedArgs.stepId);
-          return json({
-            success: true,
-            action: 'delete_build_step',
-            buildTypeId: typedArgs.buildTypeId,
-            stepId: typedArgs.stepId,
-          });
-
-        default:
-          return json({ success: false, error: 'Invalid action' });
-      }
+        },
+        args
+      );
     },
     mode: 'full',
   },
