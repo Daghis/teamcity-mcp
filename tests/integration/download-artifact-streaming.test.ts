@@ -121,10 +121,10 @@ describe('download_build_artifact tool (integration)', () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
 
     const artifactStepScript = [
-      "echo artifact-content > artifact.txt",
-      "echo artifact-extra > artifact-extra.txt",
-      "echo \"##teamcity[publishArtifacts 'artifact.txt']\"",
-      "echo \"##teamcity[publishArtifacts 'artifact-extra.txt']\"",
+      'echo artifact-content > artifact.txt',
+      'echo artifact-extra > artifact-extra.txt',
+      'echo "##teamcity[publishArtifacts \'artifact.txt\']"',
+      'echo "##teamcity[publishArtifacts \'artifact-extra.txt\']"',
     ].join('\n');
 
     const batch = await callToolsBatch('full', [
@@ -318,12 +318,16 @@ describe('download_build_artifact tool (integration)', () => {
 
     expect(first?.encoding).toBe('base64');
     expect(
-      Buffer.from(String(first?.content ?? ''), 'base64').toString('utf8').trim()
+      Buffer.from(String(first?.content ?? ''), 'base64')
+        .toString('utf8')
+        .trim()
     ).toBe('artifact-content');
 
     expect(second?.encoding).toBe('base64');
     expect(
-      Buffer.from(String(second?.content ?? ''), 'base64').toString('utf8').trim()
+      Buffer.from(String(second?.content ?? ''), 'base64')
+        .toString('utf8')
+        .trim()
     ).toBe('artifact-extra');
   }, 60_000);
 
@@ -375,16 +379,12 @@ describe('download_build_artifact tool (integration)', () => {
     let result: DownloadArtifactsResponse;
     try {
       await wait(3000);
-      result = await callTool<DownloadArtifactsResponse>(
-        'dev',
-        'download_build_artifacts',
-        {
-          buildId: targetBuildId,
-          artifactPaths: requests,
-          encoding: 'stream',
-          outputDir,
-        }
-      );
+      result = await callTool<DownloadArtifactsResponse>('dev', 'download_build_artifacts', {
+        buildId: targetBuildId,
+        artifactPaths: requests,
+        encoding: 'stream',
+        outputDir,
+      });
     } catch (error) {
       await fs.rm(outputDir, { recursive: true, force: true });
       throw error;

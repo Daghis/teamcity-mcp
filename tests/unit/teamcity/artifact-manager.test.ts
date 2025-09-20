@@ -38,11 +38,8 @@ describe('ArtifactManager', () => {
       ) => http.get(`/app/rest/builds/${buildLocator}/artifacts/${path}`, config)
     );
     mockClient.downloadArtifactContent.mockImplementation(
-      async (
-        buildId: string,
-        artifactPath: string,
-        requestConfig?: RawAxiosRequestConfig
-      ) => http.get(`/app/rest/builds/id:${buildId}/artifacts/content/${artifactPath}`, requestConfig)
+      async (buildId: string, artifactPath: string, requestConfig?: RawAxiosRequestConfig) =>
+        http.get(`/app/rest/builds/id:${buildId}/artifacts/content/${artifactPath}`, requestConfig)
     );
     mockClient.request.mockImplementation(async (fn) => fn({ axios: http, baseUrl: BASE_URL }));
     mockClient.getApiConfig.mockReturnValue({
@@ -457,7 +454,10 @@ describe('ArtifactManager', () => {
       http.get
         .mockResolvedValueOnce({ data: mockArtifacts })
         .mockResolvedValueOnce({ data: streamOne, headers: { 'content-type': 'text/plain' } })
-        .mockResolvedValueOnce({ data: streamTwo, headers: { 'content-type': 'application/json' } });
+        .mockResolvedValueOnce({
+          data: streamTwo,
+          headers: { 'content-type': 'application/json' },
+        });
 
       const result = await manager.downloadMultipleArtifacts(
         '12345',
