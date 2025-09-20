@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/Daghis/teamcity-mcp/compare/v1.9.0...v1.9.1) (2025-09-20)
+
+
+### Bug Fixes
+
+* **tools:** allow manage_build_steps updates ([#182](https://github.com/Daghis/teamcity-mcp/issues/182)) ([2c6bea0](https://github.com/Daghis/teamcity-mcp/commit/2c6bea0cf6770d22068b9e4b733542a056399148))
+
 ## [1.9.0](https://github.com/Daghis/teamcity-mcp/compare/v1.8.2...v1.9.0) (2025-09-20)
 
 
