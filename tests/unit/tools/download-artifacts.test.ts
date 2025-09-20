@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { Readable } from 'node:stream';
 
 // Mock config to keep tools in dev mode without reading env
@@ -154,6 +154,9 @@ describe('tools: download_build_artifacts', () => {
     jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance } }));
 
     const tempRoot = await mkdtemp(join(tmpdir(), 'artifact-batch-'));
+    const preexistingPath = join(tempRoot, 'logs', 'app.log');
+    await fs.mkdir(dirname(preexistingPath), { recursive: true });
+    await fs.writeFile(preexistingPath, 'existing');
 
     let handler:
       | ((args: unknown) => Promise<{ content?: Array<{ text?: string }>; success?: boolean }>)
@@ -208,6 +211,10 @@ describe('tools: download_build_artifacts', () => {
     expect(second.encoding).toBe('stream');
     expect(first.outputPath.startsWith(tempRoot)).toBe(true);
     expect(second.outputPath.startsWith(tempRoot)).toBe(true);
+
+    const firstRelative = relative(tempRoot, first.outputPath);
+    expect(firstRelative).not.toBe('logs/app.log');
+    expect(firstRelative).toMatch(/logs[\\/].*app-1\.log$/);
 
     const firstContent = await fs.readFile(first.outputPath, 'utf8');
     const secondContent = await fs.readFile(second.outputPath, 'utf8');
