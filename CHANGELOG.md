@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/Daghis/teamcity-mcp/compare/v1.5.0...v1.6.0) (2025-09-20)
+
+
+### Features
+
+* **teamcity:** add streaming artifact downloads ([#166](https://github.com/Daghis/teamcity-mcp/issues/166)) ([18830ed](https://github.com/Daghis/teamcity-mcp/commit/18830ed4805ad215518cc5a51640094adc35e31b)), closes [#151](https://github.com/Daghis/teamcity-mcp/issues/151)
+
 ## [1.5.0](https://github.com/Daghis/teamcity-mcp/compare/v1.4.0...v1.5.0) (2025-09-20)
 
 
