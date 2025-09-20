@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/Daghis/teamcity-mcp/compare/v1.3.5...v1.4.0) (2025-09-20)
+
+
+### Features
+
+* **tests:** add batched mcp tool execution ([#163](https://github.com/Daghis/teamcity-mcp/issues/163)) ([5f48060](https://github.com/Daghis/teamcity-mcp/commit/5f4806043b95686d5dac41a9d67515740b82a3f8)), closes [#162](https://github.com/Daghis/teamcity-mcp/issues/162)
+
 ## [1.3.5](https://github.com/Daghis/teamcity-mcp/compare/v1.3.4...v1.3.5) (2025-09-19)
 
 
