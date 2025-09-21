@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.3](https://github.com/Daghis/teamcity-mcp/compare/v1.9.2...v1.9.3) (2025-09-21)
+
+
+### Bug Fixes
+
+* **teamcity:** resolve nested artifact downloads ([#188](https://github.com/Daghis/teamcity-mcp/issues/188)) ([e309b90](https://github.com/Daghis/teamcity-mcp/commit/e309b90de42fe121f072fe5b549ab25df3a91aaf))
+
 ## [1.9.2](https://github.com/Daghis/teamcity-mcp/compare/v1.9.1...v1.9.2) (2025-09-21)
 
 
