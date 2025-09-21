@@ -409,31 +409,89 @@ export class ArtifactManager {
     data: ArtifactFileResponse,
     buildId: string,
     includeNested: boolean | undefined,
-    baseUrl: string
+    baseUrl: string,
+    parentSegments: string[] = []
   ): ArtifactInfo[] {
     const artifacts: ArtifactInfo[] = [];
     const files = data.file ?? [];
 
     for (const file of files) {
-      // If it's a directory and has children
-      if (file.children && includeNested) {
-        // Recursively parse nested artifacts
-        const nested = this.parseArtifacts(file.children, buildId, includeNested, baseUrl);
-        artifacts.push(...nested);
-      } else if (!file.children) {
-        // It's a file, not a directory
-        artifacts.push({
-          name: file.name ?? '',
-          path: file.fullName ?? file.name ?? '',
-          size: file.size ?? 0,
-          modificationTime: file.modificationTime ?? '',
-          downloadUrl: `${baseUrl}/app/rest/builds/id:${buildId}/artifacts/content/${file.fullName ?? file.name ?? ''}`,
-          isDirectory: false,
-        });
+      const pathSegments = this.buildArtifactSegments(file, parentSegments);
+      const resolvedPath = pathSegments.join('/');
+      const isDirectory = Boolean(file.children);
+
+      if (isDirectory) {
+        if (includeNested && file.children) {
+          const nested = this.parseArtifacts(
+            file.children,
+            buildId,
+            includeNested,
+            baseUrl,
+            pathSegments
+          );
+          artifacts.push(...nested);
+        }
+        continue;
       }
+
+      if (!resolvedPath) {
+        continue;
+      }
+
+      artifacts.push({
+        name: file.name ?? pathSegments[pathSegments.length - 1] ?? '',
+        path: resolvedPath,
+        size: file.size ?? 0,
+        modificationTime: file.modificationTime ?? '',
+        downloadUrl: `${baseUrl}/app/rest/builds/id:${buildId}/artifacts/content/${this.encodeArtifactPath(pathSegments)}`,
+        isDirectory: false,
+      });
     }
 
     return artifacts;
+  }
+
+  private buildArtifactSegments(file: ArtifactFile, parentSegments: string[]): string[] {
+    const fullName = typeof file.fullName === 'string' ? file.fullName : undefined;
+    const name = typeof file.name === 'string' ? file.name : undefined;
+    const segmentsFromFullName = fullName
+      ? fullName.split('/').filter((segment) => segment.length > 0)
+      : [];
+
+    if (segmentsFromFullName.length === 0) {
+      if (name && name.length > 0) {
+        return [...parentSegments, name];
+      }
+      return [...parentSegments];
+    }
+
+    if (parentSegments.length === 0) {
+      return segmentsFromFullName;
+    }
+
+    if (this.segmentsStartWithParent(segmentsFromFullName, parentSegments)) {
+      return segmentsFromFullName;
+    }
+
+    return [...parentSegments, ...segmentsFromFullName];
+  }
+
+  private segmentsStartWithParent(segments: string[], parent: string[]): boolean {
+    if (parent.length === 0 || segments.length < parent.length) {
+      return false;
+    }
+
+    for (let i = 0; i < parent.length; i += 1) {
+      if (segments[i] !== parent[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private encodeArtifactPath(segments: string[]): string {
+    return segments.map((segment) => encodeURIComponent(segment)).join('/');
   }
 
   private ensureBinaryBuffer(payload: unknown): Buffer {
