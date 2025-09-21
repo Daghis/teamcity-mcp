@@ -5,6 +5,52 @@ import { debug, info, error as logError } from '@/utils/logger';
 
 import type { TeamCityUnifiedClient } from './types/client';
 
+const ARTIFACT_RULES_SETTINGS_FIELD = 'settings/artifactRules';
+const ARTIFACT_RULES_LEGACY_FIELD = 'artifactRules';
+
+type BuildTypeFieldSetter = Pick<
+  TeamCityUnifiedClient['modules']['buildTypes'],
+  'setBuildTypeField'
+>;
+
+const isArtifactRulesRetryableError = (error: unknown): boolean => {
+  if (error == null || typeof error !== 'object') return false;
+  if (!('response' in error)) return false;
+  const response = (error as { response?: { status?: number } }).response;
+  const status = response?.status;
+  return status === 400 || status === 404;
+};
+
+export const setArtifactRulesWithFallback = async (
+  api: BuildTypeFieldSetter,
+  buildTypeId: string,
+  artifactRules: string
+): Promise<void> => {
+  try {
+    await api.setBuildTypeField(buildTypeId, ARTIFACT_RULES_SETTINGS_FIELD, artifactRules);
+  } catch (err) {
+    if (!isArtifactRulesRetryableError(err)) {
+      throw err;
+    }
+
+    const status = (err as { response?: { status?: number } }).response?.status;
+    debug('Retrying artifact rules update via legacy field', {
+      buildTypeId,
+      status,
+    });
+
+    try {
+      await api.setBuildTypeField(buildTypeId, ARTIFACT_RULES_LEGACY_FIELD, artifactRules);
+    } catch (fallbackError) {
+      debug('Legacy artifact rules update failed', {
+        buildTypeId,
+        status: (fallbackError as { response?: { status?: number } }).response?.status,
+      });
+      throw fallbackError;
+    }
+  }
+};
+
 export interface UpdateOptions {
   name?: string;
   description?: string;
@@ -362,6 +408,15 @@ export class BuildConfigurationUpdateManager {
         // Intentional sequential updates: TeamCity API expects ordered single-field updates
         /* eslint-disable no-await-in-loop */
         for (const setting of settings) {
+          if (setting.name === 'artifactRules') {
+            await setArtifactRulesWithFallback(
+              this.client.modules.buildTypes,
+              currentConfig.id,
+              setting.value
+            );
+            continue;
+          }
+
           await this.client.modules.buildTypes.setBuildTypeField(
             currentConfig.id,
             `settings/${setting.name}`,

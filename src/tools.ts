@@ -16,7 +16,10 @@ import { getMCPMode as getMCPModeFromConfig } from '@/config';
 import { type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import type { Step } from '@/teamcity-client/models/step';
 import { type ArtifactContent, ArtifactManager } from '@/teamcity/artifact-manager';
-import { BuildConfigurationUpdateManager } from '@/teamcity/build-configuration-update-manager';
+import {
+  BuildConfigurationUpdateManager,
+  setArtifactRulesWithFallback,
+} from '@/teamcity/build-configuration-update-manager';
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
 import {
   type TeamCityClientAdapter,
@@ -3500,9 +3503,9 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             );
           }
           if (typedArgs.artifactRules !== undefined) {
-            await adapter.modules.buildTypes.setBuildTypeField(
+            await setArtifactRulesWithFallback(
+              adapter.modules.buildTypes,
               typedArgs.buildTypeId,
-              'settings/artifactRules',
               typedArgs.artifactRules
             );
           }
@@ -3524,9 +3527,9 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           );
         }
         if (typedArgs.artifactRules !== undefined) {
-          await adapter.modules.buildTypes.setBuildTypeField(
+          await setArtifactRulesWithFallback(
+            adapter.modules.buildTypes,
             typedArgs.buildTypeId,
-            'settings/artifactRules',
             typedArgs.artifactRules
           );
         }

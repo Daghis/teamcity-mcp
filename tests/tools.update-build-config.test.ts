@@ -83,4 +83,33 @@ describe('Tool: update_build_config', () => {
       'dist/** => api-gateway-%build.number%.zip'
     );
   });
+
+  it('retries artifact rules update using legacy field when needed', async () => {
+    const { getRequiredTool } = await import('../src/tools');
+    const tool = getRequiredTool('update_build_config') as ToolDefinition;
+
+    const args = {
+      buildTypeId: 'HoneycombHaven_ApiGatewayBuild',
+      artifactRules: 'dist/** => legacy.zip',
+    };
+
+    setBuildTypeField.mockRejectedValueOnce(
+      Object.assign(new Error('bad request'), { response: { status: 400 } })
+    );
+
+    await tool.handler(args);
+
+    expect(setBuildTypeField).toHaveBeenNthCalledWith(
+      1,
+      'HoneycombHaven_ApiGatewayBuild',
+      'settings/artifactRules',
+      'dist/** => legacy.zip'
+    );
+    expect(setBuildTypeField).toHaveBeenNthCalledWith(
+      2,
+      'HoneycombHaven_ApiGatewayBuild',
+      'artifactRules',
+      'dist/** => legacy.zip'
+    );
+  });
 });
