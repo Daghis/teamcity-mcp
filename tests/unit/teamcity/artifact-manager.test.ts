@@ -56,6 +56,9 @@ describe('ArtifactManager', () => {
     });
 
     manager = new ArtifactManager(mockClient);
+    jest
+      .spyOn(manager as unknown as { delay: (ms: number) => Promise<void> }, 'delay')
+      .mockResolvedValue();
   };
 
   beforeEach(() => {
@@ -268,6 +271,63 @@ describe('ArtifactManager', () => {
       expect(result.content).toBe(base64Content);
       expect(result.mimeType).toBe('text/plain');
       expect(result.size).toBe(13);
+    });
+
+    it('downloads nested directory artifacts even when TeamCity omits parent prefixes', async () => {
+      const listingResponse = {
+        file: [
+          {
+            name: 'production',
+            fullName: 'production',
+            size: 0,
+            children: {
+              file: [
+                {
+                  name: 'web',
+                  fullName: 'web',
+                  size: 0,
+                  children: {
+                    file: [
+                      {
+                        name: 'health.json',
+                        fullName: 'health.json',
+                        size: 20,
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      const artifactContent = JSON.stringify({ status: 'ok' });
+      const expectedPath = 'production/web/health.json';
+
+      const artifactBuffer = Buffer.from(artifactContent);
+
+      http.get.mockImplementation((path: string) => {
+        if (typeof path === 'string' && path.includes('/artifacts/content/')) {
+          return Promise.resolve({
+            data: artifactBuffer,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        return Promise.resolve({ data: listingResponse });
+      });
+
+      const result = await manager.downloadArtifact('3711', expectedPath, {
+        encoding: 'base64',
+      });
+
+      expect(result.path).toBe(expectedPath);
+      expect(result.content).toBe(artifactBuffer.toString('base64'));
+      expect(http.get).toHaveBeenLastCalledWith(
+        `/app/rest/builds/id:3711/artifacts/content/${expectedPath}`,
+        expect.objectContaining({ responseType: 'arraybuffer' })
+      );
     });
 
     it('should download artifact content as text', async () => {
