@@ -1,0 +1,51 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json",
+  "name": "io.github.daghis/teamcity",
+  "description": "MCP server exposing JetBrains TeamCity CI/CD workflows to AI coding assistants",
+  "repository": {
+    "url": "https://github.com/Daghis/teamcity-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/Daghis/teamcity-mcp",
+  "version": "1.9.3",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@daghis/teamcity-mcp",
+      "version": "1.9.3",
+      "runtimeHint": "npx",
+      "runtimeArguments": [
+        {
+          "type": "positional",
+          "value": "-y"
+        }
+      ],
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "TEAMCITY_URL",
+          "description": "Base URL of your TeamCity server",
+          "isRequired": true
+        },
+        {
+          "name": "TEAMCITY_TOKEN",
+          "description": "TeamCity personal access token with required permissions",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "MCP_MODE",
+          "description": "Operational mode: dev (default) or full for elevated administrative tools",
+          "default": "dev",
+          "choices": [
+            "dev",
+            "full"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -19,7 +19,8 @@ jobs:
       - name: Release Please
         uses: googleapis/release-please-action@v4
         with:
-          release-type: node
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json
           # Use a PAT so pushes/PRs from this action trigger CI workflows
           # Create a repo secret `RELEASE_PLEASE_TOKEN` with `repo` scope (or fine-grained equivalent)
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
