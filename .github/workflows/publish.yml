@@ -6,6 +6,13 @@ on:
   workflow_run:
     workflows: ["Release Please"]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      publish_to_registry:
+        description: 'Force MCP registry publish without npm release'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -15,7 +22,8 @@ jobs:
   publish:
     if: >-
       ${{ github.event_name == 'release' ||
-          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+          (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+          github.event_name == 'workflow_dispatch' }}
     name: Publish package
     runs-on: ubuntu-latest
     steps:
@@ -65,3 +73,17 @@ jobs:
           NPM_CONFIG_PROVENANCE: 'true'
         run: |
           npm publish --access public --provenance
+
+      - name: Install MCP Publisher
+        if: steps.exists.outputs.exists == 'false' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_to_registry == 'true')
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/download/v1.0.0/mcp-publisher_1.0.0_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" \
+            | tar xz mcp-publisher
+
+      - name: Login to MCP Registry
+        if: steps.exists.outputs.exists == 'false' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_to_registry == 'true')
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        if: steps.exists.outputs.exists == 'false' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_to_registry == 'true')
+        run: ./mcp-publisher publish
