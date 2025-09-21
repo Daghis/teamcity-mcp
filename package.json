@@ -1,6 +1,6 @@
 {
   "name": "@daghis/teamcity-mcp",
-  "version": "1.9.3",
+  "version": "0.1.2",
   "description": "Model Control Protocol server for TeamCity CI/CD integration with AI coding assistants",
   "mcpName": "io.github.daghis/teamcity",
   "main": "dist/index.js",
