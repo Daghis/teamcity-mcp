@@ -207,6 +207,37 @@ describe('BuildConfigurationUpdateManager', () => {
       retrieveSpy.mockRestore();
     });
 
+    it('falls back to legacy artifactRules field when settings path is rejected', async () => {
+      const error = Object.assign(new Error('bad request'), {
+        response: { status: 400 },
+      });
+      mockClient.buildTypes.setBuildTypeField.mockRejectedValueOnce(error);
+      const retrieveSpy = jest
+        .spyOn(manager, 'retrieveConfiguration')
+        .mockResolvedValue({ ...updatedConfig, artifactRules: 'dist/** => archive.zip' });
+
+      await expect(
+        manager.applyUpdates(baseConfig, {
+          artifactRules: 'dist/** => archive.zip',
+        })
+      ).resolves.toEqual({ ...updatedConfig, artifactRules: 'dist/** => archive.zip' });
+
+      expect(mockClient.buildTypes.setBuildTypeField).toHaveBeenNthCalledWith(
+        1,
+        'cfg1',
+        'settings/artifactRules',
+        'dist/** => archive.zip'
+      );
+      expect(mockClient.buildTypes.setBuildTypeField).toHaveBeenNthCalledWith(
+        2,
+        'cfg1',
+        'artifactRules',
+        'dist/** => archive.zip'
+      );
+
+      retrieveSpy.mockRestore();
+    });
+
     it('continues when parameter deletion fails', async () => {
       mockClient.buildTypes.deleteBuildParameterOfBuildType_2.mockRejectedValueOnce(
         new Error('temporary')
