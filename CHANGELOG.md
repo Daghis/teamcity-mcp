@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.2](https://github.com/Daghis/teamcity-mcp/compare/v1.9.1...v1.9.2) (2025-09-21)
+
+
+### Bug Fixes
+
+* **teamcity:** restore artifact rules update compatibility ([#185](https://github.com/Daghis/teamcity-mcp/issues/185)) ([1d67268](https://github.com/Daghis/teamcity-mcp/commit/1d67268e6ee837db38ab9be27a94a5f3e072ab83))
+
 ## [1.9.1](https://github.com/Daghis/teamcity-mcp/compare/v1.9.0...v1.9.1) (2025-09-20)
 
 
