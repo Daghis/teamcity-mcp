@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.1.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.9.3...teamcity-mcp-v0.1.2) (2025-09-21)
+
+
+### Features
+
+* add Codecov bundle analysis ([#28](https://github.com/Daghis/teamcity-mcp/issues/28)) ([87c3de8](https://github.com/Daghis/teamcity-mcp/commit/87c3de85af34bec5b071d82612d67ba4d5a52702))
+* **publish:** automate mcp registry publishing ([#190](https://github.com/Daghis/teamcity-mcp/issues/190)) ([285b737](https://github.com/Daghis/teamcity-mcp/commit/285b737c5993332d8cf5e81e4db5be9864355701))
+* **teamcity:** add runtime guards for manager responses ([#179](https://github.com/Daghis/teamcity-mcp/issues/179)) ([9d7eaef](https://github.com/Daghis/teamcity-mcp/commit/9d7eaef161e675246d317603df47f7f39407b7d8))
+* **teamcity:** add streaming artifact downloads ([#161](https://github.com/Daghis/teamcity-mcp/issues/161)) ([b50b773](https://github.com/Daghis/teamcity-mcp/commit/b50b773ebee6f5cc85f4c53c98fef525e7098fe9)), closes [#151](https://github.com/Daghis/teamcity-mcp/issues/151)
+* **teamcity:** add streaming artifact downloads ([#166](https://github.com/Daghis/teamcity-mcp/issues/166)) ([18830ed](https://github.com/Daghis/teamcity-mcp/commit/18830ed4805ad215518cc5a51640094adc35e31b)), closes [#151](https://github.com/Daghis/teamcity-mcp/issues/151)
+* **tests:** add batched mcp tool execution ([#163](https://github.com/Daghis/teamcity-mcp/issues/163)) ([5f48060](https://github.com/Daghis/teamcity-mcp/commit/5f4806043b95686d5dac41a9d67515740b82a3f8)), closes [#162](https://github.com/Daghis/teamcity-mcp/issues/162)
+* **tools:** add streaming mode to fetch_build_log ([#171](https://github.com/Daghis/teamcity-mcp/issues/171)) ([1abce69](https://github.com/Daghis/teamcity-mcp/commit/1abce69b7fa3866ac289501e2369d5d06d57d57f))
+* **tools:** add VCS root property management tools + integration test ([#95](https://github.com/Daghis/teamcity-mcp/issues/95)) ([13bbe17](https://github.com/Daghis/teamcity-mcp/commit/13bbe178564a53564aad4fcdb99bb3f2e5db4cb8))
+* **tools:** expose change and admin REST tools ([#112](https://github.com/Daghis/teamcity-mcp/issues/112)) ([e7f4e1e](https://github.com/Daghis/teamcity-mcp/commit/e7f4e1e74bb28572ffc3ee7a0fced6090c4f92ef))
+* **tools:** support streaming artifacts in get_build_results ([#173](https://github.com/Daghis/teamcity-mcp/issues/173)) ([f95c5e4](https://github.com/Daghis/teamcity-mcp/commit/f95c5e4da9ffa80adc8b8f322c127a440c4524b5)), closes [#169](https://github.com/Daghis/teamcity-mcp/issues/169)
+* **utils:** add TeamCity service message escaping ([#85](https://github.com/Daghis/teamcity-mcp/issues/85)) ([6ee3b72](https://github.com/Daghis/teamcity-mcp/commit/6ee3b72e4db065faa0e01c7046328e1d4e1375c8))
+
+
+### Bug Fixes
+
+* authorize_agent uses authorizedInfo JSON endpoint (TeamCity 2025.07 compatibility) ([#83](https://github.com/Daghis/teamcity-mcp/issues/83)) ([198fd02](https://github.com/Daghis/teamcity-mcp/commit/198fd02ca8b6e89d83f87a1a94aafeadda593504)), closes [#78](https://github.com/Daghis/teamcity-mcp/issues/78)
+* **cli:** improve npx execution; release 0.9.2 ([#61](https://github.com/Daghis/teamcity-mcp/issues/61)) ([42577c3](https://github.com/Daghis/teamcity-mcp/commit/42577c3ed78dd7e29f21f6c8138d96da49582892))
+* **cli:** remove duplicate shebang in entrypoint; bump to 0.9.1 ([#59](https://github.com/Daghis/teamcity-mcp/issues/59)) ([740530d](https://github.com/Daghis/teamcity-mcp/commit/740530d7bfba6bc81a42f8057fd017a2f8cae14e))
+* delete_parameter: correct endpoint + arg order ([#84](https://github.com/Daghis/teamcity-mcp/issues/84)) ([9832821](https://github.com/Daghis/teamcity-mcp/commit/9832821e65fd945ec5ff0da2b85f744f413e7782))
+* **health:** accept empty locator; normalize category; fallback on 400 ([#76](https://github.com/Daghis/teamcity-mcp/issues/76)) ([174c8e9](https://github.com/Daghis/teamcity-mcp/commit/174c8e932301b1b2262bfb704a73c4647520d3bf)), closes [#75](https://github.com/Daghis/teamcity-mcp/issues/75)
+* **mcp:** normalize TeamCity errors and wrap server info/metrics with runTool ([#53](https://github.com/Daghis/teamcity-mcp/issues/53)) ([2c8ab85](https://github.com/Daghis/teamcity-mcp/commit/2c8ab855a85e5faec4216a498c089e3a1a93ed7b))
+* **teamcity:** expose unified adapter surface ([#129](https://github.com/Daghis/teamcity-mcp/issues/129)) ([b0b15e8](https://github.com/Daghis/teamcity-mcp/commit/b0b15e8597d5a79c064388be38c3ffe9c0e1fc09)), closes [#114](https://github.com/Daghis/teamcity-mcp/issues/114)
+* **teamcity:** resolve nested artifact downloads ([#188](https://github.com/Daghis/teamcity-mcp/issues/188)) ([e309b90](https://github.com/Daghis/teamcity-mcp/commit/e309b90de42fe121f072fe5b549ab25df3a91aaf))
+* **teamcity:** restore artifact rules update compatibility ([#185](https://github.com/Daghis/teamcity-mcp/issues/185)) ([1d67268](https://github.com/Daghis/teamcity-mcp/commit/1d67268e6ee837db38ab9be27a94a5f3e072ab83))
+* **teamcity:** retain adapter api credentials ([#138](https://github.com/Daghis/teamcity-mcp/issues/138)) ([3ad31ed](https://github.com/Daghis/teamcity-mcp/commit/3ad31edf227eac904eee84ec3a80d16455ae37fc)), closes [#135](https://github.com/Daghis/teamcity-mcp/issues/135)
+* **teamcity:** route results + problems via shared client ([#111](https://github.com/Daghis/teamcity-mcp/issues/111)) ([3797bb5](https://github.com/Daghis/teamcity-mcp/commit/3797bb57d8421e2cb243112a9b1cdfda92fff1f7))
+* **tools:** allow manage_build_steps updates ([#182](https://github.com/Daghis/teamcity-mcp/issues/182)) ([2c6bea0](https://github.com/Daghis/teamcity-mcp/commit/2c6bea0cf6770d22068b9e4b733542a056399148))
+* **tools:** ensure multi-ref branchSpec; remove alias logic ([#103](https://github.com/Daghis/teamcity-mcp/issues/103)) ([5012439](https://github.com/Daghis/teamcity-mcp/commit/5012439caa926422960d5ac569579a3a725732ad))
+* **tools:** harden batch artifact streaming outputs ([#177](https://github.com/Daghis/teamcity-mcp/issues/177)) ([0874325](https://github.com/Daghis/teamcity-mcp/commit/0874325c77aa2a79050cff57fced0aeec5a55ba0))
+* **tools:** migrate MCP handlers to unified client ([#141](https://github.com/Daghis/teamcity-mcp/issues/141)) ([bc3a909](https://github.com/Daghis/teamcity-mcp/commit/bc3a909f6eb8c30798865c8b48604aca5405efc8))
+* **tools:** repair manage_build_steps updates ([#154](https://github.com/Daghis/teamcity-mcp/issues/154)) ([b557e44](https://github.com/Daghis/teamcity-mcp/commit/b557e4424d5129de9d3b6e3240e1a876488da040))
+* **tools:** stabilize batch artifact downloads ([#175](https://github.com/Daghis/teamcity-mcp/issues/175)) ([91a0ec3](https://github.com/Daghis/teamcity-mcp/commit/91a0ec33ac61e680dd34393fca46914e2ba3fe7f))
+* **tools:** update_build_config uses 'settings/artifactRules' path; add tests ([#66](https://github.com/Daghis/teamcity-mcp/issues/66)) ([8b8afc6](https://github.com/Daghis/teamcity-mcp/commit/8b8afc6f41038bcde21a50a8662f90fa4acb7e9a))
+* trigger 1.0.2 release (no functional change) ([392be27](https://github.com/Daghis/teamcity-mcp/commit/392be27fe705d55fb8a3057120ff5e2c0a41ca8a))
+* trigger 1.0.3 release (no functional change) ([069212a](https://github.com/Daghis/teamcity-mcp/commit/069212a181861b17e7a1d5cfda05b40c2d11e933))
+
+
+### Miscellaneous Chores
+
+* release 0.1.2 ([21e2595](https://github.com/Daghis/teamcity-mcp/commit/21e25950074ed49bd3e6c571f432f27fb8bd434e))
+
 ## [1.9.3](https://github.com/Daghis/teamcity-mcp/compare/v1.9.2...v1.9.3) (2025-09-21)
 
 
