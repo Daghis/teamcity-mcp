@@ -104,4 +104,48 @@ describe('tools: enhanced status and results', () => {
       expect.objectContaining({ artifactEncoding: 'stream' })
     );
   });
+
+  it('get_build_results resolves builds using buildTypeId and buildNumber', async () => {
+    const fakeResults = {
+      build: { id: 6001, status: 'SUCCESS', number: '60' },
+    };
+
+    const getBuildResults = jest.fn().mockResolvedValue(fakeResults);
+    const BuildResultsManager = jest.fn().mockImplementation(() => ({ getBuildResults }));
+    jest.doMock('@/teamcity/build-results-manager', () => ({ BuildResultsManager }));
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getRequiredTool } = require('@/tools');
+    await getRequiredTool('get_build_results').handler({
+      buildTypeId: 'Infrastructure_DeployCrossroads',
+      buildNumber: '60',
+      includeStatistics: true,
+    });
+
+    expect(getBuildResults).toHaveBeenCalledWith(
+      'buildType:(id:Infrastructure_DeployCrossroads),number:60',
+      expect.objectContaining({ includeStatistics: true })
+    );
+  });
+
+  it('get_build_results surfaces friendly not-found message with build context', async () => {
+    const { TeamCityNotFoundError } = await import('@/teamcity/errors');
+
+    const notFound = new TeamCityNotFoundError('Build', 'id:12345');
+    const getBuildResults = jest.fn().mockRejectedValue(notFound);
+    const BuildResultsManager = jest.fn().mockImplementation(() => ({ getBuildResults }));
+    jest.doMock('@/teamcity/build-results-manager', () => ({ BuildResultsManager }));
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getRequiredTool } = require('@/tools');
+    const res = await getRequiredTool('get_build_results').handler({
+      buildTypeId: 'Infrastructure_DeployCrossroads',
+      buildNumber: '60',
+    });
+
+    const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+    expect(payload.success).toBe(false);
+    expect(payload.error?.message).toMatch(/Infrastructure_DeployCrossroads[^]*number\s*60/i);
+    expect(payload.error?.code).toBe('TEAMCITY_ERROR');
+  });
 });
