@@ -214,14 +214,18 @@ export class BuildQueueManager extends EventEmitter {
     }
     /* eslint-enable no-await-in-loop */
 
+    const successfulResults = results.filter(
+      (result): result is QueuedBuild => result !== undefined
+    );
+
     if (errors.length > 0) {
       this.emit('batch:partial', {
-        successful: results.filter((r) => r),
+        successful: successfulResults,
         failed: errors,
       });
     }
 
-    return results.filter((r) => r);
+    return successfulResults;
   }
 
   async getQueuePosition(buildId: string): Promise<QueuePosition> {

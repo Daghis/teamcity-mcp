@@ -592,11 +592,11 @@ export class TestProblemReporter {
 
       const problemDetails = problems
         .slice(0, 3)
-        .map((p) => p.details)
-        .filter((d) => d && d.length > 0)
+        .map((problem) => problem.details)
+        .filter((detail): detail is string => typeof detail === 'string' && detail.length > 0)
         .join('; ');
 
-      if (problemDetails) {
+      if (problemDetails.length > 0) {
         reasons.push(`Build problems: ${problemDetails}`);
       }
     }
