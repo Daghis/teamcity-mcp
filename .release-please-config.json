@@ -2,7 +2,6 @@
   "packages": {
     ".": {
       "release-type": "node",
-      "release-as": "1.9.5",
       "extra-files": [
         {
           "type": "json",
