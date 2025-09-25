@@ -325,9 +325,11 @@ describe('tools: parameters, steps, triggers', () => {
             properties: { 'script.content': scriptWithEscapedNewlines },
           });
 
-          const replacement = replaceBuildStep.mock.calls[0]?.[3] as {
-            properties?: { property?: Array<{ name?: string; value?: string }> };
-          } | undefined;
+          const replacement = replaceBuildStep.mock.calls[0]?.[3] as
+            | {
+                properties?: { property?: Array<{ name?: string; value?: string }> };
+              }
+            | undefined;
           const scriptEntry = replacement?.properties?.property?.find(
             (prop) => prop?.name === 'script.content'
           );
