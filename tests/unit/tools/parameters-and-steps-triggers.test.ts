@@ -282,6 +282,67 @@ describe('tools: parameters, steps, triggers', () => {
     });
   });
 
+  it('manage_build_steps update decodes escaped newline sequences in script.content', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const replaceBuildStep = jest.fn(async () => ({})) as jest.Mock;
+          const getBuildStep = jest.fn(async () => ({
+            data: {
+              id: 'S1',
+              name: 'Existing step',
+              type: 'simpleRunner',
+              disabled: false,
+              properties: {
+                property: [
+                  { name: 'script.type', value: 'customScript' },
+                  { name: 'use.custom.script', value: 'true' },
+                ],
+              },
+            },
+          }));
+
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                buildTypes: {
+                  replaceBuildStep,
+                  getBuildStep,
+                },
+              }),
+            },
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+
+          const scriptWithEscapedNewlines = '#!/bin/bash\\nset -euo pipefail\\necho done';
+          await getRequiredTool('manage_build_steps').handler({
+            buildTypeId: 'bt',
+            action: 'update',
+            stepId: 'S1',
+            properties: { 'script.content': scriptWithEscapedNewlines },
+          });
+
+          const replacement = replaceBuildStep.mock.calls[0]?.[3] as {
+            properties?: { property?: Array<{ name?: string; value?: string }> };
+          } | undefined;
+          const scriptEntry = replacement?.properties?.property?.find(
+            (prop) => prop?.name === 'script.content'
+          );
+
+          expect(scriptEntry).toBeDefined();
+          expect(scriptEntry?.value).toBe('#!/bin/bash\nset -euo pipefail\necho done');
+          expect(scriptEntry?.value?.includes('\n')).toBe(true);
+          expect(scriptEntry?.value?.includes('\\n')).toBe(false);
+
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
   it('manage_build_steps surfaces TeamCity errors with context', async () => {
     jest.resetModules();
     await new Promise<void>((resolve, reject) => {
