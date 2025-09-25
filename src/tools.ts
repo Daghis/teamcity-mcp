@@ -25,7 +25,7 @@ import {
   type TeamCityClientAdapter,
   createAdapterFromTeamCityAPI,
 } from '@/teamcity/client-adapter';
-import { TeamCityAPIError, isRetryableError } from '@/teamcity/errors';
+import { TeamCityAPIError, TeamCityNotFoundError, isRetryableError } from '@/teamcity/errors';
 import { createPaginatedFetcher, fetchAllPages } from '@/teamcity/pagination';
 import { debug } from '@/utils/logger';
 import { json, runTool } from '@/utils/mcp';
@@ -2160,6 +2160,17 @@ const DEV_TOOLS: ToolDefinition[] = [
       type: 'object',
       properties: {
         buildId: { type: 'string', description: 'Build ID' },
+        buildTypeId: {
+          type: 'string',
+          description: 'Build configuration ID when resolving by number',
+        },
+        buildNumber: {
+          oneOf: [
+            { type: 'string', description: 'Build number as TeamCity displays it' },
+            { type: 'number', description: 'Numeric build number' },
+          ],
+          description: 'Build number when buildId is not available',
+        },
         includeArtifacts: {
           type: 'boolean',
           description: 'Include artifacts listing and metadata',
@@ -2179,19 +2190,44 @@ const DEV_TOOLS: ToolDefinition[] = [
           default: 'base64',
         },
       },
-      required: ['buildId'],
     },
     handler: async (args: unknown) => {
-      const schema = z.object({
-        buildId: z.string().min(1),
-        includeArtifacts: z.boolean().optional(),
-        includeStatistics: z.boolean().optional(),
-        includeChanges: z.boolean().optional(),
-        includeDependencies: z.boolean().optional(),
-        artifactFilter: z.string().min(1).optional(),
-        maxArtifactSize: z.number().int().min(1).optional(),
-        artifactEncoding: z.enum(['base64', 'stream']).default('base64'),
-      });
+      const schema = z
+        .object({
+          buildId: z.string().min(1).optional(),
+          buildTypeId: z.string().min(1).optional(),
+          buildNumber: z.union([z.string().min(1), z.number().int()]).optional(),
+          includeArtifacts: z.boolean().optional(),
+          includeStatistics: z.boolean().optional(),
+          includeChanges: z.boolean().optional(),
+          includeDependencies: z.boolean().optional(),
+          artifactFilter: z.string().min(1).optional(),
+          maxArtifactSize: z.number().int().min(1).optional(),
+          artifactEncoding: z.enum(['base64', 'stream']).default('base64'),
+        })
+        .superRefine((value, ctx) => {
+          const hasBuildId = typeof value.buildId === 'string' && value.buildId.trim().length > 0;
+          const hasBuildType =
+            typeof value.buildTypeId === 'string' && value.buildTypeId.trim().length > 0;
+          const hasBuildNumber =
+            value.buildNumber !== undefined && String(value.buildNumber).trim().length > 0;
+
+          if (hasBuildType !== hasBuildNumber) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'buildTypeId and buildNumber must be provided together',
+              path: hasBuildType ? ['buildNumber'] : ['buildTypeId'],
+            });
+          }
+
+          if (!hasBuildId && !(hasBuildType && hasBuildNumber)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Provide either buildId or buildTypeId with buildNumber',
+              path: ['buildId'],
+            });
+          }
+        });
 
       return runTool(
         'get_build_results',
@@ -2200,16 +2236,50 @@ const DEV_TOOLS: ToolDefinition[] = [
           // Use the manager for rich results via the unified TeamCityAPI adapter.
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const manager = new BuildResultsManager(adapter);
-          const result = await manager.getBuildResults(typed.buildId, {
-            includeArtifacts: typed.includeArtifacts,
-            includeStatistics: typed.includeStatistics,
-            includeChanges: typed.includeChanges,
-            includeDependencies: typed.includeDependencies,
-            artifactFilter: typed.artifactFilter,
-            maxArtifactSize: typed.maxArtifactSize,
-            artifactEncoding: typed.artifactEncoding,
-          });
-          return json(result);
+
+          const trimmedBuildId =
+            typeof typed.buildId === 'string' ? typed.buildId.trim() : undefined;
+          const hasBuildId = typeof trimmedBuildId === 'string' && trimmedBuildId.length > 0;
+          const buildTypeId = typed.buildTypeId?.trim();
+          const buildNumberRaw = typed.buildNumber;
+          const buildNumber =
+            typeof buildNumberRaw === 'number'
+              ? buildNumberRaw.toString()
+              : buildNumberRaw?.toString().trim();
+
+          let buildLocator: string;
+          let friendlyIdentifier: string;
+
+          if (hasBuildId && trimmedBuildId) {
+            buildLocator = trimmedBuildId;
+            friendlyIdentifier = `ID '${trimmedBuildId}'`;
+          } else if (buildTypeId && buildNumber) {
+            buildLocator = `buildType:(id:${buildTypeId}),number:${buildNumber}`;
+            friendlyIdentifier = `build type '${buildTypeId}' and number ${buildNumber}`;
+          } else {
+            throw new TeamCityAPIError(
+              'Unable to resolve build identifier',
+              'INVALID_BUILD_IDENTIFIER'
+            );
+          }
+
+          try {
+            const result = await manager.getBuildResults(buildLocator, {
+              includeArtifacts: typed.includeArtifacts,
+              includeStatistics: typed.includeStatistics,
+              includeChanges: typed.includeChanges,
+              includeDependencies: typed.includeDependencies,
+              artifactFilter: typed.artifactFilter,
+              maxArtifactSize: typed.maxArtifactSize,
+              artifactEncoding: typed.artifactEncoding ?? 'base64',
+            });
+            return json(result);
+          } catch (error) {
+            if (error instanceof TeamCityNotFoundError) {
+              throw new TeamCityNotFoundError('Build', friendlyIdentifier, error.requestId, error);
+            }
+            throw error;
+          }
         },
         args
       );

@@ -149,6 +149,36 @@ describe('Build results and logs: full writes + dev reads', () => {
     }
   }, 60000);
 
+  it('get_build_results resolves using buildTypeId and buildNumber (dev)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    if (!buildNumber) return expect(true).toBe(true);
+    const res = await callTool<Record<string, unknown>>('dev', 'get_build_results', {
+      buildTypeId: BT_ID,
+      buildNumber,
+      includeStatistics: true,
+    });
+
+    expect(res).toBeDefined();
+    const build = (res?.['build'] ?? {}) as { number?: string };
+    if (build.number) {
+      expect(String(build.number)).toBe(String(buildNumber));
+    }
+  }, 60000);
+
+  it('get_build_results surfaces friendly not-found message for unknown build number (dev)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    const bogusNumber = `MISSING-${Date.now()}`;
+    const res = await callTool<Record<string, unknown>>('dev', 'get_build_results', {
+      buildTypeId: BT_ID,
+      buildNumber: bogusNumber,
+    });
+
+    expect(res).toBeDefined();
+    expect(res?.['success']).toBe(false);
+    const error = (res?.['error'] ?? {}) as { message?: string };
+    expect(error.message ?? '').toMatch(new RegExp(`${BT_ID}[^]*${bogusNumber}`));
+  }, 60000);
+
   it('fetch_build_log with paging and tail (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
     if (!buildId) return expect(true).toBe(true);

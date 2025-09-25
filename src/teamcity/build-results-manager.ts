@@ -1,11 +1,11 @@
 /**
  * BuildResultsManager - Manages comprehensive build results retrieval
  */
-import type { AxiosResponse } from 'axios';
+import type { AxiosError, AxiosResponse } from 'axios';
 
 import { warn } from '@/utils/logger';
 
-import { TeamCityAPIError } from './errors';
+import { TeamCityAPIError, TeamCityNotFoundError } from './errors';
 import type { TeamCityUnifiedClient } from './types/client';
 import { toBuildLocator } from './utils/build-locator';
 
@@ -266,11 +266,40 @@ export class BuildResultsManager {
 
       return result;
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('not found')) {
-        throw new Error(`Build not found: ${buildId}`);
+      if (error instanceof TeamCityAPIError) {
+        if (error.statusCode === 404) {
+          throw new TeamCityNotFoundError('Build', buildId, error.requestId, error);
+        }
+        throw error;
       }
-      throw new Error(`Failed to fetch build results: ${errorMessage}`);
+
+      if (this.isAxiosNotFound(error)) {
+        const axiosError = error as AxiosError;
+        const apiError = TeamCityAPIError.fromAxiosError(axiosError);
+        if (apiError.statusCode === 404) {
+          throw new TeamCityNotFoundError('Build', buildId, apiError.requestId, apiError);
+        }
+        throw apiError;
+      }
+
+      const message = error instanceof Error ? error.message : String(error);
+      if (/not found/i.test(message)) {
+        throw new TeamCityNotFoundError(
+          'Build',
+          buildId,
+          undefined,
+          error instanceof Error ? error : undefined
+        );
+      }
+
+      throw new TeamCityAPIError(
+        `Failed to fetch build results: ${message}`,
+        'GET_BUILD_RESULTS_FAILED',
+        undefined,
+        undefined,
+        undefined,
+        error instanceof Error ? error : undefined
+      );
     }
   }
 
@@ -905,6 +934,11 @@ export class BuildResultsManager {
    */
   private getCacheKey(buildId: string, options: BuildResultsOptions): string {
     return `${buildId}:${JSON.stringify(options)}`;
+  }
+
+  private isAxiosNotFound(error: unknown): error is AxiosError {
+    const axiosError = error as AxiosError | undefined;
+    return Boolean(axiosError?.response && axiosError.response.status === 404);
   }
 
   /**

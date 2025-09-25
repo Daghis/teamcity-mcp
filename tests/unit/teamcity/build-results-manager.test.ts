@@ -106,6 +106,24 @@ describe('BuildResultsManager', () => {
       expect(result.changes).toBeUndefined();
       expect(result.dependencies).toBeUndefined();
     });
+
+    it('throws TeamCityNotFoundError with locator context on 404', async () => {
+      const { TeamCityAPIError, TeamCityNotFoundError } = await import('@/teamcity/errors');
+      const notFound = new TeamCityAPIError('HTTP 404', 'HTTP_404', 404);
+      stub.modules.builds.getBuild.mockRejectedValue(notFound);
+
+      let captured: unknown;
+      try {
+        await manager.getBuildResults('987654');
+      } catch (err) {
+        captured = err;
+      }
+
+      expect(captured).toBeInstanceOf(TeamCityNotFoundError);
+      const error = captured as Error;
+      expect(error.message).toContain("'987654'");
+      expect((captured as { code?: string }).code).toBe('NOT_FOUND');
+    });
   });
 
   describe('fetchArtifacts', () => {
