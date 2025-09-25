@@ -3844,6 +3844,22 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           }
         });
 
+      const decodeScriptContent = (key: string, value: string): string => {
+        if (key !== 'script.content' && key !== 'kotlinScript.content') {
+          return value;
+        }
+
+        const normalised = value.replace(/\r\n/g, '\n');
+        if (!normalised.includes('\\')) {
+          return normalised;
+        }
+
+        return normalised
+          .replace(/\\r\\n/g, '\n')
+          .replace(/\\r/g, '\n')
+          .replace(/\\n/g, '\n');
+      };
+
       return runTool(
         'manage_build_steps',
         schema,
@@ -3853,7 +3869,10 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           switch (typedArgs.action) {
             case 'add': {
               const stepProps: Record<string, string> = Object.fromEntries(
-                Object.entries(typedArgs.properties ?? {}).map(([k, v]) => [k, String(v)])
+                Object.entries(typedArgs.properties ?? {}).map(([k, v]) => {
+                  const value = String(v);
+                  return [k, decodeScriptContent(k, value)];
+                })
               );
               // Ensure command runner uses custom script when script.content is provided
               if (typedArgs.type === 'simpleRunner' && stepProps['script.content']) {
@@ -3933,7 +3952,10 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
               const rawProps = typedArgs.properties ?? {};
               const providedProps: Record<string, string> = Object.fromEntries(
-                Object.entries(rawProps).map(([k, v]) => [k, String(v)])
+                Object.entries(rawProps).map(([k, v]) => {
+                  const value = String(v);
+                  return [k, decodeScriptContent(k, value)];
+                })
               );
 
               const mergedProps: Record<string, string> = {
