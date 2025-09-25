@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.9.5...teamcity-mcp-v1.9.6) (2025-09-25)
+
+
+### Bug Fixes
+
+* **tools:** resolve builds by number (GH-198) ([#211](https://github.com/Daghis/teamcity-mcp/issues/211)) ([abcb614](https://github.com/Daghis/teamcity-mcp/commit/abcb614364e4ba60d6e4d19faabe515fa20c7d5a))
+
 ## [1.9.5](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.9.5...teamcity-mcp-v1.9.5) (2025-09-25)
 
 
