@@ -3882,30 +3882,74 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             }
 
             case 'update': {
+              const existingStepResponse = await adapter.modules.buildTypes.getBuildStep(
+                typedArgs.buildTypeId,
+                typedArgs.stepId as string,
+                'id,name,type,disabled,properties(property(name,value))',
+                {
+                  headers: {
+                    Accept: 'application/json',
+                  },
+                }
+              );
+
+              const existingStep = existingStepResponse.data as Step;
+
+              const toRecord = (collection?: {
+                property?: Array<{ name?: string | null; value?: unknown }>;
+              }): Record<string, string> => {
+                if (!collection || !Array.isArray(collection.property)) {
+                  return {};
+                }
+
+                const entries = collection.property
+                  .filter((item): item is { name: string; value: unknown } => {
+                    return Boolean(item?.name);
+                  })
+                  .map((item) => {
+                    return [item.name, item.value != null ? String(item.value) : ''];
+                  });
+
+                return Object.fromEntries(entries);
+              };
+
+              const existingProperties = toRecord(existingStep?.properties);
+
               const updatePayload: Record<string, unknown> = {};
 
-              if (typedArgs.name != null) {
-                updatePayload['name'] = typedArgs.name;
+              const mergedName = typedArgs.name ?? existingStep?.name;
+              if (mergedName != null) {
+                updatePayload['name'] = mergedName;
               }
 
-              if (typedArgs.type != null) {
-                updatePayload['type'] = typedArgs.type;
+              const mergedType = typedArgs.type ?? existingStep?.type;
+              if (mergedType != null) {
+                updatePayload['type'] = mergedType;
+              }
+
+              if (existingStep?.disabled != null) {
+                updatePayload['disabled'] = existingStep.disabled;
               }
 
               const rawProps = typedArgs.properties ?? {};
-              const stepProps: Record<string, string> = Object.fromEntries(
+              const providedProps: Record<string, string> = Object.fromEntries(
                 Object.entries(rawProps).map(([k, v]) => [k, String(v)])
               );
 
-              if (stepProps['script.content']) {
+              const mergedProps: Record<string, string> = {
+                ...existingProperties,
+                ...providedProps,
+              };
+
+              if (mergedProps['script.content'] && mergedType === 'simpleRunner') {
                 // Ensure simple runners keep custom script flags when updating script content
-                stepProps['use.custom.script'] = stepProps['use.custom.script'] ?? 'true';
-                stepProps['script.type'] = stepProps['script.type'] ?? 'customScript';
+                mergedProps['use.custom.script'] = mergedProps['use.custom.script'] ?? 'true';
+                mergedProps['script.type'] = mergedProps['script.type'] ?? 'customScript';
               }
 
-              if (Object.keys(stepProps).length > 0) {
+              if (Object.keys(mergedProps).length > 0) {
                 updatePayload['properties'] = {
-                  property: Object.entries(stepProps).map(([name, value]) => ({ name, value })),
+                  property: Object.entries(mergedProps).map(([name, value]) => ({ name, value })),
                 };
               }
 

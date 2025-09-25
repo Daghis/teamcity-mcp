@@ -76,10 +76,26 @@ describe('tools: parameters, steps, triggers', () => {
           const addBuildStepToBuildType = jest.fn(async () => ({}));
           const replaceBuildStep = jest.fn(async () => ({}));
           const deleteBuildStep = jest.fn(async () => ({}));
+          const getBuildStep = jest.fn(async () => ({
+            data: {
+              id: 'S1',
+              name: 'Existing step',
+              type: 'simpleRunner',
+              disabled: false,
+              properties: {
+                property: [{ name: 'some.setting', value: 'keep' }],
+              },
+            },
+          }));
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: {
               getInstance: () => ({
-                buildTypes: { addBuildStepToBuildType, replaceBuildStep, deleteBuildStep },
+                buildTypes: {
+                  addBuildStepToBuildType,
+                  replaceBuildStep,
+                  deleteBuildStep,
+                  getBuildStep,
+                },
               }),
             },
           }));
@@ -112,15 +128,19 @@ describe('tools: parameters, steps, triggers', () => {
             buildTypeId: 'bt',
             stepId: 'S1',
           });
+          expect(getBuildStep).toHaveBeenCalled();
           expect(replaceBuildStep).toHaveBeenCalledWith(
             'bt',
             'S1',
             undefined,
             expect.objectContaining({
+              name: 'Existing step',
+              type: 'simpleRunner',
               properties: {
                 property: expect.arrayContaining([
                   { name: 'a', value: '1' },
                   { name: 'b', value: '2' },
+                  { name: 'some.setting', value: 'keep' },
                 ]),
               },
             }),
@@ -151,6 +171,7 @@ describe('tools: parameters, steps, triggers', () => {
                   { name: 'script.content', value: 'echo hi' },
                   { name: 'use.custom.script', value: 'true' },
                   { name: 'script.type', value: 'customScript' },
+                  { name: 'some.setting', value: 'keep' },
                 ]),
               },
             }),
@@ -180,6 +201,87 @@ describe('tools: parameters, steps, triggers', () => {
     });
   });
 
+  it('manage_build_steps update merges existing step defaults when only script changes', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const getBuildStep = jest.fn(async () => ({
+            data: {
+              id: 'S9',
+              name: 'Run script',
+              type: 'simpleRunner',
+              disabled: false,
+              properties: {
+                property: [
+                  { name: 'script.content', value: 'echo old' },
+                  { name: 'some.setting', value: 'keep' },
+                ],
+              },
+            },
+          }));
+          const replaceBuildStep = jest.fn(async () => ({}));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                buildTypes: {
+                  getBuildStep,
+                  replaceBuildStep,
+                },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+
+          await getRequiredTool('manage_build_steps').handler({
+            buildTypeId: 'bt',
+            action: 'update',
+            stepId: 'S9',
+            properties: {
+              'script.content': 'echo 42',
+            },
+          });
+
+          expect(getBuildStep).toHaveBeenCalledWith(
+            'bt',
+            'S9',
+            'id,name,type,disabled,properties(property(name,value))',
+            expect.objectContaining({
+              headers: expect.objectContaining({ Accept: 'application/json' }),
+            })
+          );
+          expect(replaceBuildStep).toHaveBeenCalledWith(
+            'bt',
+            'S9',
+            undefined,
+            expect.objectContaining({
+              name: 'Run script',
+              type: 'simpleRunner',
+              disabled: false,
+              properties: {
+                property: expect.arrayContaining([
+                  { name: 'script.content', value: 'echo 42' },
+                  { name: 'some.setting', value: 'keep' },
+                  { name: 'use.custom.script', value: 'true' },
+                  { name: 'script.type', value: 'customScript' },
+                ]),
+              },
+            }),
+            expect.objectContaining({
+              headers: expect.objectContaining({
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              }),
+            })
+          );
+
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
   it('manage_build_steps surfaces TeamCity errors with context', async () => {
     jest.resetModules();
     await new Promise<void>((resolve, reject) => {
@@ -189,6 +291,17 @@ describe('tools: parameters, steps, triggers', () => {
           const replaceBuildStep = jest
             .fn()
             .mockRejectedValue(new TeamCityAPIError('Bad payload', 'VALIDATION_ERROR', 400));
+          const getBuildStep = jest.fn(async () => ({
+            data: {
+              id: 'S9',
+              name: 'Existing step',
+              type: 'simpleRunner',
+              disabled: false,
+              properties: {
+                property: [{ name: 'script.content', value: 'echo old' }],
+              },
+            },
+          }));
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: {
               getInstance: () => ({
@@ -196,6 +309,7 @@ describe('tools: parameters, steps, triggers', () => {
                   addBuildStepToBuildType: jest.fn(),
                   replaceBuildStep,
                   deleteBuildStep: jest.fn(),
+                  getBuildStep,
                 },
               }),
             },
