@@ -306,7 +306,7 @@ export class BuildQueueManager extends EventEmitter {
 
       // Check for blocking dependencies
       // Intentional sequential check; need deterministic fail-fast and message aggregation
-      // eslint-disable-next-line no-await-in-loop
+
       for (const pos of positions) {
         if (pos.blockedBy?.length) {
           throw new Error(`Build ${pos.buildId} is blocked by ${pos.blockedBy.join(', ')}`);
@@ -523,7 +523,7 @@ export class BuildQueueManager extends EventEmitter {
   private validateDependencies(dependencies: Array<{ buildId: string; waitForFinish?: boolean }>) {
     const seen = new Set<string>();
     // Validate linearly; tiny array and readability preferred
-    // eslint-disable-next-line no-await-in-loop
+
     for (const dep of dependencies) {
       if (seen.has(dep.buildId)) {
         throw new Error(`Circular dependency detected: ${dep.buildId} appears multiple times`);

@@ -4,7 +4,7 @@ declare module '../jest.config.js' {
   export default value;
 }
 
-declare module '../.eslintrc.js' {
+declare module '../eslint.config.cjs' {
   const value: any;
   export default value;
 }
@@ -14,7 +14,7 @@ declare module '*/jest.config.js' {
   export default value;
 }
 
-declare module '*/.eslintrc.js' {
+declare module '*/eslint.config.cjs' {
   const value: any;
   export default value;
 }
