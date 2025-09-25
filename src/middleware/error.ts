@@ -29,7 +29,7 @@ export class MCPValidationError extends MCPToolError {
     message: string,
     public errors?: z.ZodError
   ) {
-    super(message, 'VALIDATION_ERROR', 400, errors?.errors);
+    super(message, 'VALIDATION_ERROR', 400, errors?.issues);
     this.name = 'MCPValidationError';
   }
 }
@@ -150,7 +150,7 @@ export function formatError(
 
   if (err instanceof z.ZodError) {
     logError('Validation Error', err, {
-      errors: err.errors,
+      errors: err.issues,
       ...context,
     });
 
@@ -159,7 +159,7 @@ export function formatError(
       error: {
         message: 'Validation failed',
         code: 'VALIDATION_ERROR',
-        data: err.errors,
+        data: err.issues,
       },
     };
   }
