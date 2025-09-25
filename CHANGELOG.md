@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v0.1.2...teamcity-mcp-v0.1.3) (2025-09-25)
+
+
+### Bug Fixes
+
+* **tools:** merge build step defaults during update (199) ([#203](https://github.com/Daghis/teamcity-mcp/issues/203)) ([43a668f](https://github.com/Daghis/teamcity-mcp/commit/43a668f0bdc3b0f69c6a3bca0e2a47c49f1cd1a7))
+
 ## [0.1.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.9.3...teamcity-mcp-v0.1.2) (2025-09-21)
 
 
