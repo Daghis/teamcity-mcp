@@ -118,7 +118,7 @@ export class BranchSpecificationParser {
 
     // Apply rules in order
     for (const spec of specs) {
-      if (spec.regex && spec.regex.test(branchName)) {
+      if (spec.regex?.test(branchName)) {
         if (spec.type === 'include') {
           matched = true;
         } else if (spec.type === 'exclude') {
@@ -142,7 +142,7 @@ export class BranchMatcher {
 
     // Apply rules in order
     for (const spec of specs) {
-      if (spec.regex && spec.regex.test(branchName)) {
+      if (spec.regex?.test(branchName)) {
         if (spec.type === 'include') {
           matched = true;
         } else if (spec.type === 'exclude') {
@@ -172,7 +172,7 @@ export class BranchMatcher {
         let confidence = 0;
 
         for (const spec of specs) {
-          if (spec.type === 'include' && spec.regex && spec.regex.test(branchName)) {
+          if (spec.type === 'include' && spec.regex?.test(branchName)) {
             matchedSpec = spec.pattern;
             confidence = this.calculateConfidence(spec.pattern, branchName);
             break;

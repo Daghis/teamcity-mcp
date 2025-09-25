@@ -33,10 +33,15 @@ module.exports = {
     'prefer-arrow-callback': 'error',
     
     // TypeScript Rules
-    '@typescript-eslint/no-unused-vars': ['error', { 
-      argsIgnorePattern: '^_',
-      varsIgnorePattern: '^_' 
-    }],
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrors: 'none',
+        ignoreRestSiblings: true,
+      },
+    ],
     '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/strict-boolean-expressions': ['error', {
       allowString: true,
@@ -133,6 +138,7 @@ module.exports = {
         '@typescript-eslint/strict-boolean-expressions': 'error',
         '@typescript-eslint/no-floating-promises': 'error',
         '@typescript-eslint/no-misused-promises': 'error',
+        '@typescript-eslint/no-require-imports': 'off',
         // Tests mutate process.env frequently; avoid noisy false positives
         'require-atomic-updates': 'off',
         'no-console': 'off', // Allow console in tests

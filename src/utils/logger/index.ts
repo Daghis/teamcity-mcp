@@ -5,6 +5,8 @@
  * the existing logger implementations and enforces consistent logging
  * patterns throughout the application.
  */
+import { existsSync, mkdirSync } from 'node:fs';
+
 import winston, { type Logger } from 'winston';
 
 /**
@@ -220,10 +222,8 @@ export class TeamCityLogger implements ILogger {
    */
   private ensureLogDirectory(directory: string): void {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const fs = require('fs');
-      if (fs.existsSync(directory) === false) {
-        fs.mkdirSync(directory, { recursive: true });
+      if (existsSync(directory) === false) {
+        mkdirSync(directory, { recursive: true });
       }
     } catch (error) {
       // Fallback to current directory if log directory creation fails

@@ -99,7 +99,7 @@ const sanitizePathSegments = (artifactPath: string | undefined, fallbackName: st
   const rawSegments = artifactPath?.split('/') ?? [];
   const sanitizedSegments = rawSegments
     .map((segment) => segment.trim())
-    .filter((segment) => segment && segment !== '.' && segment !== '..')
+    .filter((segment) => segment.length > 0 && segment !== '.' && segment !== '..')
     .map((segment) => segment.replace(/[^a-zA-Z0-9._-]/g, '_'));
 
   if (sanitizedSegments.length === 0) {
@@ -137,8 +137,10 @@ const resolveStreamOutputPath = async (
   artifact: ArtifactContent,
   options: StreamOptions
 ): Promise<string> => {
-  if (options.explicitOutputPath) {
-    const target = options.explicitOutputPath;
+  const { explicitOutputPath } = options;
+
+  if (typeof explicitOutputPath === 'string' && explicitOutputPath.length > 0) {
+    const target = explicitOutputPath;
     await fs.mkdir(dirname(target), { recursive: true });
     return target;
   }
@@ -4072,7 +4074,10 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
               buildTypeId?: string;
             }>;
             const ids = new Set(typed.buildTypeIds);
-            const toCancel = builds.filter((b) => b.buildTypeId && ids.has(b.buildTypeId));
+            const toCancel = builds.filter(
+              (build): build is { id?: number; buildTypeId: string } =>
+                typeof build.buildTypeId === 'string' && ids.has(build.buildTypeId)
+            );
             for (const b of toCancel) {
               if (b.id == null) continue;
               // eslint-disable-next-line no-await-in-loop
