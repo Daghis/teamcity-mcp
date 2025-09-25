@@ -128,7 +128,7 @@ export function validateWithSchema<T>(
       errorLogger.logError('Validation error', validationError, {
         operation: context?.operation,
         field: context?.field,
-        errors: error.errors,
+        errors: error.issues,
       });
 
       return { success: false, error: validationError };
@@ -230,7 +230,7 @@ export const validateBuildParameters = (
     return { valid: true, errors: [] };
   }
 
-  const errors = result.error.errors.map((err) => `${err.path.join('.')}: ${err.message}`);
+  const errors = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`);
 
   return { valid: false, errors };
 };

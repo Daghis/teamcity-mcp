@@ -35,13 +35,13 @@ describe('Error Classes', () => {
 
   describe('MCPValidationError', () => {
     it('should create validation error', () => {
-      const zodError = new z.ZodError([
-        {
-          path: ['field'],
-          message: 'Invalid value',
-          code: 'custom',
-        },
-      ]);
+      let zodError: z.ZodError;
+      try {
+        z.object({ field: z.string() }).parse({ field: 42 });
+        throw new Error('Expected schema parsing to fail');
+      } catch (error) {
+        zodError = error as z.ZodError;
+      }
       const error = new MCPValidationError('Validation failed', zodError);
       expect(error.message).toBe('Validation failed');
       expect(error.code).toBe('VALIDATION_ERROR');
@@ -87,20 +87,20 @@ describe('formatError', () => {
   });
 
   it('should format ZodError', () => {
-    const zodError = new z.ZodError([
-      {
-        path: ['field'],
-        message: 'Invalid value',
-        code: 'custom',
-      },
-    ]);
+    let zodError: z.ZodError;
+    try {
+      z.object({ field: z.string() }).parse({ field: 42 });
+      throw new Error('Expected schema parsing to fail');
+    } catch (error) {
+      zodError = error as z.ZodError;
+    }
     const result = formatError(zodError);
     expect(result).toEqual({
       success: false,
       error: {
         message: 'Validation failed',
         code: 'VALIDATION_ERROR',
-        data: zodError.errors,
+        data: zodError.issues,
       },
     });
   });

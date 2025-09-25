@@ -3830,7 +3830,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           stepId: z.string().min(1).optional(),
           name: z.string().optional(),
           type: z.string().optional(),
-          properties: z.record(z.unknown()).optional(),
+          properties: z.record(z.string(), z.unknown()).optional(),
         })
         .superRefine((value, ctx) => {
           if (value.action === 'update' || value.action === 'delete') {
