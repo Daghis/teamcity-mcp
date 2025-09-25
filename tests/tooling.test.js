@@ -10,15 +10,15 @@ describe('Development Tooling', () => {
   const rootDir = path.resolve(__dirname, '..');
 
   describe('ESLint Configuration', () => {
-    test('.eslintrc.js should exist', () => {
-      const eslintrcPath = path.join(rootDir, '.eslintrc.js');
-      expect(fs.existsSync(eslintrcPath)).toBe(true);
+    test('eslint.config.cjs should exist', () => {
+      const configPath = path.join(rootDir, 'eslint.config.cjs');
+      expect(fs.existsSync(configPath)).toBe(true);
     });
 
     test('should have TypeScript parser configured', () => {
-      const eslintrcPath = path.join(rootDir, '.eslintrc.js');
-      if (fs.existsSync(eslintrcPath)) {
-        const content = fs.readFileSync(eslintrcPath, 'utf8');
+      const configPath = path.join(rootDir, 'eslint.config.cjs');
+      if (fs.existsSync(configPath)) {
+        const content = fs.readFileSync(configPath, 'utf8');
         expect(content).toContain('@typescript-eslint/parser');
         expect(content).toContain('@typescript-eslint');
       }
@@ -39,7 +39,7 @@ describe('Development Tooling', () => {
           // Run ESLint only on the specific test file to verify clean code passes
           const eslintJs = path.join(rootDir, 'node_modules', 'eslint', 'bin', 'eslint.js');
           const node = process.execPath;
-          execSync(`"${node}" "${eslintJs}" "${testFile}" --config .eslintrc.js`, {
+          execSync(`"${node}" "${eslintJs}" "${testFile}" --config eslint.config.cjs`, {
             cwd: rootDir,
             stdio: 'pipe',
           });

@@ -75,6 +75,7 @@
   },
   "devDependencies": {
     "@codecov/bundler-plugin-core": "^1.9.1",
+    "@eslint/compat": "^1.4.0",
     "@esbuild-plugins/tsconfig-paths": "^0.1.2",
     "@trivago/prettier-plugin-sort-imports": "^5.2.2",
     "@types/ajv": "^1.0.4",
@@ -87,7 +88,7 @@
     "@typescript-eslint/parser": "^8.44.1",
     "axios-retry": "^4.5.0",
     "esbuild": "^0.25.9",
-    "eslint": "^8.54.0",
+    "eslint": "^9.36.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",

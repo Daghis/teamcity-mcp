@@ -6,28 +6,53 @@ import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import eslintConfig from '../.eslintrc.js';
 import packageJson from '../package.json';
+
+type FlatConfig = {
+  languageOptions?: {
+    parser?: unknown;
+  };
+  plugins?: Record<string, unknown>;
+  rules?: Record<string, unknown>;
+};
+
+let loadedConfigs: FlatConfig[] = [];
+
+beforeAll(() => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const module = require('../eslint.config.cjs');
+  loadedConfigs = Array.isArray(module) ? (module as FlatConfig[]) : ([module] as FlatConfig[]);
+});
 
 describe('Development Tooling and Code Quality', () => {
   describe('ESLint Configuration', () => {
     it('should have ESLint configuration file', () => {
-      const configPath = path.join(process.cwd(), '.eslintrc.js');
+      const configPath = path.join(process.cwd(), 'eslint.config.cjs');
       expect(fs.existsSync(configPath)).toBe(true);
     });
 
     it('should have TypeScript parser configured', () => {
-      expect(eslintConfig.parser).toBe('@typescript-eslint/parser');
+      const mainConfig = loadedConfigs.find(
+        (config) => config.languageOptions?.parser !== undefined
+      );
+      expect(mainConfig?.languageOptions?.parser).toBeDefined();
     });
 
     it('should have TypeScript plugin configured', () => {
-      expect(eslintConfig.plugins).toContain('@typescript-eslint');
+      const mainConfig = loadedConfigs.find((config) => config.plugins !== undefined);
+      const pluginKeys = mainConfig?.plugins ? Object.keys(mainConfig.plugins) : [];
+      expect(pluginKeys).toContain('@typescript-eslint');
     });
 
     it('should have strict rules enabled', () => {
-      expect(eslintConfig.rules).toBeDefined();
-      expect(eslintConfig.rules['@typescript-eslint/no-explicit-any']).toBe('error');
-      expect(eslintConfig.rules['@typescript-eslint/strict-boolean-expressions']).toEqual([
+      const baseConfig = loadedConfigs.find(
+        (config) => config.rules && '@typescript-eslint/no-explicit-any' in config.rules
+      );
+      const strictConfig = loadedConfigs.find(
+        (config) => config.rules && '@typescript-eslint/strict-boolean-expressions' in config.rules
+      );
+      expect(baseConfig?.rules?.['@typescript-eslint/no-explicit-any']).toBe('error');
+      expect(strictConfig?.rules?.['@typescript-eslint/strict-boolean-expressions']).toEqual([
         'error',
         expect.objectContaining({
           allowString: true,
