@@ -5,7 +5,7 @@ describe('LRUCache', () => {
 
   afterEach(() => {
     // Restore Date.now after time-based tests
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+
     Date.now = realNow;
   });
 
@@ -51,7 +51,7 @@ describe('LRUCache', () => {
 
   it('expires entries by ttl via get/has and evictExpired()', () => {
     const start = 1_000_000_000_000; // arbitrary epoch
-    // eslint-disable-next-line @typescript-eslint/unbound-method
+
     Date.now = jest.fn(() => start);
 
     const cache = new LRUCache<string>({ maxSize: 5, ttl: 10_000 });

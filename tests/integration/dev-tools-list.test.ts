@@ -86,7 +86,6 @@ describe('Dev mode tool surface', () => {
       child.on('error', reject);
       child.on('close', (code) => {
         if (code !== 0) {
-          // eslint-disable-next-line no-console
           console.error(Buffer.concat(errs).toString('utf8'));
           reject(new Error(`Process exited with code ${code}`));
         } else resolve();
@@ -105,7 +104,7 @@ describe('Dev mode tool surface', () => {
 
     if (missing.length || extra.length) {
       // Provide readable assertion output
-      // eslint-disable-next-line no-console
+
       console.error('Dev tools mismatch', { missing, extra, actual: tools });
     }
 

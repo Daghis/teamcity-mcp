@@ -55,7 +55,7 @@ describe('Build triggers: add and delete (full) with dev verification', () => {
       expect(addTrig).toMatchObject({ success: true, action: 'add_build_trigger' });
     } catch (e) {
       // Non-fatal; some servers may have policy restrictions
-      // eslint-disable-next-line no-console
+
       console.warn('add trigger failed (non-fatal):', e);
       return expect(true).toBe(true);
     }

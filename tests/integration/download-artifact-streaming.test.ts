@@ -63,7 +63,7 @@ interface DownloadArtifactsResponse {
 async function waitForBuildCompletion(id: string, timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let promoted = false;
-  // eslint-disable-next-line no-constant-condition
+
   while (true) {
     if (Date.now() > deadline) {
       throw new Error(`Timed out waiting for build ${id} to finish`);
@@ -79,7 +79,7 @@ async function waitForBuildCompletion(id: string, timeoutMs = 60_000): Promise<v
       });
     } catch (error) {
       // Allow transient errors (e.g., build yet to be registered) before timing out.
-      // eslint-disable-next-line no-console
+
       console.warn(`Polling build status failed: ${error}`);
     }
 
@@ -99,7 +99,7 @@ async function waitForBuildCompletion(id: string, timeoutMs = 60_000): Promise<v
         await callTool('full', 'move_queued_build_to_top', { buildId: id });
       } catch (error) {
         // Non-fatal: servers may restrict queue operations or build may have started already.
-        // eslint-disable-next-line no-console
+
         console.warn(`move_queued_build_to_top failed (non-fatal): ${error}`);
       } finally {
         promoted = true;
@@ -208,7 +208,7 @@ serialDescribe('download_build_artifact tool (integration)', () => {
       await callTool('full', 'move_queued_build_to_top', { buildId });
     } catch (error) {
       // Non-fatal: queue manipulation may not be permitted or build already running.
-      // eslint-disable-next-line no-console
+
       console.warn(`Initial move_queued_build_to_top failed (non-fatal): ${error}`);
     }
 
@@ -246,7 +246,7 @@ serialDescribe('download_build_artifact tool (integration)', () => {
     const content = String(result.content ?? '');
     const decoded = Buffer.from(content, 'base64').toString('utf8').trim();
     expect(decoded).toBe('artifact-content');
-    // eslint-disable-next-line no-console
+
     console.log('single artifact path', result.path);
   }, 60_000);
 

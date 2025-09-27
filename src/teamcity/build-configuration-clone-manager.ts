@@ -31,6 +31,7 @@ export interface CloneOptions {
   vcsRootId?: string;
   parameters?: Record<string, string>;
   copyBuildCounter?: boolean;
+  id?: string;
 }
 
 export interface BuildConfiguration {
@@ -253,7 +254,8 @@ export class BuildConfigurationCloneManager {
     options: CloneOptions
   ): Promise<BuildConfiguration> {
     // Generate new configuration ID
-    const configId = this.generateBuildConfigId(options.targetProjectId, options.name);
+    const configId =
+      options.id ?? this.generateBuildConfigId(options.targetProjectId, options.name);
 
     // Build the configuration payload
     const configPayload: BuildTypeClonePayload = {
