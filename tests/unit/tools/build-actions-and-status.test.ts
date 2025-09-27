@@ -38,28 +38,144 @@ describe('tools: build actions and status/basic info', () => {
     });
   });
 
-  it('trigger_build uses API and returns structured JSON', async () => {
+  it('trigger_build enqueues build with branch and comment metadata', async () => {
     jest.resetModules();
     await new Promise<void>((resolve, reject) => {
       jest.isolateModules(() => {
         (async () => {
-          const triggerBuild = jest.fn(async () => ({
-            id: 777,
-            state: 'queued',
-            status: 'UNKNOWN',
+          const addBuildToQueue = jest.fn(async () => ({
+            data: {
+              id: 777,
+              state: 'queued',
+              status: 'UNKNOWN',
+              branchName: 'feature/foo',
+            },
           }));
           jest.doMock('@/api-client', () => ({
-            TeamCityAPI: { getInstance: () => ({ triggerBuild }) },
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: {
+                  buildQueue: {
+                    addBuildToQueue,
+                  },
+                },
+              }),
+            },
           }));
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
           const res = await getRequiredTool('trigger_build').handler({
             buildTypeId: 'bt1',
-            branchName: 'main',
+            branchName: 'feature/foo',
             comment: 'go',
           });
           const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
           expect(payload).toMatchObject({ success: true, action: 'trigger_build', buildId: '777' });
+          expect(payload.branchName).toBe('feature/foo');
+          expect(addBuildToQueue).toHaveBeenCalledTimes(1);
+          expect(addBuildToQueue).toHaveBeenCalledWith(
+            false,
+            expect.objectContaining({
+              buildType: { id: 'bt1' },
+              branchName: 'feature/foo',
+              comment: { text: 'go' },
+            }),
+            expect.objectContaining({
+              headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+            })
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('trigger_build infers branch from teamcity.build.branch property', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn(async () => ({
+            data: {
+              id: 888,
+              state: 'queued',
+              status: 'UNKNOWN',
+              branchName: 'feature/bar',
+            },
+          }));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: {
+                  buildQueue: {
+                    addBuildToQueue,
+                  },
+                },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('trigger_build').handler({
+            buildTypeId: 'bt2',
+            properties: {
+              'teamcity.build.branch': 'feature/bar',
+              'env.FOO': 'bar',
+            },
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({ success: true, action: 'trigger_build', buildId: '888' });
+          expect(payload.branchName).toBe('feature/bar');
+          expect(addBuildToQueue).toHaveBeenCalledWith(
+            false,
+            expect.objectContaining({
+              buildType: { id: 'bt2' },
+              branchName: 'feature/bar',
+              properties: {
+                property: expect.arrayContaining([
+                  { name: 'teamcity.build.branch', value: 'feature/bar' },
+                  { name: 'env.FOO', value: 'bar' },
+                ]),
+              },
+            }),
+            expect.anything()
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('trigger_build rejects conflicting branch overrides', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn();
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: {
+                  buildQueue: {
+                    addBuildToQueue,
+                  },
+                },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('trigger_build').handler({
+            buildTypeId: 'bt3',
+            branchName: 'main',
+            properties: {
+              'teamcity.build.branch': 'feature/baz',
+            },
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload.success).toBe(false);
+          expect(String(payload.error)).toContain('Conflicting branch overrides');
+          expect(addBuildToQueue).not.toHaveBeenCalled();
           resolve();
         })().catch(reject);
       });

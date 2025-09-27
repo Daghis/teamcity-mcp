@@ -85,6 +85,20 @@ serialDescribe('Branches and queue operations', () => {
       branchName: BRANCH_NAME,
     });
     expect(trig).toMatchObject({ success: true, action: 'trigger_build' });
+    expect(trig.branchName).toBe(BRANCH_NAME);
+  }, 90000);
+
+  it('triggers a build using teamcity.build.branch property (dev)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    const trig = await callTool<TriggerBuildResult>('dev', 'trigger_build', {
+      buildTypeId: BT_ID,
+      properties: {
+        'teamcity.build.branch': `${BRANCH_NAME}-prop`,
+        'env.CUSTOM_FLAG': 'true',
+      },
+    });
+    expect(trig).toMatchObject({ success: true, action: 'trigger_build' });
+    expect(trig.branchName).toBe(`${BRANCH_NAME}-prop`);
   }, 90000);
 
   it('lists branches for project and build type (dev)', async () => {
