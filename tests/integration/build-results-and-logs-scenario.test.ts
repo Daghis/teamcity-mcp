@@ -169,6 +169,51 @@ serialDescribe('Build results and logs: full writes + dev reads', () => {
     }
   }, 60000);
 
+  it('get_build_status resolves using buildTypeId and buildNumber (dev)', async () => {
+    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    if (!buildNumber) return expect(true).toBe(true);
+    let result: Record<string, unknown> | undefined;
+    let lastFailure: Record<string, unknown> | undefined;
+    let attempts = 0;
+    while (attempts < 10) {
+      // eslint-disable-next-line no-await-in-loop
+      const candidate = await callTool<Record<string, unknown>>('dev', 'get_build_status', {
+        buildTypeId: BT_ID,
+        buildNumber,
+        includeTests: true,
+      });
+      const isFailure =
+        candidate != null &&
+        typeof candidate === 'object' &&
+        'success' in candidate &&
+        candidate['success'] === false;
+      if (!isFailure) {
+        result = candidate;
+        break;
+      }
+      attempts += 1;
+      // eslint-disable-next-line no-await-in-loop
+      lastFailure = candidate;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    if (!result && lastFailure) {
+      const failureMessage =
+        typeof lastFailure === 'object' && lastFailure !== null && 'error' in lastFailure
+          ? JSON.stringify(lastFailure['error'], null, 2)
+          : 'Unknown failure';
+      throw new Error(`get_build_status by buildNumber failed after retries: ${failureMessage}`);
+    }
+
+    expect(result).toBeDefined();
+    expect(result?.['success']).not.toBe(false);
+    expect(result?.['buildId']).toBeDefined();
+    const resolvedNumber = result?.['buildNumber'];
+    if (typeof resolvedNumber === 'string' && resolvedNumber.length > 0) {
+      expect(String(resolvedNumber)).toBe(String(buildNumber));
+    }
+  }, 60000);
+
   it('get_build_results surfaces friendly not-found message for unknown build number (dev)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
     const bogusNumber = `MISSING-${Date.now()}`;

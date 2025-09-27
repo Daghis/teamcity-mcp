@@ -794,6 +794,14 @@ const DEV_TOOLS: ToolDefinition[] = [
       type: 'object',
       properties: {
         buildId: { type: 'string', description: 'Build ID' },
+        buildNumber: {
+          type: 'string',
+          description: 'Human build number (requires buildTypeId when provided)',
+        },
+        buildTypeId: {
+          type: 'string',
+          description: 'Build configuration identifier (required when using buildNumber)',
+        },
         includeTests: { type: 'boolean', description: 'Include test summary' },
         includeProblems: { type: 'boolean', description: 'Include build problems' },
         includeQueueTotals: {
@@ -805,16 +813,35 @@ const DEV_TOOLS: ToolDefinition[] = [
           description: 'Include waitReason for the queued item (extra API call when queued)',
         },
       },
-      required: ['buildId'],
     },
     handler: async (args: unknown) => {
-      const schema = z.object({
-        buildId: z.string().min(1),
-        includeTests: z.boolean().optional(),
-        includeProblems: z.boolean().optional(),
-        includeQueueTotals: z.boolean().optional(),
-        includeQueueReason: z.boolean().optional(),
-      });
+      const schema = z
+        .object({
+          buildId: z.string().min(1).optional(),
+          buildNumber: z.string().min(1).optional(),
+          buildTypeId: z.string().min(1).optional(),
+          includeTests: z.boolean().optional(),
+          includeProblems: z.boolean().optional(),
+          includeQueueTotals: z.boolean().optional(),
+          includeQueueReason: z.boolean().optional(),
+        })
+        .superRefine((value, ctx) => {
+          if (!value.buildId && !value.buildNumber) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['buildId'],
+              message: 'Either buildId or buildNumber must be provided',
+            });
+          }
+
+          if (value.buildNumber && !value.buildTypeId) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['buildTypeId'],
+              message: 'buildTypeId is required when querying by buildNumber',
+            });
+          }
+        });
       return runTool(
         'get_build_status',
         schema,
@@ -825,6 +852,8 @@ const DEV_TOOLS: ToolDefinition[] = [
           ).BuildStatusManager(adapter);
           const result = await statusManager.getBuildStatus({
             buildId: typed.buildId,
+            buildNumber: typed.buildNumber,
+            buildTypeId: typed.buildTypeId,
             includeTests: typed.includeTests,
             includeProblems: typed.includeProblems,
           });
@@ -850,8 +879,11 @@ const DEV_TOOLS: ToolDefinition[] = [
             }
             if (typed.includeQueueReason) {
               try {
-                const qb = await adapter.modules.buildQueue.getQueuedBuild(typed.buildId);
-                enrich.waitReason = (qb.data as { waitReason?: string }).waitReason;
+                const targetBuildId = typed.buildId ?? result.buildId;
+                if (targetBuildId) {
+                  const qb = await adapter.modules.buildQueue.getQueuedBuild(targetBuildId);
+                  enrich.waitReason = (qb.data as { waitReason?: string }).waitReason;
+                }
               } catch {
                 /* ignore */
               }

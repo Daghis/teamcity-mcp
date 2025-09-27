@@ -168,21 +168,13 @@ export class BuildStatusManager {
         );
         buildData = response.data as BuildApiBuild;
       } else {
-        // Query by build number and type
+        // Query by build number and type using direct build locator
         const locator = this.buildLocator(options);
-        const response = await this.client.builds.getMultipleBuilds(
+        const response = await this.client.builds.getBuild(
           locator,
           this.getFieldSelection(options)
         );
-
-        const data = response.data as { build?: BuildApiBuild[] };
-        if (!Array.isArray(data.build) || data.build.length === 0) {
-          throw new BuildNotFoundError(
-            `No build found for number ${options.buildNumber} in ${options.buildTypeId}`
-          );
-        }
-
-        buildData = data.build[0] as BuildApiBuild;
+        buildData = response.data as BuildApiBuild;
       }
 
       if (buildData == null) {

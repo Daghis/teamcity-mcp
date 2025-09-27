@@ -50,6 +50,87 @@ describe('tools: enhanced status and results', () => {
     expect(payload.buildId).toBe('123');
   });
 
+  it('get_build_status resolves builds using buildTypeId and buildNumber', async () => {
+    const fakeStatus = {
+      buildId: 'b166',
+      buildNumber: '166',
+      state: 'finished',
+      status: 'SUCCESS',
+      percentageComplete: 100,
+    };
+
+    const getBuildStatus = jest.fn().mockResolvedValue(fakeStatus);
+    const BuildStatusManager = jest.fn().mockImplementation(() => ({ getBuildStatus }));
+    jest.doMock('@/teamcity/build-status-manager', () => ({ BuildStatusManager }));
+
+    jest.doMock('@/api-client', () => ({
+      TeamCityAPI: {
+        getInstance: () => ({
+          builds: {},
+          buildQueue: {},
+          listBuildArtifacts: jest.fn(),
+          downloadBuildArtifact: jest.fn(),
+          getBuildStatistics: jest.fn(),
+          listChangesForBuild: jest.fn(),
+          listSnapshotDependencies: jest.fn(),
+          getBaseUrl: () => 'https://example.test',
+        }),
+      },
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getRequiredTool } = require('@/tools');
+    const res = await getRequiredTool('get_build_status').handler({
+      buildTypeId: 'Infrastructure_DeployCrossroads',
+      buildNumber: '166',
+      includeProblems: true,
+    });
+
+    const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+    expect(payload.buildId).toBe('b166');
+    expect(payload.buildNumber).toBe('166');
+    expect(getBuildStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        buildTypeId: 'Infrastructure_DeployCrossroads',
+        buildNumber: '166',
+        includeProblems: true,
+      })
+    );
+  });
+
+  it('get_build_status rejects when neither buildId nor buildNumber is provided', async () => {
+    jest.doMock('@/teamcity/build-status-manager', () => ({
+      BuildStatusManager: jest.fn().mockImplementation(() => ({
+        getBuildStatus: jest.fn(),
+      })),
+    }));
+
+    jest.doMock('@/api-client', () => ({
+      TeamCityAPI: {
+        getInstance: () => ({
+          builds: {},
+          buildQueue: {},
+          listBuildArtifacts: jest.fn(),
+          downloadBuildArtifact: jest.fn(),
+          getBuildStatistics: jest.fn(),
+          listChangesForBuild: jest.fn(),
+          listSnapshotDependencies: jest.fn(),
+          getBaseUrl: () => 'https://example.test',
+        }),
+      },
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getRequiredTool } = require('@/tools');
+    const res = await getRequiredTool('get_build_status').handler({ includeTests: true });
+
+    const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+    expect(payload.success).toBe(false);
+    expect(payload.error?.code).toBe('VALIDATION_ERROR');
+    const issues = (payload.error?.data ?? []) as Array<{ message?: string }>;
+    expect(issues.some((issue) => issue?.message?.includes('buildId or buildNumber'))).toBe(true);
+  });
+
   it('get_build_results returns enriched payload via manager', async () => {
     const fakeResults = {
       build: { id: 99, status: 'SUCCESS', number: '1' },
