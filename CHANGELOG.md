@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.9.6...teamcity-mcp-v1.10.0) (2025-09-27)
+
+
+### Features
+
+* **tools:** add build config management tools ([#216](https://github.com/Daghis/teamcity-mcp/issues/216)) ([241c784](https://github.com/Daghis/teamcity-mcp/commit/241c78450414a1014c3ab160927c2fae7656cddb))
+* **tools:** add build config management tools ([#216](https://github.com/Daghis/teamcity-mcp/issues/216)) ([c3a15e8](https://github.com/Daghis/teamcity-mcp/commit/c3a15e80ec60e413d601f10907c5a237236383f9))
+
 ## [1.9.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.9.5...teamcity-mcp-v1.9.6) (2025-09-25)
 
 
