@@ -13,6 +13,10 @@ import {
   callToolsBatchExpect,
 } from './lib/mcp-runner';
 
+const SERIAL_WORKER =
+  process.env['JEST_WORKER_ID'] === '1' || process.env['SERIAL_BUILD_TESTS'] === 'true';
+const serialDescribe = SERIAL_WORKER ? describe : describe.skip;
+
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
     (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
@@ -27,7 +31,7 @@ const BRANCH_NAME = 'feature/e2e';
 
 let queuedId: string | undefined;
 
-describe('Branches and queue operations', () => {
+serialDescribe('Branches and queue operations', () => {
   afterAll(async () => {
     try {
       await callTool('full', 'delete_project', { projectId: PROJECT_ID });
