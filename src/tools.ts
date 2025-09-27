@@ -17,6 +17,7 @@ import { type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import type { Step } from '@/teamcity-client/models/step';
 import { AgentRequirementsManager } from '@/teamcity/agent-requirements-manager';
 import { type ArtifactContent, ArtifactManager } from '@/teamcity/artifact-manager';
+import { BuildConfigurationCloneManager } from '@/teamcity/build-configuration-clone-manager';
 import {
   BuildConfigurationUpdateManager,
   setArtifactRulesWithFallback,
@@ -396,6 +397,9 @@ interface CloneBuildConfigArgs {
   name: string;
   id: string;
   projectId?: string;
+  description?: string;
+  parameters?: Record<string, string>;
+  copyBuildCounter?: boolean;
 }
 interface UpdateBuildConfigArgs {
   buildTypeId: string;
@@ -3528,31 +3532,96 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         name: { type: 'string', description: 'New build configuration name' },
         id: { type: 'string', description: 'New build configuration ID' },
         projectId: { type: 'string', description: 'Target project ID' },
+        description: { type: 'string', description: 'Description for the cloned configuration' },
+        parameters: {
+          type: 'object',
+          description: 'Optional parameter overrides to apply to the clone',
+          additionalProperties: { type: 'string' },
+        },
+        copyBuildCounter: {
+          type: 'boolean',
+          description: 'Copy the build number counter from the source configuration',
+        },
       },
       required: ['sourceBuildTypeId', 'name', 'id'],
     },
     handler: async (args: unknown) => {
-      const typedArgs = args as CloneBuildConfigArgs;
+      const schema = z
+        .object({
+          sourceBuildTypeId: z.string().min(1),
+          name: z.string().min(1),
+          id: z.string().min(1),
+          projectId: z.string().min(1).optional(),
+          description: z.string().optional(),
+          parameters: z.record(z.string(), z.string()).optional(),
+          copyBuildCounter: z.boolean().optional(),
+        })
+        .superRefine((value, ctx) => {
+          if (value.id.trim() === '') {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'id must be a non-empty string.',
+              path: ['id'],
+            });
+          }
+        });
 
-      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-      // Get source build type
-      const source = (await adapter.getBuildType(typedArgs.sourceBuildTypeId)) as Record<
-        string,
-        unknown
-      > & {
-        project?: { id?: string };
-      };
+      return runTool(
+        'clone_build_config',
+        schema,
+        async (typedArgs: CloneBuildConfigArgs) => {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const manager = new BuildConfigurationCloneManager(adapter);
 
-      // Create new build type based on source
-      const buildType = {
-        ...source,
-        name: typedArgs.name,
-        id: typedArgs.id,
-        project: { id: typedArgs.projectId ?? source.project?.id ?? '_Root' },
-      };
+          const source = await manager.retrieveConfiguration(typedArgs.sourceBuildTypeId);
+          if (!source) {
+            return json({
+              success: false,
+              action: 'clone_build_config',
+              error: `Source build configuration not found: ${typedArgs.sourceBuildTypeId}`,
+            });
+          }
 
-      const response = await adapter.modules.buildTypes.createBuildType(undefined, buildType);
-      return json({ success: true, action: 'clone_build_config', id: response.data.id });
+          const targetProjectId = typedArgs.projectId ?? source.projectId;
+          if (!targetProjectId) {
+            return json({
+              success: false,
+              action: 'clone_build_config',
+              error:
+                'projectId is required when the source configuration does not specify a project.',
+            });
+          }
+
+          try {
+            const cloned = await manager.cloneConfiguration(source, {
+              id: typedArgs.id,
+              name: typedArgs.name,
+              targetProjectId,
+              description: typedArgs.description ?? source.description,
+              parameters: typedArgs.parameters,
+              copyBuildCounter: typedArgs.copyBuildCounter,
+            });
+
+            return json({
+              success: true,
+              action: 'clone_build_config',
+              id: cloned.id,
+              name: cloned.name,
+              projectId: cloned.projectId,
+              url: cloned.url,
+              description: cloned.description,
+            });
+          } catch (error) {
+            return json({
+              success: false,
+              action: 'clone_build_config',
+              error:
+                error instanceof Error ? error.message : 'Failed to clone build configuration.',
+            });
+          }
+        },
+        args
+      );
     },
     mode: 'full',
   },

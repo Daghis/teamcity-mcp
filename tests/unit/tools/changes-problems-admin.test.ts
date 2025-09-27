@@ -155,7 +155,7 @@ describe('changes/problems/investigation tools', () => {
     const originalMode = process.env['MCP_MODE'];
     process.env['MCP_MODE'] = 'full';
     jest.isolateModules(() => {
-      // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { getRequiredTool: getTool } = require('@/tools') as typeof import('@/tools');
       tool = getTool('mute_tests');
     });

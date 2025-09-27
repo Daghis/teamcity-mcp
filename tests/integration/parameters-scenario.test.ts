@@ -68,7 +68,7 @@ describe('Parameters lifecycle: full writes + dev reads', () => {
       expect(add).toMatchObject({ success: true, action: 'add_parameter' });
     } catch (e) {
       // Some servers may restrict parameter APIs; treat as non-fatal for this smoke
-      // eslint-disable-next-line no-console
+
       console.warn('add_parameter failed (non-fatal):', e);
       return expect(true).toBe(true);
     }
@@ -82,7 +82,6 @@ describe('Parameters lifecycle: full writes + dev reads', () => {
       });
       expect(del).toMatchObject({ success: true, action: 'delete_parameter' });
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.warn('delete_parameter failed (non-fatal):', e);
     }
 

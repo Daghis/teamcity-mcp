@@ -72,7 +72,6 @@ describe('tools: availability & queue structured tools', () => {
           // Mock status manager to return a queued build with queuePosition
           jest.doMock('@/teamcity/build-status-manager', () => ({
             BuildStatusManager: class {
-              // eslint-disable-next-line class-methods-use-this
               async getBuildStatus() {
                 return {
                   buildId: 'b123',

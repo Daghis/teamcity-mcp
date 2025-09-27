@@ -54,7 +54,6 @@ describe('Pause/unpause build configs (full) with dev verification', () => {
 
     const pauseStep = batch.results[0];
     if (!pauseStep?.ok) {
-      // eslint-disable-next-line no-console
       console.warn('set_build_configs_paused (pause) failed (non-fatal):', pauseStep?.error);
       return expect(true).toBe(true);
     }
@@ -62,7 +61,6 @@ describe('Pause/unpause build configs (full) with dev verification', () => {
 
     const unpauseStep = batch.results[1];
     if (!unpauseStep?.ok) {
-      // eslint-disable-next-line no-console
       console.warn('set_build_configs_paused (unpause) failed (non-fatal):', unpauseStep?.error);
       return expect(true).toBe(true);
     }

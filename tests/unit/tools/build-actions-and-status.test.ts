@@ -98,7 +98,6 @@ describe('tools: build actions and status/basic info', () => {
           // Mock BuildStatusManager to avoid hitting real adapter
           jest.doMock('@/teamcity/build-status-manager', () => ({
             BuildStatusManager: class {
-              // eslint-disable-next-line class-methods-use-this
               async getBuildStatus() {
                 return {
                   buildId: 'b9',
