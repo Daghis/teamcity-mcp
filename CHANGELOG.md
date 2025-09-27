@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.2...teamcity-mcp-v1.10.3) (2025-09-27)
+
+
+### Bug Fixes
+
+* **tools:** honor trigger_build branch overrides (210) ([#223](https://github.com/Daghis/teamcity-mcp/issues/223)) ([7222c28](https://github.com/Daghis/teamcity-mcp/commit/7222c28c4fc9a307222ee9a50fa518127f5187de))
+
 ## [1.10.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.1...teamcity-mcp-v1.10.2) (2025-09-27)
 
 
