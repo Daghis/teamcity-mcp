@@ -7,13 +7,13 @@
     "source": "github"
   },
   "websiteUrl": "https://github.com/Daghis/teamcity-mcp",
-  "version": "1.10.1",
+  "version": "1.10.2",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@daghis/teamcity-mcp",
-      "version": "1.10.1",
+      "version": "1.10.2",
       "runtimeHint": "npx",
       "runtimeArguments": [
         {

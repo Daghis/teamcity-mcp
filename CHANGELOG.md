@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.1...teamcity-mcp-v1.10.2) (2025-09-27)
+
+
+### Bug Fixes
+
+* **tools:** clone_build_config uses manager (215) ([b84d1f8](https://github.com/Daghis/teamcity-mcp/commit/b84d1f80a4233783a93dd1e3ede9a83a7cf57171))
+* **tools:** clone_build_config uses manager (215) ([c4cd959](https://github.com/Daghis/teamcity-mcp/commit/c4cd959a9f35052bf95386162316a9ace5599eb6))
+
 ## [1.10.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.0...teamcity-mcp-v1.10.1) (2025-09-27)
 
 
