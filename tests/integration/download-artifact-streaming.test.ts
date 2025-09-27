@@ -7,6 +7,10 @@ import { describe, expect, it } from '@jest/globals';
 import type { ActionResult, BuildRef, TriggerBuildResult } from '../types/tool-results';
 import { callTool, callToolsBatch } from './lib/mcp-runner';
 
+const SERIAL_WORKER =
+  process.env['JEST_WORKER_ID'] === '1' || process.env['SERIAL_BUILD_TESTS'] === 'true';
+const serialDescribe = SERIAL_WORKER ? describe : describe.skip;
+
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
     (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
@@ -107,7 +111,7 @@ async function waitForBuildCompletion(id: string, timeoutMs = 60_000): Promise<v
   }
 }
 
-describe('download_build_artifact tool (integration)', () => {
+serialDescribe('download_build_artifact tool (integration)', () => {
   afterAll(async () => {
     if (!hasTeamCityEnv) return;
     try {

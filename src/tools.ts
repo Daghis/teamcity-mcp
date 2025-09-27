@@ -15,11 +15,14 @@ import { z } from 'zod';
 import { getMCPMode as getMCPModeFromConfig } from '@/config';
 import { type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import type { Step } from '@/teamcity-client/models/step';
+import { AgentRequirementsManager } from '@/teamcity/agent-requirements-manager';
 import { type ArtifactContent, ArtifactManager } from '@/teamcity/artifact-manager';
 import {
   BuildConfigurationUpdateManager,
   setArtifactRulesWithFallback,
 } from '@/teamcity/build-configuration-update-manager';
+import { BuildDependencyManager } from '@/teamcity/build-dependency-manager';
+import { BuildFeatureManager } from '@/teamcity/build-feature-manager';
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
 import {
   type TeamCityClientAdapter,
@@ -3617,6 +3620,414 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       }
 
       return json({ success: true, action: 'update_build_config', id: typedArgs.buildTypeId });
+    },
+    mode: 'full',
+  },
+
+  // === Dependency, Feature, and Requirement Management ===
+  {
+    name: 'manage_build_dependencies',
+    description:
+      'Add, update, or delete artifact and snapshot dependencies for a build configuration',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildTypeId: { type: 'string', description: 'Build configuration ID' },
+        dependencyType: {
+          type: 'string',
+          enum: ['artifact', 'snapshot'],
+          description: 'Dependency type to manage',
+        },
+        action: {
+          type: 'string',
+          enum: ['add', 'update', 'delete'],
+          description: 'Operation to perform',
+        },
+        dependencyId: {
+          type: 'string',
+          description: 'Dependency ID (required for update/delete)',
+        },
+        dependsOn: {
+          type: 'string',
+          description: 'Upstream build configuration ID for the dependency',
+        },
+        properties: {
+          type: 'object',
+          description: 'Dependency properties (e.g. cleanDestinationDirectory, pathRules)',
+        },
+        type: {
+          type: 'string',
+          description: 'Override dependency type value sent to TeamCity',
+        },
+        disabled: { type: 'boolean', description: 'Disable or enable the dependency' },
+      },
+      required: ['buildTypeId', 'dependencyType', 'action'],
+    },
+    handler: async (args: unknown) => {
+      const propertyValue = z.union([z.string(), z.number(), z.boolean()]);
+      const schema = z
+        .object({
+          buildTypeId: z.string().min(1),
+          dependencyType: z.enum(['artifact', 'snapshot']),
+          action: z.enum(['add', 'update', 'delete']),
+          dependencyId: z.string().min(1).optional(),
+          dependsOn: z.string().min(1).optional(),
+          properties: z.record(z.string(), propertyValue).optional(),
+          type: z.string().min(1).optional(),
+          disabled: z.boolean().optional(),
+        })
+        .superRefine((value, ctx) => {
+          if ((value.action === 'update' || value.action === 'delete') && !value.dependencyId) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message:
+                'dependencyId is required for update/delete actions. Provide the TeamCity dependency ID or fall back to the UI.',
+              path: ['dependencyId'],
+            });
+          }
+          if (value.action === 'add' && !value.dependsOn) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'dependsOn is required when adding a dependency.',
+              path: ['dependsOn'],
+            });
+          }
+        });
+
+      return runTool(
+        'manage_build_dependencies',
+        schema,
+        async (typed) => {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const manager = new BuildDependencyManager(adapter);
+
+          switch (typed.action) {
+            case 'add': {
+              const result = await manager.addDependency({
+                buildTypeId: typed.buildTypeId,
+                dependencyType: typed.dependencyType,
+                dependsOn: typed.dependsOn,
+                properties: typed.properties,
+                type: typed.type,
+                disabled: typed.disabled,
+              });
+              return json({
+                success: true,
+                action: 'manage_build_dependencies',
+                operation: 'add',
+                buildTypeId: typed.buildTypeId,
+                dependencyType: typed.dependencyType,
+                dependencyId: result.id,
+              });
+            }
+            case 'update': {
+              const result = await manager.updateDependency(typed.dependencyId as string, {
+                buildTypeId: typed.buildTypeId,
+                dependencyType: typed.dependencyType,
+                dependsOn: typed.dependsOn,
+                properties: typed.properties,
+                type: typed.type,
+                disabled: typed.disabled,
+              });
+              return json({
+                success: true,
+                action: 'manage_build_dependencies',
+                operation: 'update',
+                buildTypeId: typed.buildTypeId,
+                dependencyType: typed.dependencyType,
+                dependencyId: result.id,
+              });
+            }
+            case 'delete': {
+              await manager.deleteDependency(
+                typed.dependencyType,
+                typed.buildTypeId,
+                typed.dependencyId as string
+              );
+              return json({
+                success: true,
+                action: 'manage_build_dependencies',
+                operation: 'delete',
+                buildTypeId: typed.buildTypeId,
+                dependencyType: typed.dependencyType,
+                dependencyId: typed.dependencyId,
+              });
+            }
+            default:
+              return json({
+                success: false,
+                action: 'manage_build_dependencies',
+                error: `Unsupported action: ${typed.action}`,
+              });
+          }
+        },
+        args
+      );
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'manage_build_features',
+    description:
+      'Add, update, or delete build features such as ssh-agent or requirements enforcement',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildTypeId: { type: 'string', description: 'Build configuration ID' },
+        action: {
+          type: 'string',
+          enum: ['add', 'update', 'delete'],
+          description: 'Operation to perform',
+        },
+        featureId: {
+          type: 'string',
+          description: 'Feature ID (required for update/delete)',
+        },
+        type: { type: 'string', description: 'Feature type (required for add)' },
+        properties: { type: 'object', description: 'Feature properties' },
+        disabled: { type: 'boolean', description: 'Disable or enable the feature' },
+      },
+      required: ['buildTypeId', 'action'],
+    },
+    handler: async (args: unknown) => {
+      const propertyValue = z.union([z.string(), z.number(), z.boolean()]);
+      const schema = z
+        .object({
+          buildTypeId: z.string().min(1),
+          action: z.enum(['add', 'update', 'delete']),
+          featureId: z.string().min(1).optional(),
+          type: z.string().min(1).optional(),
+          properties: z.record(z.string(), propertyValue).optional(),
+          disabled: z.boolean().optional(),
+        })
+        .superRefine((value, ctx) => {
+          if ((value.action === 'update' || value.action === 'delete') && !value.featureId) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message:
+                'featureId is required for update/delete actions. Capture the feature ID from TeamCity or use the UI.',
+              path: ['featureId'],
+            });
+          }
+          if (value.action === 'add' && !value.type) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'type is required when adding a build feature.',
+              path: ['type'],
+            });
+          }
+        });
+
+      return runTool(
+        'manage_build_features',
+        schema,
+        async (typed) => {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const manager = new BuildFeatureManager(adapter);
+
+          switch (typed.action) {
+            case 'add': {
+              const result = await manager.addFeature({
+                buildTypeId: typed.buildTypeId,
+                type: typed.type,
+                properties: typed.properties,
+                disabled: typed.disabled,
+              });
+              return json({
+                success: true,
+                action: 'manage_build_features',
+                operation: 'add',
+                buildTypeId: typed.buildTypeId,
+                featureId: result.id,
+              });
+            }
+            case 'update': {
+              const result = await manager.updateFeature(typed.featureId as string, {
+                buildTypeId: typed.buildTypeId,
+                type: typed.type,
+                properties: typed.properties,
+                disabled: typed.disabled,
+              });
+              return json({
+                success: true,
+                action: 'manage_build_features',
+                operation: 'update',
+                buildTypeId: typed.buildTypeId,
+                featureId: result.id,
+              });
+            }
+            case 'delete': {
+              await manager.deleteFeature(typed.buildTypeId, typed.featureId as string);
+              return json({
+                success: true,
+                action: 'manage_build_features',
+                operation: 'delete',
+                buildTypeId: typed.buildTypeId,
+                featureId: typed.featureId,
+              });
+            }
+            default:
+              return json({
+                success: false,
+                action: 'manage_build_features',
+                error: `Unsupported action: ${typed.action}`,
+              });
+          }
+        },
+        args
+      );
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'manage_agent_requirements',
+    description: 'Add, update, or delete build agent requirements for a configuration',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildTypeId: { type: 'string', description: 'Build configuration ID' },
+        action: {
+          type: 'string',
+          enum: ['add', 'update', 'delete'],
+          description: 'Operation to perform',
+        },
+        requirementId: {
+          type: 'string',
+          description: 'Requirement ID (required for update/delete)',
+        },
+        properties: {
+          type: 'object',
+          description: 'Requirement properties (e.g. property-name, condition, value)',
+        },
+        disabled: { type: 'boolean', description: 'Disable or enable the requirement' },
+      },
+      required: ['buildTypeId', 'action'],
+    },
+    handler: async (args: unknown) => {
+      const propertyValue = z.union([z.string(), z.number(), z.boolean()]);
+      const schema = z
+        .object({
+          buildTypeId: z.string().min(1),
+          action: z.enum(['add', 'update', 'delete']),
+          requirementId: z.string().min(1).optional(),
+          properties: z.record(z.string(), propertyValue).optional(),
+          disabled: z.boolean().optional(),
+        })
+        .superRefine((value, ctx) => {
+          if ((value.action === 'update' || value.action === 'delete') && !value.requirementId) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message:
+                'requirementId is required for update/delete actions. Capture the requirement ID via the API or TeamCity UI.',
+              path: ['requirementId'],
+            });
+          }
+        });
+
+      return runTool(
+        'manage_agent_requirements',
+        schema,
+        async (typed) => {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const manager = new AgentRequirementsManager(adapter);
+
+          switch (typed.action) {
+            case 'add': {
+              const result = await manager.addRequirement({
+                buildTypeId: typed.buildTypeId,
+                properties: typed.properties,
+                disabled: typed.disabled,
+              });
+              return json({
+                success: true,
+                action: 'manage_agent_requirements',
+                operation: 'add',
+                buildTypeId: typed.buildTypeId,
+                requirementId: result.id,
+              });
+            }
+            case 'update': {
+              const result = await manager.updateRequirement(typed.requirementId as string, {
+                buildTypeId: typed.buildTypeId,
+                properties: typed.properties,
+                disabled: typed.disabled,
+              });
+              return json({
+                success: true,
+                action: 'manage_agent_requirements',
+                operation: 'update',
+                buildTypeId: typed.buildTypeId,
+                requirementId: result.id,
+              });
+            }
+            case 'delete': {
+              await manager.deleteRequirement(typed.buildTypeId, typed.requirementId as string);
+              return json({
+                success: true,
+                action: 'manage_agent_requirements',
+                operation: 'delete',
+                buildTypeId: typed.buildTypeId,
+                requirementId: typed.requirementId,
+              });
+            }
+            default:
+              return json({
+                success: false,
+                action: 'manage_agent_requirements',
+                error: `Unsupported action: ${typed.action}`,
+              });
+          }
+        },
+        args
+      );
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'set_build_config_state',
+    description: 'Enable or disable a build configuration by toggling its paused flag',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildTypeId: { type: 'string', description: 'Build configuration ID' },
+        paused: { type: 'boolean', description: 'True to pause/disable, false to enable' },
+      },
+      required: ['buildTypeId', 'paused'],
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({
+        buildTypeId: z.string().min(1),
+        paused: z.boolean(),
+      });
+
+      return runTool(
+        'set_build_config_state',
+        schema,
+        async (typed) => {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          await adapter.modules.buildTypes.setBuildTypeField(
+            typed.buildTypeId,
+            'paused',
+            String(typed.paused),
+            {
+              headers: {
+                'Content-Type': 'text/plain',
+                Accept: 'application/json',
+              },
+            }
+          );
+          return json({
+            success: true,
+            action: 'set_build_config_state',
+            buildTypeId: typed.buildTypeId,
+            paused: typed.paused,
+          });
+        },
+        args
+      );
     },
     mode: 'full',
   },

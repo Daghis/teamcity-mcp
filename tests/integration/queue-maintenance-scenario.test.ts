@@ -3,6 +3,10 @@ import { describe, expect, it } from '@jest/globals';
 import type { ActionResult, ListResult } from '../types/tool-results';
 import { callTool, callToolsBatch, callToolsBatchExpect } from './lib/mcp-runner';
 
+const SERIAL_WORKER =
+  process.env['JEST_WORKER_ID'] === '1' || process.env['SERIAL_BUILD_TESTS'] === 'true';
+const serialDescribe = SERIAL_WORKER ? describe : describe.skip;
+
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
     (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
@@ -14,7 +18,7 @@ const PROJECT_NAME = `E2E Queue ${ts}`;
 const BT_ID = `E2E_QUEUE_BT_${ts}`;
 const BT_NAME = `E2E Queue BuildType ${ts}`;
 
-describe('Queue maintenance (full)', () => {
+serialDescribe('Queue maintenance (full)', () => {
   afterAll(async () => {
     try {
       await callTool('full', 'delete_project', { projectId: PROJECT_ID });
