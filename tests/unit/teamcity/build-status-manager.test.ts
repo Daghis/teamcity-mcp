@@ -108,20 +108,16 @@ describe('BuildStatusManager', () => {
       it('should retrieve build by build type and number', async () => {
         const mockBuildResponse = {
           data: {
-            build: [
-              {
-                id: 12345,
-                number: '42',
-                buildTypeId: 'Build_Config_1',
-                state: 'finished',
-                status: 'FAILURE',
-                statusText: 'Tests failed',
-              },
-            ],
+            id: 12345,
+            number: '42',
+            buildTypeId: 'Build_Config_1',
+            state: 'finished',
+            status: 'FAILURE',
+            statusText: 'Tests failed',
           },
         };
 
-        mockClient.builds.getMultipleBuilds.mockResolvedValue(mockBuildResponse);
+        mockClient.builds.getBuild.mockResolvedValue(mockBuildResponse);
 
         const result = await manager.getBuildStatus({
           buildNumber: '42',
@@ -138,20 +134,16 @@ describe('BuildStatusManager', () => {
       it('should handle build number with branch filter', async () => {
         const mockBuildResponse = {
           data: {
-            build: [
-              {
-                id: 12346,
-                number: '43',
-                buildTypeId: 'Build_Config_1',
-                branchName: 'feature/test',
-                state: 'finished',
-                status: 'SUCCESS',
-              },
-            ],
+            id: 12346,
+            number: '43',
+            buildTypeId: 'Build_Config_1',
+            branchName: 'feature/test',
+            state: 'finished',
+            status: 'SUCCESS',
           },
         };
 
-        mockClient.builds.getMultipleBuilds.mockResolvedValue(mockBuildResponse);
+        mockClient.builds.getBuild.mockResolvedValue(mockBuildResponse);
 
         const result = await manager.getBuildStatus({
           buildNumber: '43',
