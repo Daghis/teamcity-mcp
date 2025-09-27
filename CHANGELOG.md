@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.0...teamcity-mcp-v1.10.1) (2025-09-27)
+
+
+### Bug Fixes
+
+* **tools:** support get_build_status buildNumber (209) ([#219](https://github.com/Daghis/teamcity-mcp/issues/219)) ([efb9a00](https://github.com/Daghis/teamcity-mcp/commit/efb9a00ad697335239e7cd87c9436259df27a49c))
+
 ## [1.10.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.9.6...teamcity-mcp-v1.10.0) (2025-09-27)
 
 
