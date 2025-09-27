@@ -29,6 +29,7 @@ export interface TriggerBuildResult extends ActionResult<'trigger_build'> {
   buildId: string;
   state?: string;
   status?: string;
+  branchName?: string;
 }
 
 export interface BuildRef {

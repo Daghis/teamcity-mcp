@@ -706,6 +706,11 @@ const DEV_TOOLS: ToolDefinition[] = [
         buildTypeId: { type: 'string', description: 'Build type ID to trigger' },
         branchName: { type: 'string', description: 'Branch to build (optional)' },
         comment: { type: 'string', description: 'Build comment (optional)' },
+        properties: {
+          type: 'object',
+          description: 'Optional build parameters to set when triggering the build',
+          additionalProperties: { type: 'string' },
+        },
       },
       required: ['buildTypeId'],
     },
@@ -714,6 +719,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         buildTypeId: z.string().min(1),
         branchName: z.string().min(1).max(255).optional(),
         comment: z.string().max(500).optional(),
+        properties: z.record(z.string(), z.string()).optional(),
       });
 
       return runTool(
@@ -721,28 +727,94 @@ const DEV_TOOLS: ToolDefinition[] = [
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-          try {
-            const build = (await adapter.triggerBuild(
-              typed.buildTypeId,
-              typed.branchName,
-              typed.comment
-            )) as { id?: number | string; state?: string; status?: string };
-            return json({
-              success: true,
+          const directBranch = typed.branchName?.trim();
+          const normalizedDirectBranch =
+            directBranch && directBranch.length > 0 ? directBranch : undefined;
+          const rawPropertyBranch = typed.properties?.['teamcity.build.branch'];
+          const trimmedPropertyBranch = rawPropertyBranch?.trim();
+          const normalizedPropertyBranch =
+            trimmedPropertyBranch && trimmedPropertyBranch.length > 0
+              ? trimmedPropertyBranch
+              : undefined;
+          const branchName = normalizedDirectBranch ?? normalizedPropertyBranch;
+
+          if (
+            normalizedDirectBranch &&
+            normalizedPropertyBranch &&
+            normalizedDirectBranch !== normalizedPropertyBranch
+          ) {
+            const errorPayload = {
+              success: false,
               action: 'trigger_build',
-              buildId: String(build.id ?? ''),
-              state: (build.state as string) ?? undefined,
-              status: (build.status as string) ?? undefined,
-            });
-          } catch (e) {
-            // Fallback to XML body in case server rejects JSON body
-            const branchPart = typed.branchName
-              ? `<branchName>${typed.branchName}</branchName>`
+              error: `Conflicting branch overrides: branchName='${normalizedDirectBranch}' vs properties.teamcity.build.branch='${normalizedPropertyBranch}'.`,
+            } as const;
+            return {
+              success: false,
+              error: errorPayload.error,
+              content: [{ type: 'text', text: JSON.stringify(errorPayload, null, 2) }],
+            };
+          }
+
+          const propertyEntries = typed.properties
+            ? Object.entries(typed.properties).map(([name, value]) => ({
+                name,
+                value:
+                  name === 'teamcity.build.branch' && normalizedPropertyBranch
+                    ? normalizedPropertyBranch
+                    : value,
+              }))
+            : [];
+          const propertiesPayload =
+            propertyEntries.length > 0 ? { property: propertyEntries } : undefined;
+
+          const buildRequest: {
+            buildType: { id: string };
+            branchName?: string;
+            comment?: { text: string };
+            properties?: { property: Array<{ name: string; value: string }> };
+          } = {
+            buildType: { id: typed.buildTypeId },
+          };
+
+          if (branchName) {
+            buildRequest.branchName = branchName;
+          }
+
+          const commentText = typed.comment?.trim();
+          if (commentText && commentText.length > 0) {
+            buildRequest.comment = { text: commentText };
+          }
+
+          if (propertiesPayload) {
+            buildRequest.properties = propertiesPayload;
+          }
+
+          const sendXmlFallback = async (error: unknown) => {
+            const escapeXml = (value: string): string =>
+              value
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+
+            const branchPart = branchName
+              ? `<branchName>${escapeXml(branchName)}</branchName>`
               : '';
-            const commentPart = typed.comment
-              ? `<comment><text>${typed.comment.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text></comment>`
+            const commentPart = commentText
+              ? `<comment><text>${escapeXml(commentText)}</text></comment>`
               : '';
-            const xml = `<?xml version="1.0" encoding="UTF-8"?><build><buildType id="${typed.buildTypeId}"/>${branchPart}${commentPart}</build>`;
+            const propertiesPart = propertiesPayload
+              ? `<properties>${propertiesPayload.property
+                  .map(
+                    (prop) =>
+                      `<property name="${escapeXml(prop.name)}" value="${escapeXml(prop.value)}"/>`
+                  )
+                  .join('')}</properties>`
+              : '';
+            const xml = `<?xml version="1.0" encoding="UTF-8"?><build><buildType id="${escapeXml(
+              typed.buildTypeId
+            )}"/>${branchPart}${commentPart}${propertiesPart}</build>`;
             const response = await adapter.modules.buildQueue.addBuildToQueue(
               false,
               xml as unknown as never,
@@ -750,14 +822,47 @@ const DEV_TOOLS: ToolDefinition[] = [
                 headers: { 'Content-Type': 'application/xml', Accept: 'application/json' },
               }
             );
-            const build = response.data as { id?: number; state?: string; status?: string };
+            const build = response.data as {
+              id?: number | string;
+              state?: string;
+              status?: string;
+              branchName?: string;
+            };
             return json({
               success: true,
               action: 'trigger_build',
               buildId: String(build.id ?? ''),
               state: (build.state as string) ?? undefined,
               status: (build.status as string) ?? undefined,
+              branchName: (build.branchName as string) ?? branchName,
+              fallback: { mode: 'xml', reason: (error as Error)?.message },
             });
+          };
+
+          try {
+            const response = await adapter.modules.buildQueue.addBuildToQueue(
+              false,
+              buildRequest as unknown as never,
+              {
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              }
+            );
+            const build = response.data as {
+              id?: number | string;
+              state?: string;
+              status?: string;
+              branchName?: string;
+            };
+            return json({
+              success: true,
+              action: 'trigger_build',
+              buildId: String(build.id ?? ''),
+              state: (build.state as string) ?? undefined,
+              status: (build.status as string) ?? undefined,
+              branchName: (build.branchName as string) ?? branchName,
+            });
+          } catch (error) {
+            return sendXmlFallback(error);
           }
         },
         args
