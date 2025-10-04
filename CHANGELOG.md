@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.5...teamcity-mcp-v1.10.6) (2025-10-04)
+
+
+### Bug Fixes
+
+* **runtime:** replace double assertions in client tooling ([#233](https://github.com/Daghis/teamcity-mcp/issues/233)) ([08b19da](https://github.com/Daghis/teamcity-mcp/commit/08b19da78e09b03fd79c50121c4d607c715ec46a))
+
 ## [1.10.5](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.4...teamcity-mcp-v1.10.5) (2025-10-04)
 
 
