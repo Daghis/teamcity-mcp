@@ -88,9 +88,7 @@ describe('BuildConfigurationCloneManager', () => {
             ],
           },
           'artifact-dependencies': {
-            'artifact-dependency': [
-              { sourceBuildTypeId: 'SourceCfg', name: 'artifact' },
-            ],
+            'artifact-dependency': [{ sourceBuildTypeId: 'SourceCfg', name: 'artifact' }],
           },
           'snapshot-dependencies': {
             'snapshot-dependency': [

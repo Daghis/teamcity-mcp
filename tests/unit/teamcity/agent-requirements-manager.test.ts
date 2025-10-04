@@ -107,9 +107,9 @@ describe('AgentRequirementsManager', () => {
       response: { status: 404 },
     });
 
-    await expect(
-      manager.updateRequirement('missing', { buildTypeId: 'BuildCfg' })
-    ).rejects.toThrow(/was not found/);
+    await expect(manager.updateRequirement('missing', { buildTypeId: 'BuildCfg' })).rejects.toThrow(
+      /was not found/
+    );
   });
 
   test('deleteRequirement delegates to API', async () => {
