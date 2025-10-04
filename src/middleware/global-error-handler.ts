@@ -40,9 +40,7 @@ export class GlobalErrorHandler {
   }
 
   public static getInstance(options?: GlobalErrorHandlerOptions): GlobalErrorHandler {
-    if (GlobalErrorHandler.instance == null) {
-      GlobalErrorHandler.instance = new GlobalErrorHandler(options);
-    }
+    GlobalErrorHandler.instance ??= new GlobalErrorHandler(options);
     return GlobalErrorHandler.instance;
   }
 

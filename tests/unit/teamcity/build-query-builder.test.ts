@@ -159,6 +159,18 @@ describe('BuildQueryBuilder', () => {
       expect(locator).toBe('tag:(version,1.0)');
     });
 
+    it('should escape branch values containing slashes without wildcards', () => {
+      const locator = builder.withBranch('refs/heads/main').build();
+
+      expect(locator).toBe('branch:(refs/heads/main)');
+    });
+
+    it('should escape branch values containing whitespace', () => {
+      const locator = builder.withBranch('feature branch').build();
+
+      expect(locator).toBe('branch:(feature branch)');
+    });
+
     it('should not escape wildcards', () => {
       const locator = builder.withBranch('feature/*:test').build();
 

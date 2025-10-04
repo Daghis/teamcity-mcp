@@ -23,15 +23,11 @@ let sharedLogger: ReturnType<typeof makeMockLogger>;
 
 jest.mock('@/utils/logger/index', () => ({
   getLogger: () => {
-    if (sharedLogger === undefined) {
-      sharedLogger = makeMockLogger();
-    }
+    sharedLogger ??= makeMockLogger();
     return sharedLogger;
   },
   get logger() {
-    if (sharedLogger === undefined) {
-      sharedLogger = makeMockLogger();
-    }
+    sharedLogger ??= makeMockLogger();
     return sharedLogger;
   },
   debug: jest.fn(),
@@ -40,7 +36,7 @@ jest.mock('@/utils/logger/index', () => ({
   error: jest.fn(),
 }));
 
-sharedLogger = makeMockLogger();
+sharedLogger ??= makeMockLogger();
 
 jest.mock('@/middleware/error', () => ({
   formatError: jest.fn((err: unknown) => ({ kind: 'zod', message: String(err) })),

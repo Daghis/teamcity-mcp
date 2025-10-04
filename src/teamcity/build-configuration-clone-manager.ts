@@ -344,9 +344,7 @@ export class BuildConfigurationCloneManager {
 
     // Handle build counter
     if (options.copyBuildCounter && source.buildNumberCounter) {
-      if (configPayload.settings == null) {
-        configPayload.settings = { property: [] };
-      }
+      configPayload.settings ??= { property: [] };
       configPayload.settings.property?.push({
         name: 'buildNumberCounter',
         value: source.buildNumberCounter.toString(),
@@ -355,9 +353,7 @@ export class BuildConfigurationCloneManager {
 
     // Copy build number format
     if (source.buildNumberFormat) {
-      if (configPayload.settings == null) {
-        configPayload.settings = { property: [] };
-      }
+      configPayload.settings ??= { property: [] };
       configPayload.settings.property?.push({
         name: 'buildNumberPattern',
         value: source.buildNumberFormat,

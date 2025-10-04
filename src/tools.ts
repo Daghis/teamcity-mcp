@@ -31,6 +31,11 @@ import {
 } from '@/teamcity/client-adapter';
 import { TeamCityAPIError, TeamCityNotFoundError, isRetryableError } from '@/teamcity/errors';
 import { createPaginatedFetcher, fetchAllPages } from '@/teamcity/pagination';
+import {
+  buildBranchSegmentInput,
+  hasBranchSegment,
+  normalizeLocatorSegments,
+} from '@/utils/list-builds-locator';
 import { debug } from '@/utils/logger';
 import { json, runTool } from '@/utils/mcp';
 
@@ -589,6 +594,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         locator: { type: 'string', description: 'Optional build locator to filter builds' },
         projectId: { type: 'string', description: 'Filter by project ID' },
         buildTypeId: { type: 'string', description: 'Filter by build type ID' },
+        branch: { type: 'string', description: 'Filter by branch (logical or VCS name)' },
         status: {
           type: 'string',
           enum: ['SUCCESS', 'FAILURE', 'ERROR'],
@@ -609,6 +615,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         locator: z.string().min(1).optional(),
         projectId: z.string().min(1).optional(),
         buildTypeId: z.string().min(1).optional(),
+        branch: z.string().min(1).optional(),
         status: z.enum(['SUCCESS', 'FAILURE', 'ERROR']).optional(),
         count: z.number().int().min(1).max(1000).default(10).optional(),
         pageSize: z.number().int().min(1).max(1000).optional(),
@@ -622,11 +629,20 @@ const DEV_TOOLS: ToolDefinition[] = [
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+
+          const locatorSegments = normalizeLocatorSegments(typed.locator);
+          const hasBranchInLocator = hasBranchSegment(locatorSegments);
+
           // Build shared filter parts
-          const baseParts: string[] = [];
-          if (typed.locator) baseParts.push(typed.locator);
+          const baseParts: string[] = [...locatorSegments];
           if (typed.projectId) baseParts.push(`project:(id:${typed.projectId})`);
           if (typed.buildTypeId) baseParts.push(`buildType:(id:${typed.buildTypeId})`);
+          if (typed.branch) {
+            const branchSegment = buildBranchSegmentInput(typed.branch);
+            if (!hasBranchInLocator) {
+              baseParts.push(branchSegment);
+            }
+          }
           if (typed.status) baseParts.push(`status:${typed.status}`);
 
           const pageSize = typed.pageSize ?? typed.count ?? 100;
