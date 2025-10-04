@@ -268,13 +268,21 @@ export class BuildQueryBuilder {
    * Check if a value needs escaping
    */
   private needsEscaping(value: string): boolean {
-    // Don't escape pure wildcards
-    if (!BuildQueryBuilder.specialCharsRegex.test(value)) {
-      return false;
+    const containsWildcard = value.includes('*');
+
+    if (/\s/.test(value)) {
+      return true;
     }
 
-    // Need to escape if contains special chars
-    return true;
+    if (BuildQueryBuilder.specialCharsRegex.test(value)) {
+      return true;
+    }
+
+    if (value.includes('/')) {
+      return !containsWildcard;
+    }
+
+    return false;
   }
 
   /**
