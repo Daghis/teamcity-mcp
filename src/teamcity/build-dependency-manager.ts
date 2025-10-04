@@ -35,9 +35,9 @@ const JSON_GET_HEADERS: RawAxiosRequestConfig = {
 const defaultTypeFor = (dependencyType: DependencyType): string | undefined => {
   switch (dependencyType) {
     case 'artifact':
-      return undefined;
+      return 'artifactDependency';
     case 'snapshot':
-      return undefined;
+      return 'snapshotDependency';
     default:
       return undefined;
   }
