@@ -589,6 +589,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         locator: { type: 'string', description: 'Optional build locator to filter builds' },
         projectId: { type: 'string', description: 'Filter by project ID' },
         buildTypeId: { type: 'string', description: 'Filter by build type ID' },
+        branch: { type: 'string', description: 'Filter by branch (logical or VCS name)' },
         status: {
           type: 'string',
           enum: ['SUCCESS', 'FAILURE', 'ERROR'],
@@ -609,6 +610,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         locator: z.string().min(1).optional(),
         projectId: z.string().min(1).optional(),
         buildTypeId: z.string().min(1).optional(),
+        branch: z.string().min(1).optional(),
         status: z.enum(['SUCCESS', 'FAILURE', 'ERROR']).optional(),
         count: z.number().int().min(1).max(1000).default(10).optional(),
         pageSize: z.number().int().min(1).max(1000).optional(),
@@ -622,11 +624,126 @@ const DEV_TOOLS: ToolDefinition[] = [
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const splitLocatorParts = (locator: string): string[] => {
+            const parts: string[] = [];
+            let current = '';
+            let depth = 0;
+
+            for (const char of locator) {
+              if (char === ',' && depth === 0) {
+                const piece = current.trim();
+                if (piece.length > 0) {
+                  parts.push(piece);
+                }
+                current = '';
+                continue;
+              }
+
+              if (char === '(') {
+                depth += 1;
+              } else if (char === ')' && depth > 0) {
+                depth -= 1;
+              }
+
+              current += char;
+            }
+
+            const finalPiece = current.trim();
+            if (finalPiece.length > 0) {
+              parts.push(finalPiece);
+            }
+
+            return parts;
+          };
+
+          const simpleBranchValues = new Set([
+            'default:true',
+            'default:false',
+            'default:any',
+            'unspecified:true',
+            'unspecified:false',
+            'unspecified:any',
+            'branched:true',
+            'branched:false',
+            'branched:any',
+          ]);
+
+          const branchPrefixesAllowUnwrapped = ['default:', 'unspecified:', 'branched:', 'policy:'];
+
+          const wrapBranchValue = (value: string): string => {
+            const trimmed = value.trim();
+            if (trimmed.length === 0) {
+              return trimmed;
+            }
+
+            if (trimmed.startsWith('(')) {
+              return trimmed;
+            }
+
+            const lower = trimmed.toLowerCase();
+
+            if (simpleBranchValues.has(lower)) {
+              return trimmed;
+            }
+
+            if (branchPrefixesAllowUnwrapped.some((prefix) => lower.startsWith(prefix))) {
+              return trimmed;
+            }
+
+            if (trimmed.includes('*') && !trimmed.includes(':')) {
+              return trimmed;
+            }
+
+            if (trimmed.includes('/') || trimmed.includes(':') || /\s/.test(trimmed)) {
+              return `(${trimmed})`;
+            }
+
+            return trimmed;
+          };
+
+          const normalizeLocatorSegment = (segment: string): string => {
+            const trimmed = segment.trim();
+            if (trimmed.length === 0) {
+              return trimmed;
+            }
+
+            if (!trimmed.toLowerCase().startsWith('branch:')) {
+              return trimmed;
+            }
+
+            const rawValue = trimmed.slice('branch:'.length).trim();
+            if (rawValue.length === 0) {
+              return trimmed;
+            }
+
+            if (rawValue.startsWith('(')) {
+              return `branch:${rawValue}`;
+            }
+
+            return `branch:${wrapBranchValue(rawValue)}`;
+          };
+
+          const locatorSegments = typed.locator
+            ? splitLocatorParts(typed.locator).map(normalizeLocatorSegment).filter(Boolean)
+            : [];
+          const hasBranchInLocator = locatorSegments.some((segment) =>
+            segment.toLowerCase().startsWith('branch:')
+          );
+
           // Build shared filter parts
-          const baseParts: string[] = [];
-          if (typed.locator) baseParts.push(typed.locator);
+          const baseParts: string[] = [...locatorSegments];
           if (typed.projectId) baseParts.push(`project:(id:${typed.projectId})`);
           if (typed.buildTypeId) baseParts.push(`buildType:(id:${typed.buildTypeId})`);
+          if (typed.branch) {
+            const normalizedBranchInput = typed.branch.trim();
+            const branchSegmentInput = normalizedBranchInput.toLowerCase().startsWith('branch:')
+              ? normalizedBranchInput
+              : `branch:${normalizedBranchInput}`;
+            const branchSegment = normalizeLocatorSegment(branchSegmentInput);
+            if (!hasBranchInLocator) {
+              baseParts.push(branchSegment);
+            }
+          }
           if (typed.status) baseParts.push(`status:${typed.status}`);
 
           const pageSize = typed.pageSize ?? typed.count ?? 100;
