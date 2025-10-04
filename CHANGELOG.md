@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.5](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.4...teamcity-mcp-v1.10.5) (2025-10-04)
+
+
+### Bug Fixes
+
+* **teamcity:** set dependency types when adding via tool ([#231](https://github.com/Daghis/teamcity-mcp/issues/231)) ([702764a](https://github.com/Daghis/teamcity-mcp/commit/702764a19de0a649e394d5b4679dc8ea6373dcf2))
+
 ## [1.10.4](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.3...teamcity-mcp-v1.10.4) (2025-10-04)
 
 
