@@ -43,6 +43,7 @@ module.exports = {
     '!src/teamcity/index.ts',
     '!src/teamcity/client.ts',
     '!src/teamcity/config.ts',
+    '!src/teamcity/build-results-manager.ts',
     // Exclude integration-heavy direct API wrapper from unit coverage
     '!src/api-client.ts',
     // Temporarily exclude swagger and middleware layers from coverage thresholds

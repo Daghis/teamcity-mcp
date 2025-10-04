@@ -165,6 +165,12 @@ describe('BuildQueryBuilder', () => {
       expect(locator).toBe('branch:(refs/heads/main)');
     });
 
+    it('should escape branch values containing whitespace', () => {
+      const locator = builder.withBranch('feature branch').build();
+
+      expect(locator).toBe('branch:(feature branch)');
+    });
+
     it('should not escape wildcards', () => {
       const locator = builder.withBranch('feature/*:test').build();
 

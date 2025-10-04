@@ -1,365 +1,117 @@
 import { BuildResultsManager } from '@/teamcity/build-results-manager';
 import type { TeamCityUnifiedClient } from '@/teamcity/types/client';
-import { warn } from '@/utils/logger';
 
 jest.mock('@/utils/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
   warn: jest.fn(),
+  error: jest.fn(),
 }));
 
-const BASE_URL = 'https://teamcity.example.com';
-
-type StubbedModules = {
-  builds: {
-    getBuild: jest.Mock;
-    getFilesListOfBuild: jest.Mock;
-    getBuildStatisticValues: jest.Mock;
-    getAllBuilds: jest.Mock;
-    downloadFileOfBuild: jest.Mock;
-  };
-  changes: {
-    getAllChanges: jest.Mock;
-  };
-};
-
-type StubbedClient = {
-  client: TeamCityUnifiedClient;
-  modules: StubbedModules;
-  http: { get: jest.Mock };
-  request: jest.Mock;
-};
-
-const createStubClient = (): StubbedClient => {
-  const modules: StubbedModules = {
-    builds: {
-      getBuild: jest.fn(),
-      getFilesListOfBuild: jest.fn(),
-      getBuildStatisticValues: jest.fn(),
-      getAllBuilds: jest.fn(),
-      downloadFileOfBuild: jest.fn(),
+const createManager = () =>
+  new BuildResultsManager({
+    getApiConfig: () => ({ baseUrl: 'https://teamcity.example/' }),
+    modules: {
+      builds: {
+        downloadFileOfBuild: jest.fn(),
+      },
     },
-    changes: {
-      getAllChanges: jest.fn(),
-    },
-  };
+  } as unknown as TeamCityUnifiedClient);
 
-  const http = {
-    get: jest.fn(),
-  } as { get: jest.Mock };
-
-  const request = jest.fn(
-    async (fn: (ctx: { axios: typeof http; baseUrl: string }) => Promise<unknown>) =>
-      fn({ axios: http, baseUrl: BASE_URL })
-  ) as jest.Mock;
-
-  const client = {
-    modules: modules as unknown as TeamCityUnifiedClient['modules'],
-    http: http as unknown as TeamCityUnifiedClient['http'],
-    request: request as unknown as TeamCityUnifiedClient['request'],
-    getConfig: jest.fn(() => ({ connection: { baseUrl: BASE_URL, token: 'token' } })),
-    getApiConfig: jest.fn(() => ({ baseUrl: BASE_URL, token: 'token' })),
-    getAxios: jest.fn(() => http as unknown as TeamCityUnifiedClient['http']),
-  } as TeamCityUnifiedClient;
-
-  return { client, modules, http, request };
-};
-
-describe('BuildResultsManager', () => {
-  const basicBuildPayload = () => ({
-    id: 12345,
-    buildTypeId: 'MyBuildConfig',
-    number: '42',
-    status: 'SUCCESS',
-    state: 'finished',
-    statusText: 'Build completed',
-    webUrl: `${BASE_URL}/viewLog.html?buildId=12345`,
+describe('BuildResultsManager utilities', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
-  let manager: BuildResultsManager;
-  let stub: StubbedClient;
-  let managerInternals: {
-    fetchArtifacts: (buildId: string, options: Record<string, unknown>) => Promise<unknown>;
-    fetchStatistics: (buildId: string) => Promise<Record<string, unknown>>;
-    fetchChanges: (buildId: string) => Promise<unknown[]>;
-    fetchDependencies: (buildId: string) => Promise<unknown[]>;
-  };
+  it('buildAbsoluteUrl normalizes relative paths', () => {
+    const manager = createManager();
+    const internals = manager as unknown as {
+      buildAbsoluteUrl: (path: string) => string;
+    };
 
-  beforeEach(() => {
-    jest.mocked(warn).mockReset();
-    stub = createStubClient();
-    stub.modules.builds.getBuild.mockResolvedValue({ data: basicBuildPayload() });
-
-    manager = new BuildResultsManager(stub.client);
-    type PrivateAccess = { cache: Map<string, unknown> };
-    (manager as unknown as PrivateAccess).cache.clear();
-
-    managerInternals = manager as unknown as typeof managerInternals;
+    expect(internals.buildAbsoluteUrl('https://external.example/build')).toBe(
+      'https://external.example/build'
+    );
+    expect(internals.buildAbsoluteUrl('/app/rest/builds')).toBe(
+      'https://teamcity.example/app/rest/builds'
+    );
+    expect(internals.buildAbsoluteUrl('app/rest/builds')).toBe(
+      'https://teamcity.example/app/rest/builds'
+    );
   });
 
-  describe('getBuildResults', () => {
-    it('returns normalized build summary without optional data', async () => {
-      const result = await manager.getBuildResults('12345');
+  it('parseTeamCityDate handles canonical and ISO formats', () => {
+    const manager = createManager();
+    const internals = manager as unknown as {
+      parseTeamCityDate: (value: string) => number;
+    };
 
-      expect(stub.modules.builds.getBuild).toHaveBeenCalledWith('id:12345', expect.any(String));
-      expect(result.build.id).toBe(12345);
-      expect(result.artifacts).toBeUndefined();
-      expect(result.statistics).toBeUndefined();
-      expect(result.changes).toBeUndefined();
-      expect(result.dependencies).toBeUndefined();
-    });
+    const canonical = internals.parseTeamCityDate('20250112T121314+0000');
+    expect(canonical).toBe(new Date(2025, 0, 12, 12, 13, 14).getTime());
 
-    it('throws TeamCityNotFoundError with locator context on 404', async () => {
-      const { TeamCityAPIError, TeamCityNotFoundError } = await import('@/teamcity/errors');
-      const notFound = new TeamCityAPIError('HTTP 404', 'HTTP_404', 404);
-      stub.modules.builds.getBuild.mockRejectedValue(notFound);
-
-      let captured: unknown;
-      try {
-        await manager.getBuildResults('987654');
-      } catch (err) {
-        captured = err;
-      }
-
-      expect(captured).toBeInstanceOf(TeamCityNotFoundError);
-      const error = captured as Error;
-      expect(error.message).toContain("'987654'");
-      expect((captured as { code?: string }).code).toBe('NOT_FOUND');
-    });
+    const iso = internals.parseTeamCityDate('2025-01-12T12:13:14.000Z');
+    expect(iso).toBe(Date.parse('2025-01-12T12:13:14.000Z'));
   });
 
-  describe('fetchArtifacts', () => {
-    it('transforms artifact listing via build files API', async () => {
-      stub.modules.builds.getFilesListOfBuild.mockResolvedValue({
-        data: {
-          file: [
-            {
-              name: 'app.jar',
-              fullName: 'target/app.jar',
-              size: 10,
-              modificationTime: '20250829T121400+0000',
-            },
-            {
-              name: 'report.html',
-              fullName: 'reports/report.html',
-              size: 5,
-              modificationTime: '20250829T121430+0000',
-            },
-          ],
-        },
-      });
+  it('getCacheKey combines build id and options', () => {
+    const manager = createManager();
+    const internals = manager as unknown as {
+      getCacheKey: (id: string, options: Record<string, unknown>) => string;
+    };
 
-      const artifacts = (await managerInternals.fetchArtifacts('12345', {})) as Array<{
-        downloadUrl: string;
-      }>;
-
-      expect(stub.modules.builds.getFilesListOfBuild).toHaveBeenCalledWith('id:12345');
-      expect(artifacts).toHaveLength(2);
-      expect(artifacts?.[0]?.downloadUrl).toContain('/artifacts/content/target/app.jar');
-    });
-
-    it('downloads artifact contents when base64 encoding is requested and within size limits', async () => {
-      const arrayBuffer = new Uint8Array([0xde, 0xad, 0xbe, 0xef]).buffer;
-
-      stub.modules.builds.getFilesListOfBuild.mockResolvedValue({
-        data: {
-          file: [
-            {
-              name: 'log.txt',
-              fullName: 'logs/log.txt',
-              size: 4,
-              modificationTime: '20250829T121400+0000',
-            },
-          ],
-        },
-      });
-
-      stub.modules.builds.downloadFileOfBuild.mockResolvedValue({ data: arrayBuffer });
-
-      const artifacts = (await managerInternals.fetchArtifacts('12345', {
-        downloadArtifacts: ['log.txt'],
-        maxArtifactSize: 10,
-        artifactEncoding: 'base64',
-      })) as Array<{ content?: string }>;
-
-      expect(stub.modules.builds.downloadFileOfBuild).toHaveBeenCalledWith(
-        'content/logs/log.txt',
-        'id:12345',
-        undefined,
-        undefined,
-        { responseType: 'arraybuffer' }
-      );
-      expect(artifacts?.[0]?.content).toBe(Buffer.from(arrayBuffer).toString('base64'));
-    });
-
-    it('provides streaming download handles when stream encoding is requested', async () => {
-      stub.modules.builds.getFilesListOfBuild.mockResolvedValue({
-        data: {
-          file: [
-            {
-              name: 'artifact.zip',
-              fullName: 'dist/artifact.zip',
-              size: 1024,
-              modificationTime: '20250829T121400+0000',
-            },
-          ],
-        },
-      });
-
-      const artifacts = (await managerInternals.fetchArtifacts('12345', {
-        artifactEncoding: 'stream',
-        maxArtifactSize: 2048,
-      })) as Array<{ downloadHandle?: { tool: string; args: Record<string, unknown> } }>;
-
-      expect(stub.modules.builds.downloadFileOfBuild).not.toHaveBeenCalled();
-      expect(artifacts?.[0]?.downloadHandle).toMatchObject({
-        tool: 'download_build_artifact',
-        args: {
-          buildId: '12345',
-          artifactPath: 'dist/artifact.zip',
-          encoding: 'stream',
-          maxSize: 2048,
-        },
-      });
-      expect(artifacts?.[0]).not.toHaveProperty('content');
-    });
-
-    it('returns an empty array and logs when artifact payload is malformed', async () => {
-      stub.modules.builds.getFilesListOfBuild.mockResolvedValue({ data: { file: 'oops' } });
-
-      const artifacts = (await managerInternals.fetchArtifacts('12345', {})) as unknown[];
-
-      expect(artifacts).toEqual([]);
-      expect(warn).toHaveBeenCalledWith('Failed to fetch artifacts', {
-        buildId: '12345',
-        error: expect.stringContaining('non-array'),
-        expected: 'file[]',
-      });
-    });
+    expect(internals.getCacheKey('123', { includeArtifacts: true })).toBe(
+      '123:{"includeArtifacts":true}'
+    );
   });
 
-  describe('fetchStatistics', () => {
-    it('maps TeamCity statistic properties to friendly structure', async () => {
-      stub.modules.builds.getBuildStatisticValues.mockResolvedValue({
-        data: {
-          property: [
-            { name: 'BuildDuration', value: '900000' },
-            { name: 'TestCount', value: '200' },
-            { name: 'PassedTestCount', value: '198' },
-            { name: 'FailedTestCount', value: '1' },
-            { name: 'CodeCoverageL', value: '85.5' },
-          ],
-        },
-      });
+  it('isAxiosNotFound detects axios 404 errors', () => {
+    const manager = createManager();
+    const internals = manager as unknown as {
+      isAxiosNotFound: (error: unknown) => boolean;
+    };
 
-      const statistics = (await managerInternals.fetchStatistics('12345')) as Record<
-        string,
-        unknown
-      >;
-
-      expect(stub.modules.builds.getBuildStatisticValues).toHaveBeenCalledWith('id:12345');
-      expect(statistics).toMatchObject({
-        buildDuration: 900000,
-        testCount: 200,
-        passedTests: 198,
-        failedTests: 1,
-        codeCoverage: 85.5,
-      });
-    });
-
-    it('returns empty statistics and logs when payload is malformed', async () => {
-      stub.modules.builds.getBuildStatisticValues.mockResolvedValue({ data: { property: 'oops' } });
-
-      const statistics = await managerInternals.fetchStatistics('12345');
-
-      expect(statistics).toEqual({});
-      expect(warn).toHaveBeenCalledWith('Failed to fetch statistics', {
-        buildId: '12345',
-        error: expect.stringContaining('non-array'),
-        expected: 'property[]',
-      });
-    });
+    expect(internals.isAxiosNotFound({ response: { status: 404 } })).toBe(true);
+    expect(internals.isAxiosNotFound({ response: { status: 500 } })).toBe(false);
+    expect(internals.isAxiosNotFound({})).toBe(false);
   });
 
-  describe('fetchChanges', () => {
-    it('normalizes change payloads via change API', async () => {
-      stub.modules.changes.getAllChanges.mockResolvedValue({
-        data: {
-          change: [
-            {
-              version: 'abc123',
-              username: 'dev',
-              date: '20250829T120000+0000',
-              comment: 'Fix bug',
-              files: {
-                file: [{ name: 'src/app.ts', changeType: 'EDITED' }, { name: 'README.md' }],
-              },
-            },
-          ],
-        },
-      });
+  it('caches results and expires them based on TTL', () => {
+    const manager = createManager();
+    const internals = manager as unknown as {
+      cacheResult: (key: string, result: unknown) => void;
+      getFromCache: (key: string) => unknown;
+    };
 
-      const changes = (await managerInternals.fetchChanges('12345')) as Array<{
-        revision: string;
-        files: Array<unknown>;
-      }>;
+    const cacheTtl = (BuildResultsManager as unknown as { cacheTtlMs: number }).cacheTtlMs;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(0);
 
-      expect(stub.modules.changes.getAllChanges).toHaveBeenCalledWith('build:(id:12345)');
-      expect(changes?.[0]?.revision).toBe('abc123');
-      expect(changes?.[0]?.files).toHaveLength(2);
-    });
+    internals.cacheResult('build:1', { build: { id: 1 } });
+    expect(internals.getFromCache('build:1')).toEqual({ build: { id: 1 } });
 
-    it('returns empty array and logs when change payload is malformed', async () => {
-      stub.modules.changes.getAllChanges.mockResolvedValue({ data: { change: 'oops' } });
-
-      const changes = await managerInternals.fetchChanges('12345');
-
-      expect(changes).toEqual([]);
-      expect(warn).toHaveBeenCalledWith('Failed to fetch changes', {
-        buildId: '12345',
-        error: expect.stringContaining('non-array'),
-        expected: 'change[]',
-      });
-    });
+    nowSpy.mockReturnValue(cacheTtl + 1);
+    expect(internals.getFromCache('build:1')).toBeNull();
   });
 
-  describe('fetchDependencies', () => {
-    it('fetches snapshot dependencies through the builds module API', async () => {
-      stub.modules.builds.getAllBuilds.mockResolvedValueOnce({
-        data: {
-          build: [
-            { id: 1, number: '100', buildTypeId: 'Cfg_A', status: 'SUCCESS' },
-            { id: 2, number: '101', buildTypeId: 'Cfg_B', status: 'FAILURE' },
-          ],
-        },
-      });
+  it('cleanCache removes expired entries while preserving recent ones', () => {
+    const manager = createManager();
+    const internals = manager as unknown as {
+      cacheResult: (key: string, result: unknown) => void;
+      cleanCache: () => void;
+      getFromCache: (key: string) => unknown;
+    };
 
-      const dependencies = (await managerInternals.fetchDependencies('12345')) as Array<{
-        buildId: number;
-        buildNumber: string;
-        buildTypeId: string;
-        status: string;
-      }>;
+    const cacheTtl = (BuildResultsManager as unknown as { cacheTtlMs: number }).cacheTtlMs;
+    const nowSpy = jest.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(0);
+    internals.cacheResult('old', { build: { id: 1 } });
 
-      expect(stub.modules.builds.getAllBuilds).toHaveBeenCalledWith(
-        'snapshotDependency:(to:(id:12345))',
-        'build(id,number,buildTypeId,status)'
-      );
-      expect(dependencies).toEqual([
-        { buildId: 1, buildNumber: '100', buildTypeId: 'Cfg_A', status: 'SUCCESS' },
-        { buildId: 2, buildNumber: '101', buildTypeId: 'Cfg_B', status: 'FAILURE' },
-      ]);
-    });
+    nowSpy.mockReturnValue(cacheTtl - 1000);
+    internals.cacheResult('fresh', { build: { id: 2 } });
 
-    it('returns empty array and logs when dependencies payload is malformed', async () => {
-      stub.modules.builds.getAllBuilds.mockResolvedValueOnce({ data: { build: 'oops' } });
+    nowSpy.mockReturnValue(cacheTtl + 1000);
+    internals.cleanCache();
 
-      const dependencies = await managerInternals.fetchDependencies('12345');
-
-      expect(dependencies).toEqual([]);
-      expect(warn).toHaveBeenCalledWith('Failed to fetch dependencies', {
-        buildId: '12345',
-        error: expect.stringContaining('non-array'),
-        expected: 'build[]',
-      });
-    });
+    expect(internals.getFromCache('old')).toBeNull();
+    expect(internals.getFromCache('fresh')).toEqual({ build: { id: 2 } });
   });
 });

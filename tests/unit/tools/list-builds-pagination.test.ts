@@ -60,6 +60,25 @@ describe('list_builds branch normalization', () => {
     expect(locatorArg).toContain('branch:(name:refs/heads/feature/test-123)');
   });
 
+  it('splits top-level locator segments while preserving nested commas', async () => {
+    await getRequiredTool('list_builds').handler({
+      locator: 'branch:(name:refs/heads/feature/test-123,default:false),status:SUCCESS',
+    });
+
+    const [locatorArg] = getAllBuildsMock.mock.calls[0] ?? [];
+    expect(locatorArg).toContain('branch:(name:refs/heads/feature/test-123,default:false)');
+    expect(locatorArg).toContain(',status:SUCCESS');
+  });
+
+  it('ignores empty locator segments when splitting', async () => {
+    await getRequiredTool('list_builds').handler({
+      locator: 'branch:default:any,,status:SUCCESS',
+    });
+
+    const [locatorArg] = getAllBuildsMock.mock.calls[0] ?? [];
+    expect(locatorArg?.startsWith('branch:default:any,status:SUCCESS')).toBe(true);
+  });
+
   it('adds branch filter when branch argument is provided', async () => {
     await getRequiredTool('list_builds').handler({ branch: 'refs/heads/main' });
 
@@ -75,6 +94,37 @@ describe('list_builds branch normalization', () => {
     expect(locatorArg).not.toContain('branch:(feature/*)');
   });
 
+  it('supports default branch selectors without wrapping', async () => {
+    await getRequiredTool('list_builds').handler({ branch: 'default:any' });
+
+    const [locatorArg] = getAllBuildsMock.mock.calls[0] ?? [];
+    expect(locatorArg).toContain('branch:default:any');
+    expect(locatorArg).not.toContain('branch:(default:any)');
+  });
+
+  it('preserves policy selectors coming from branch argument', async () => {
+    await getRequiredTool('list_builds').handler({ branch: 'policy:ALL_BRANCHES' });
+
+    const [locatorArg] = getAllBuildsMock.mock.calls[0] ?? [];
+    expect(locatorArg).toContain('branch:policy:ALL_BRANCHES');
+    expect(locatorArg).not.toContain('branch:(policy:ALL_BRANCHES)');
+  });
+
+  it('wraps branch arguments containing whitespace', async () => {
+    await getRequiredTool('list_builds').handler({ branch: 'feature branch' });
+
+    const [locatorArg] = getAllBuildsMock.mock.calls[0] ?? [];
+    expect(locatorArg).toContain('branch:(feature branch)');
+  });
+
+  it('respects already wrapped branch arguments', async () => {
+    await getRequiredTool('list_builds').handler({ branch: 'branch:(refs/heads/develop)' });
+
+    const [locatorArg] = getAllBuildsMock.mock.calls[0] ?? [];
+    expect(locatorArg).toContain('branch:(refs/heads/develop)');
+    expect(locatorArg?.match(/branch:\(\(refs\/heads\/develop\)\)/)).toBeNull();
+  });
+
   it('avoids duplicating branch filters when locator already includes one', async () => {
     await getRequiredTool('list_builds').handler({
       locator: 'branch:default:any',
@@ -84,5 +134,18 @@ describe('list_builds branch normalization', () => {
     const [locatorArg] = getAllBuildsMock.mock.calls[0] ?? [];
     expect(locatorArg).toContain('branch:default:any');
     expect(locatorArg).not.toContain('refs/heads/ignored');
+  });
+
+  it('appends project, build type, and status filters', async () => {
+    await getRequiredTool('list_builds').handler({
+      projectId: 'MyProject',
+      buildTypeId: 'MyBuildType',
+      status: 'SUCCESS',
+    });
+
+    const [locatorArg] = getAllBuildsMock.mock.calls[0] ?? [];
+    expect(locatorArg).toContain('project:(id:MyProject)');
+    expect(locatorArg).toContain('buildType:(id:MyBuildType)');
+    expect(locatorArg).toContain('status:SUCCESS');
   });
 });
