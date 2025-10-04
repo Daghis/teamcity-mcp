@@ -30,16 +30,16 @@ TeamCityAPI (generated client) ──> TeamCityClientAdapter ──> Managers �
 The adapter extends `TeamCityUnifiedClient` (defined in `src/teamcity/types/client.ts`). Key
 members are summarised below:
 
-| Member | Type | Purpose |
-| --- | --- | --- |
-| `modules` | `Readonly<TeamCityApiSurface>` | Direct access to generated API modules (e.g. `client.modules.builds`). |
-| `http` / `getAxios()` | `AxiosInstance` | Shared axios client with auth, interceptors, and retry policy. |
-| `request(fn)` | `(ctx) => Promise<T>` | Executes a callback with `{ axios, baseUrl, requestId }`. Use only when an API method does not expose the required operation. |
-| `getConfig()` | `TeamCityFullConfig` | Returns the effective configuration used to initialise the adapter. |
-| `getApiConfig()` | `TeamCityAPIClientConfig` | Normalised connection details (base URL, token, timeout). |
-| Convenience helpers | `listProjects`, `getBuild`, `triggerBuild`, etc. | Backwards-compatible wrappers preserved for legacy managers and tooling. |
-| Legacy compatibility | `builds`, `listBuildArtifacts`, `downloadArtifactContent`, etc. | Thin adapters over historical helper methods; prefer `modules` when building new features. |
-| `baseUrl` | `string` | Canonical TeamCity server URL resolved during initialisation. |
+| Member                | Type                                                            | Purpose                                                                                                                       |
+| --------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `modules`             | `Readonly<TeamCityApiSurface>`                                  | Direct access to generated API modules (e.g. `client.modules.builds`).                                                        |
+| `http` / `getAxios()` | `AxiosInstance`                                                 | Shared axios client with auth, interceptors, and retry policy.                                                                |
+| `request(fn)`         | `(ctx) => Promise<T>`                                           | Executes a callback with `{ axios, baseUrl, requestId }`. Use only when an API method does not expose the required operation. |
+| `getConfig()`         | `TeamCityFullConfig`                                            | Returns the effective configuration used to initialise the adapter.                                                           |
+| `getApiConfig()`      | `TeamCityAPIClientConfig`                                       | Normalised connection details (base URL, token, timeout).                                                                     |
+| Convenience helpers   | `listProjects`, `getBuild`, `triggerBuild`, etc.                | Backwards-compatible wrappers preserved for legacy managers and tooling.                                                      |
+| Legacy compatibility  | `builds`, `listBuildArtifacts`, `downloadArtifactContent`, etc. | Thin adapters over historical helper methods; prefer `modules` when building new features.                                    |
+| `baseUrl`             | `string`                                                        | Canonical TeamCity server URL resolved during initialisation.                                                                 |
 
 The adapter is created by `initializeTeamCity` / `createTeamCityClient` in `src/teamcity/index.ts`.
 Both functions validate configuration, instantiate the singleton, and wrap it with
@@ -84,7 +84,8 @@ When adding or updating a manager:
 1. Accept a `TeamCityClientAdapter` in the constructor and store it as `private readonly client`.
 2. Use `client.modules` to invoke REST endpoints and keep locator strings or field selectors in
    private helpers for reuse.
-3. Avoid `as unknown as ...` casts. When the OpenAPI typings are too generic, add dedicated
+3. Avoid double type assertions (for example, casting through `unknown`).
+   When the OpenAPI typings are too generic, add dedicated
    interfaces or runtime validation before transforming data.
 4. Prefer returning rich domain objects (e.g. normalized build summaries) instead of raw REST
    payloads.
@@ -109,9 +110,11 @@ The `tests/test-utils/mock-teamcity-client.ts` helper provides a typed
 - Override only the modules or helpers you need for a test:
   ```ts
   const mockClient = createMockTeamCityClient();
-  mockClient.mockModules.builds.getAllBuilds.mockResolvedValue(createMockAxiosResponse({
-    build: [],
-  }));
+  mockClient.mockModules.builds.getAllBuilds.mockResolvedValue(
+    createMockAxiosResponse({
+      build: [],
+    })
+  );
   ```
 - The mock exposes both the `modules` object and legacy helpers (`mockClient.builds`).
 - Use `mockClient.resetAllMocks()` between tests to avoid cross-test pollution.

@@ -13,7 +13,7 @@ import { isAxiosError } from 'axios';
 import { z } from 'zod';
 
 import { getMCPMode as getMCPModeFromConfig } from '@/config';
-import { type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
+import { type Build, type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import type { Step } from '@/teamcity-client/models/step';
 import { AgentRequirementsManager } from '@/teamcity/agent-requirements-manager';
 import { type ArtifactContent, ArtifactManager } from '@/teamcity/artifact-manager';
@@ -783,10 +783,8 @@ const DEV_TOOLS: ToolDefinition[] = [
           const propertiesPayload =
             propertyEntries.length > 0 ? { property: propertyEntries } : undefined;
 
-          const buildRequest: {
+          const buildRequest: Partial<Build> & {
             buildType: { id: string };
-            branchName?: string;
-            comment?: { text: string };
             properties?: { property: Array<{ name: string; value: string }> };
           } = {
             buildType: { id: typed.buildTypeId },
@@ -831,13 +829,10 @@ const DEV_TOOLS: ToolDefinition[] = [
             const xml = `<?xml version="1.0" encoding="UTF-8"?><build><buildType id="${escapeXml(
               typed.buildTypeId
             )}"/>${branchPart}${commentPart}${propertiesPart}</build>`;
-            const response = await adapter.modules.buildQueue.addBuildToQueue(
-              false,
-              xml as unknown as never,
-              {
-                headers: { 'Content-Type': 'application/xml', Accept: 'application/json' },
-              }
-            );
+            const response = await adapter.http.post('/app/rest/buildQueue', xml, {
+              headers: { 'Content-Type': 'application/xml', Accept: 'application/json' },
+              params: { moveToTop: false },
+            });
             const build = response.data as {
               id?: number | string;
               state?: string;
@@ -858,7 +853,7 @@ const DEV_TOOLS: ToolDefinition[] = [
           try {
             const response = await adapter.modules.buildQueue.addBuildToQueue(
               false,
-              buildRequest as unknown as never,
+              buildRequest as Build,
               {
                 headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
               }
