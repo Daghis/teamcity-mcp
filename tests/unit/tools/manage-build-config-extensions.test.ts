@@ -116,6 +116,35 @@ describe('build configuration extended management tools', () => {
 
           res = await getRequiredTool('manage_build_dependencies').handler({
             buildTypeId: 'Config_A',
+            dependencyType: 'snapshot',
+            action: 'add',
+            dependsOn: 'Base_Config',
+          });
+          payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'manage_build_dependencies',
+            operation: 'add',
+            dependencyType: 'snapshot',
+            dependencyId: 'snapshotDep-2',
+          });
+          expect(addSnapshotDependencyToBuildType).toHaveBeenCalledWith(
+            'Config_A',
+            undefined,
+            expect.objectContaining({
+              'source-buildType': { id: 'Base_Config' },
+              type: 'snapshotDependency',
+            }),
+            expect.objectContaining({
+              headers: expect.objectContaining({
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              }),
+            })
+          );
+
+          res = await getRequiredTool('manage_build_dependencies').handler({
+            buildTypeId: 'Config_A',
             dependencyType: 'artifact',
             action: 'update',
             dependencyId: 'artifactDep-1',
