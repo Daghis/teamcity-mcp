@@ -55,6 +55,18 @@ export interface TeamCityAPIClientConfig {
   timeout?: number;
 }
 
+const extractRetryAfterMilliseconds = (value: unknown): number | undefined => {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { retryAfter?: unknown }).retryAfter === 'number'
+  ) {
+    return (value as { retryAfter: number }).retryAfter * 1000;
+  }
+
+  return undefined;
+};
+
 interface NormalizedClientConfig {
   baseUrl: string;
   token: string;
@@ -135,10 +147,7 @@ export class TeamCityAPI {
         const reqId = (error?.config as { requestId?: string } | undefined)?.requestId;
         const tcError = TeamCityAPIError.fromAxiosError(error, reqId);
         // Prefer Retry-After when present (seconds), else exponential backoff
-        const retryAfter =
-          typeof (tcError as unknown as { retryAfter?: number }).retryAfter === 'number'
-            ? ((tcError as unknown as { retryAfter?: number }).retryAfter as number) * 1000
-            : undefined;
+        const retryAfter = extractRetryAfterMilliseconds(tcError);
         return retryAfter ?? Math.min(1000 * Math.pow(2, Math.max(0, retryCount - 1)), 8000);
       },
       retryCondition: (error) => {
