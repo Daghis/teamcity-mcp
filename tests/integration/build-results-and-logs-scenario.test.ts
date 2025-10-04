@@ -194,6 +194,7 @@ serialDescribe('Build results and logs: full writes + dev reads', () => {
       attempts += 1;
 
       lastFailure = candidate;
+      // eslint-disable-next-line no-await-in-loop
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 

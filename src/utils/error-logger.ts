@@ -29,9 +29,7 @@ export class ErrorLogger {
   private static instance: ErrorLogger;
 
   public static getInstance(): ErrorLogger {
-    if (ErrorLogger.instance == null) {
-      ErrorLogger.instance = new ErrorLogger();
-    }
+    ErrorLogger.instance ??= new ErrorLogger();
     return ErrorLogger.instance;
   }
 

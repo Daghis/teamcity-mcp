@@ -119,9 +119,7 @@ export function loadConfig(): ApplicationConfig {
 let cachedConfig: ApplicationConfig | null = null;
 
 export function getConfig(): ApplicationConfig {
-  if (!cachedConfig) {
-    cachedConfig = loadConfig();
-  }
+  cachedConfig ??= loadConfig();
   return cachedConfig;
 }
 
