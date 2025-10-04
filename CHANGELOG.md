@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.4](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.3...teamcity-mcp-v1.10.4) (2025-10-04)
+
+
+### Bug Fixes
+
+* **tools:** normalize branch locators for list_builds ([#228](https://github.com/Daghis/teamcity-mcp/issues/228)) ([16fe7f0](https://github.com/Daghis/teamcity-mcp/commit/16fe7f0e2b46d04e66253ddb3cd9a06c5febf0b6))
+
 ## [1.10.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.2...teamcity-mcp-v1.10.3) (2025-09-27)
 
 
