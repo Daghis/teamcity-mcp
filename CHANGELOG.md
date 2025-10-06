@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.7](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.6...teamcity-mcp-v1.10.7) (2025-10-06)
+
+
+### Bug Fixes
+
+* **teamcity:** serialize snapshot dependencies as xml ([#235](https://github.com/Daghis/teamcity-mcp/issues/235)) ([#236](https://github.com/Daghis/teamcity-mcp/issues/236)) ([9cec149](https://github.com/Daghis/teamcity-mcp/commit/9cec14934783f135b408211fefa41ba6a38391c8))
+
 ## [1.10.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.5...teamcity-mcp-v1.10.6) (2025-10-04)
 
 
