@@ -26,6 +26,13 @@ const JSON_HEADERS: RawAxiosRequestConfig = {
   },
 };
 
+const XML_HEADERS: RawAxiosRequestConfig = {
+  headers: {
+    'Content-Type': 'application/xml',
+    Accept: 'application/json',
+  },
+};
+
 const JSON_GET_HEADERS: RawAxiosRequestConfig = {
   headers: {
     Accept: 'application/json',
@@ -96,6 +103,127 @@ const mergeRecords = (base: StringMap, override: StringMap): StringMap => {
   }
   return merged;
 };
+
+const escapeXml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+const attributesToString = (attributes: Record<string, string | undefined>): string => {
+  const parts = Object.entries(attributes)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => `${key}="${escapeXml(value as string)}"`);
+  return parts.length > 0 ? ` ${parts.join(' ')}` : '';
+};
+
+const propertiesToXml = (properties?: Properties | undefined): string | undefined => {
+  if (!properties) {
+    return undefined;
+  }
+  const entries = properties.property;
+  const list = Array.isArray(entries) ? entries : entries != null ? [entries] : [];
+
+  if (list.length === 0) {
+    return undefined;
+  }
+
+  const nodes = list
+    .filter((item) => item?.name)
+    .map((item) => {
+      const name = item?.name ?? '';
+      const value = item?.value != null ? String(item.value) : '';
+      return `<property name="${escapeXml(name)}" value="${escapeXml(value)}"/>`;
+    });
+
+  if (nodes.length === 0) {
+    return undefined;
+  }
+
+  return `<properties>${nodes.join('')}</properties>`;
+};
+
+const sourceBuildTypeToXml = (
+  source?: SnapshotDependency['source-buildType'] | ArtifactDependency['source-buildType']
+): string | undefined => {
+  if (!source || typeof source !== 'object') {
+    return undefined;
+  }
+
+  const { id, name } = source as { id?: string; name?: string };
+  if (!id) {
+    return undefined;
+  }
+
+  const attributes: Record<string, string | undefined> = {
+    id,
+    name,
+  };
+
+  return `<source-buildType${attributesToString(attributes)}/>`;
+};
+
+const dependencyToXml = (
+  dependencyType: DependencyType,
+  payload: ArtifactDependency | SnapshotDependency
+): string => {
+  const root = dependencyType === 'artifact' ? 'artifact-dependency' : 'snapshot-dependency';
+  const normalizeTypeAttribute = (value?: string): string | undefined => {
+    if (!value) {
+      return undefined;
+    }
+    if (dependencyType === 'snapshot' && value === 'snapshotDependency') {
+      return 'snapshot_dependency';
+    }
+    if (dependencyType === 'artifact' && value === 'artifactDependency') {
+      return 'artifact_dependency';
+    }
+    return value;
+  };
+  const attributes: Record<string, string | undefined> = {
+    id: typeof payload.id === 'string' && payload.id.trim() !== '' ? payload.id : undefined,
+    name: typeof payload.name === 'string' && payload.name.trim() !== '' ? payload.name : undefined,
+    type:
+      typeof payload.type === 'string' && payload.type.trim() !== ''
+        ? normalizeTypeAttribute(payload.type)
+        : undefined,
+    disabled:
+      typeof payload.disabled === 'boolean' ? (payload.disabled ? 'true' : 'false') : undefined,
+    inherited:
+      typeof payload.inherited === 'boolean' ? (payload.inherited ? 'true' : 'false') : undefined,
+  };
+
+  const fragments: string[] = [];
+  const sourceBuildTypeXml = sourceBuildTypeToXml(
+    payload['source-buildType'] as SnapshotDependency['source-buildType']
+  );
+  if (sourceBuildTypeXml) {
+    fragments.push(sourceBuildTypeXml);
+  }
+
+  const propertiesXml = propertiesToXml(payload.properties);
+  if (propertiesXml) {
+    fragments.push(propertiesXml);
+  }
+
+  return `<${root}${attributesToString(attributes)}>${fragments.join('')}</${root}>`;
+};
+
+const prepareArtifactRequest = (
+  payload: ArtifactDependency
+): { body: ArtifactDependency; headers: RawAxiosRequestConfig } => ({
+  body: payload,
+  headers: JSON_HEADERS,
+});
+
+const prepareSnapshotRequest = (
+  payload: SnapshotDependency
+): { body: string; headers: RawAxiosRequestConfig } => ({
+  body: dependencyToXml('snapshot', payload),
+  headers: XML_HEADERS,
+});
 
 export class BuildDependencyManager {
   constructor(private readonly client: TeamCityClientAdapter) {}
@@ -171,19 +299,22 @@ export class BuildDependencyManager {
     payload: ArtifactDependency | SnapshotDependency
   ): Promise<AxiosResponse<DependencyResource>> {
     if (dependencyType === 'artifact') {
+      const { body, headers } = prepareArtifactRequest(payload as ArtifactDependency);
       return this.client.modules.buildTypes.addArtifactDependencyToBuildType(
         buildTypeId,
         undefined,
-        payload,
-        JSON_HEADERS
+        body,
+        headers
       );
     }
 
+    const { body, headers } = prepareSnapshotRequest(payload as SnapshotDependency);
+    // Generated client expects a SnapshotDependency body, but the endpoint requires XML.
     return this.client.modules.buildTypes.addSnapshotDependencyToBuildType(
       buildTypeId,
       undefined,
-      payload,
-      JSON_HEADERS
+      body as unknown as SnapshotDependency,
+      headers
     );
   }
 
@@ -194,21 +325,24 @@ export class BuildDependencyManager {
     payload: ArtifactDependency | SnapshotDependency
   ): Promise<AxiosResponse<DependencyResource>> {
     if (dependencyType === 'artifact') {
+      const { body, headers } = prepareArtifactRequest(payload as ArtifactDependency);
       return this.client.modules.buildTypes.replaceArtifactDependency(
         buildTypeId,
         dependencyId,
         undefined,
-        payload,
-        JSON_HEADERS
+        body,
+        headers
       );
     }
 
+    const { body, headers } = prepareSnapshotRequest(payload as SnapshotDependency);
+    // Generated client expects a SnapshotDependency body, but the endpoint requires XML.
     return this.client.modules.buildTypes.replaceSnapshotDependency(
       buildTypeId,
       dependencyId,
       undefined,
-      payload,
-      JSON_HEADERS
+      body as unknown as SnapshotDependency,
+      headers
     );
   }
 

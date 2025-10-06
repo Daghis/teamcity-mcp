@@ -131,16 +131,16 @@ describe('build configuration extended management tools', () => {
           expect(addSnapshotDependencyToBuildType).toHaveBeenCalledWith(
             'Config_A',
             undefined,
-            expect.objectContaining({
-              'source-buildType': { id: 'Base_Config' },
-              type: 'snapshotDependency',
-            }),
+            expect.stringMatching(/^<snapshot-dependency\b[\s\S]*<\/snapshot-dependency>$/),
             expect.objectContaining({
               headers: expect.objectContaining({
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/xml',
                 Accept: 'application/json',
               }),
             })
+          );
+          expect(addSnapshotDependencyToBuildType.mock.calls[0]?.[2]).toContain(
+            '<source-buildType id="Base_Config"/>'
           );
 
           res = await getRequiredTool('manage_build_dependencies').handler({
@@ -219,20 +219,19 @@ describe('build configuration extended management tools', () => {
             'Config_A',
             'snapshotDep-2',
             undefined,
-            expect.objectContaining({
-              'source-buildType': { id: 'New_Base_Config' },
-              properties: {
-                property: expect.arrayContaining([
-                  { name: 'run-build-if-dependency-failed', value: 'true' },
-                ]),
-              },
-            }),
+            expect.stringMatching(/^<snapshot-dependency\b[\s\S]*<\/snapshot-dependency>$/),
             expect.objectContaining({
               headers: expect.objectContaining({
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/xml',
                 Accept: 'application/json',
               }),
             })
+          );
+          expect(replaceSnapshotDependency.mock.calls[0]?.[3]).toContain(
+            '<source-buildType id="New_Base_Config"/>'
+          );
+          expect(replaceSnapshotDependency.mock.calls[0]?.[3]).toContain(
+            '<properties><property name="run-build-if-dependency-failed" value="true"/></properties>'
           );
 
           res = await getRequiredTool('manage_build_dependencies').handler({
