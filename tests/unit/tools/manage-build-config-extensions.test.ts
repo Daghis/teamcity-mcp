@@ -52,6 +52,9 @@ describe('build configuration extended management tools', () => {
               properties: {
                 property: [{ name: 'run-build-if-dependency-failed', value: 'false' }],
               },
+              options: {
+                option: [{ name: 'run-build-on-the-same-agent', value: 'false' }],
+              },
               'source-buildType': { id: 'Base_Config' },
             },
           }));
@@ -197,6 +200,7 @@ describe('build configuration extended management tools', () => {
             dependsOn: 'New_Base_Config',
             properties: {
               'run-build-if-dependency-failed': 'true',
+              'run-build-on-the-same-agent': true,
             },
           });
           payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
@@ -230,8 +234,12 @@ describe('build configuration extended management tools', () => {
           expect(replaceSnapshotDependency.mock.calls[0]?.[3]).toContain(
             '<source-buildType id="New_Base_Config"/>'
           );
-          expect(replaceSnapshotDependency.mock.calls[0]?.[3]).toContain(
+          const updateSnapshotXml = replaceSnapshotDependency.mock.calls[0]?.[3] as string;
+          expect(updateSnapshotXml).toContain(
             '<properties><property name="run-build-if-dependency-failed" value="true"/></properties>'
+          );
+          expect(updateSnapshotXml).toContain(
+            '<options><option name="run-build-on-the-same-agent" value="true"/></options>'
           );
 
           res = await getRequiredTool('manage_build_dependencies').handler({
