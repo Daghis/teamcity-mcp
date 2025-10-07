@@ -3872,6 +3872,10 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           type: 'object',
           description: 'Dependency properties (e.g. cleanDestinationDirectory, pathRules)',
         },
+        options: {
+          type: 'object',
+          description: 'Snapshot dependency options (e.g. run-build-on-the-same-agent)',
+        },
         type: {
           type: 'string',
           description: 'Override dependency type value sent to TeamCity',
@@ -3890,6 +3894,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           dependencyId: z.string().min(1).optional(),
           dependsOn: z.string().min(1).optional(),
           properties: z.record(z.string(), propertyValue).optional(),
+          options: z.record(z.string(), propertyValue).optional(),
           type: z.string().min(1).optional(),
           disabled: z.boolean().optional(),
         })
@@ -3925,6 +3930,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
                 dependencyType: typed.dependencyType,
                 dependsOn: typed.dependsOn,
                 properties: typed.properties,
+                options: typed.options,
                 type: typed.type,
                 disabled: typed.disabled,
               });
@@ -3943,6 +3949,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
                 dependencyType: typed.dependencyType,
                 dependsOn: typed.dependsOn,
                 properties: typed.properties,
+                options: typed.options,
                 type: typed.type,
                 disabled: typed.disabled,
               });
