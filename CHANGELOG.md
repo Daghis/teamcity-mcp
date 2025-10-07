@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.8](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.7...teamcity-mcp-v1.10.8) (2025-10-07)
+
+
+### Bug Fixes
+
+* **teamcity:** send snapshot options separately (238) ([fc9b313](https://github.com/Daghis/teamcity-mcp/commit/fc9b31379feccded78db5a35e1dc6f5ad13dccbd))
+* **teamcity:** send snapshot options separately (238) ([6af8ea6](https://github.com/Daghis/teamcity-mcp/commit/6af8ea63dcc7dfae915a55287f3e1bc31e0a5c03))
+
 ## [1.10.7](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.6...teamcity-mcp-v1.10.7) (2025-10-06)
 
 
