@@ -79,12 +79,27 @@ npx -y @daghis/teamcity-mcp
 npx -y @daghis/teamcity-mcp
 ```
 
+### Docker image
+
+```bash
+# Clone the repository
+git clone https://github.com/Daghis/teamcity-mcp.git
+cd teamcity-mcp
+
+#Build image
+docker build -t teamcity-mcp .
+```
+
 ## Claude Code
 
 - Add the MCP:
   - `claude mcp add [-s user] teamcity -- npx -y @daghis/teamcity-mcp`
 - With env vars (if not using .env):
   - `claude mcp add [-s user] teamcity -- env TEAMCITY_URL="https://teamcity.example.com" TEAMCITY_TOKEN="tc_<your_token>" MCP_MODE=dev npx -y @daghis/teamcity-mcp`
+- Using docker image
+  - `claude mcp add [-s user] teamcity -- docker run --rm -i --env-file <env_file_path> teamcity-mcp`
+- Docker image with env vars (if not using .env)
+  - `claude mcp add [-s user] teamcity -- docker run --rm -i -e TEAMCITY_URL="https://teamcity.example.com" -e TEAMCITY_TOKEN="tc_<your_token>" -e MCP_MODE=dev teamcity-mcp`
 - Context usage (Opus 4.1, estimates):
   - Dev (default): ~14k tokens for MCP tools
   - Full (`MCP_MODE=full`): ~26k tokens for MCP tools
