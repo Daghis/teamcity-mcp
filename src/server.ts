@@ -12,6 +12,7 @@ import {
 
 import { info, debug as logDebug, error as logError } from '@/utils/logger';
 
+import packageJson from '../package.json';
 import { getConfig } from './config';
 import { getAvailableTools, getMCPMode, getTool } from './tools';
 
@@ -32,7 +33,7 @@ export function createSimpleServer(): Server {
   const server = new Server(
     {
       name: 'teamcity-mcp',
-      version: '0.1.0',
+      version: packageJson.version,
     },
     {
       capabilities: {

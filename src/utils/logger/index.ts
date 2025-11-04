@@ -154,10 +154,12 @@ export class TeamCityLogger implements ILogger {
     const transports: winston.transport[] = [];
 
     // Console transport
+    // For MCP stdio transport compliance, ALL console output must go to stderr
     if (enableConsole) {
       transports.push(
         new winston.transports.Console({
           format: isProduction ? prodFormat : devFormat,
+          stderrLevels: ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'],
         })
       );
     }
@@ -439,3 +441,6 @@ export const logger = {
 // Backward compatibility exports
 export const createTeamCityLogger = createLogger;
 export const getTeamCityLogger = getLogger;
+
+// Export individual convenience functions for direct import
+export const { debug, info, warn, error, child } = logger;
