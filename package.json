@@ -60,35 +60,35 @@
     "url": "https://github.com/Daghis/teamcity-mcp.git"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.18.0",
+    "@modelcontextprotocol/sdk": "^1.21.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "axios": "^1.12.1",
+    "axios": "^1.13.2",
     "dotenv": "16.6.1",
     "express": "^5.1.0",
-    "inversify": "^7.9.1",
+    "inversify": "^7.10.4",
     "morgan": "^1.10.0",
     "reflect-metadata": "^0.2.2",
     "tslib": "^2.8.1",
     "winston": "^3.11.0",
-    "zod": "^4.1.11"
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@codecov/bundler-plugin-core": "^1.9.1",
-    "@eslint/compat": "^1.4.0",
+    "@eslint/compat": "^1.4.1",
     "@esbuild-plugins/tsconfig-paths": "^0.1.2",
     "@trivago/prettier-plugin-sort-imports": "^5.2.2",
     "@types/ajv": "^1.0.4",
-    "@types/express": "^5.0.3",
+    "@types/express": "^5.0.5",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/morgan": "^1.9.9",
-    "@types/node": "^24.3.1",
-    "@typescript-eslint/eslint-plugin": "^8.44.1",
-    "@typescript-eslint/parser": "^8.44.1",
+    "@types/node": "^24.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
     "axios-retry": "^4.5.0",
-    "esbuild": "^0.25.9",
-    "eslint": "^9.36.0",
+    "esbuild": "^0.25.12",
+    "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
@@ -97,13 +97,13 @@
     "jest-junit": "^16.0.0",
     "js-yaml": "^4.1.0",
     "prettier": "^3.1.0",
-    "ts-jest": "^29.4.1",
+    "ts-jest": "^29.4.5",
     "tsc-alias": "^1.8.8",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.6.0",
     "typescript": "^5.3.2"
   },
   "overrides": {
-    "axios": "^1.12.1"
+    "axios": "^1.13.2"
   }
 }
