@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.9...teamcity-mcp-v1.11.0) (2025-11-04)
+
+
+### Features
+
+* **server:** enable MCP client compatibility via stdio transport compliance ([#253](https://github.com/Daghis/teamcity-mcp/issues/253)) ([b51ecbe](https://github.com/Daghis/teamcity-mcp/commit/b51ecbe2751db632c332d22263c1f2f6f1cea5bc))
+
 ## [1.10.9](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.8...teamcity-mcp-v1.10.9) (2025-11-04)
 
 
