@@ -35,7 +35,9 @@ describe('MCP stdio transport compliance', () => {
 
       let stdoutData = '';
       let stderrData = '';
-      let initResponse: unknown = null;
+      let initResponse: {
+        result?: { serverInfo?: { name: string; version: string }; protocolVersion?: string };
+      } | null = null;
 
       const stdoutPromise = new Promise<void>((resolve, reject) => {
         server.stdout.on('data', (data) => {

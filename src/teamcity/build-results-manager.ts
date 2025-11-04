@@ -938,7 +938,7 @@ export class BuildResultsManager {
 
   private isAxiosNotFound(error: unknown): error is AxiosError {
     const axiosError = error as AxiosError | undefined;
-    return Boolean(axiosError?.response && axiosError.response.status === 404);
+    return Boolean(axiosError?.response?.status === 404);
   }
 
   /**
