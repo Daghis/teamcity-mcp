@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.9](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.8...teamcity-mcp-v1.10.9) (2025-11-04)
+
+
+### Bug Fixes
+
+* **server:** keep stdio transport alive ([#247](https://github.com/Daghis/teamcity-mcp/issues/247)) ([c325cf4](https://github.com/Daghis/teamcity-mcp/commit/c325cf4d436489a91cabf0bb8e0d84087c97a1e4))
+* **server:** keep stdio transport alive (247) ([3b77eea](https://github.com/Daghis/teamcity-mcp/commit/3b77eea2fc771964c78a3b011f67ffb8afdd02e9))
+
 ## [1.10.8](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.7...teamcity-mcp-v1.10.8) (2025-10-07)
 
 
