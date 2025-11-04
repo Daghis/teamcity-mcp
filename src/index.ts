@@ -12,7 +12,8 @@ import { startServerLifecycle } from '@/server-runner';
 import { createSimpleServer } from './server';
 
 // Load environment variables
-dotenv.config();
+// Silent mode to avoid polluting stdout (required for MCP stdio transport)
+dotenv.config({ quiet: true });
 
 let activeServer: Server | null = null;
 let lifecyclePromise: Promise<void> | null = null;
