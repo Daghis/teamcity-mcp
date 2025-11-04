@@ -36,6 +36,13 @@ async function main() {
 
     await server.connect(transport);
     process.stderr.write('TeamCity MCP Server is running and ready to accept connections\n');
+
+    // Keep the server running until explicitly terminated
+    // The server will handle requests over stdio and only exit on SIGINT/SIGTERM
+    await new Promise(() => {
+      // This promise never resolves, keeping the process alive
+      // The process will only exit via the signal handlers above
+    });
   } catch (error) {
     process.stderr.write(`Failed to start server: ${error}\n`);
     process.exit(1);
