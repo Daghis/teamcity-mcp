@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.0...teamcity-mcp-v1.11.1) (2025-11-04)
+
+
+### Bug Fixes
+
+* **deps:** downgrade dotenv to 16.6.1 to fix MCP stdio transport ([#255](https://github.com/Daghis/teamcity-mcp/issues/255)) ([ec85772](https://github.com/Daghis/teamcity-mcp/commit/ec857727bc90ffff513d51cb33dbb31a0fb8158e))
+
 ## [1.11.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.10.9...teamcity-mcp-v1.11.0) (2025-11-04)
 
 
