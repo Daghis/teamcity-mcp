@@ -7,6 +7,10 @@
 
 A Model Control Protocol (MCP) server that bridges AI coding assistants with JetBrains TeamCity CI/CD server, exposing TeamCity operations as MCP tools.
 
+<a href="https://glama.ai/mcp/servers/@Daghis/teamcity-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@Daghis/teamcity-mcp/badge" alt="TeamCity Server MCP server" />
+</a>
+
 ## Overview
 
 The TeamCity MCP Server allows developers using AI-powered coding assistants (Claude Code, Cursor, Windsurf) to interact with TeamCity directly from their development environment via MCP tools.
