@@ -77,7 +77,7 @@
     "@codecov/bundler-plugin-core": "^1.9.1",
     "@eslint/compat": "^1.4.1",
     "@esbuild-plugins/tsconfig-paths": "^0.1.2",
-    "@trivago/prettier-plugin-sort-imports": "^5.2.2",
+    "@trivago/prettier-plugin-sort-imports": "^6.0.0",
     "@types/ajv": "^1.0.4",
     "@types/express": "^5.0.5",
     "@types/jest": "^30.0.0",
