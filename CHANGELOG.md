@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.20...teamcity-mcp-v1.12.0) (2025-12-06)
+
+
+### Features
+
+* add type safety standards and test utilities for [#158](https://github.com/Daghis/teamcity-mcp/issues/158) ([#314](https://github.com/Daghis/teamcity-mcp/issues/314)) ([1f89a25](https://github.com/Daghis/teamcity-mcp/commit/1f89a25a63fca111f04e96763b4d17888f91bc2a))
+
 ## [1.11.20](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.19...teamcity-mcp-v1.11.20) (2025-12-06)
 
 
