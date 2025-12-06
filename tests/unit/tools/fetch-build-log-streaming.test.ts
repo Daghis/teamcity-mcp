@@ -114,7 +114,7 @@ describe('tools: fetch_build_log streaming', () => {
       | ((args: unknown) => Promise<{ content?: Array<{ text?: string }>; success?: boolean }>)
       | undefined;
     jest.isolateModules(() => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { getRequiredTool } = require('@/tools');
       handler = getRequiredTool('fetch_build_log').handler;
     });
@@ -145,7 +145,7 @@ describe('tools: fetch_build_log streaming', () => {
       | ((args: unknown) => Promise<{ content?: Array<{ text?: string }>; success?: boolean }>)
       | undefined;
     jest.isolateModules(() => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { getRequiredTool } = require('@/tools');
       handler = getRequiredTool('fetch_build_log').handler;
     });

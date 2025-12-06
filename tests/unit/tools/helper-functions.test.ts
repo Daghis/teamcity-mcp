@@ -11,7 +11,7 @@
  */
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, basename } from 'node:path';
+import { basename, join } from 'node:path';
 import { Readable } from 'node:stream';
 
 // Mock config to keep tools in dev mode without reading env
@@ -61,11 +61,12 @@ type ToolHandler = (args: unknown) => Promise<{
   isError?: boolean;
 }>;
 
-interface ToolResponse {
-  content?: Array<{ text?: string }>;
-  success?: boolean;
-  isError?: boolean;
-}
+// Reserved for future test typing needs
+// interface ToolResponse {
+//   content?: Array<{ text?: string }>;
+//   success?: boolean;
+//   isError?: boolean;
+// }
 
 describe('tools: helper function branch coverage', () => {
   afterEach(async () => {
@@ -100,7 +101,7 @@ describe('tools: helper function branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -150,7 +151,7 @@ describe('tools: helper function branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -204,7 +205,7 @@ describe('tools: helper function branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -254,7 +255,7 @@ describe('tools: helper function branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifact').handler;
       });
@@ -311,7 +312,7 @@ describe('tools: helper function branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -369,7 +370,7 @@ describe('tools: helper function branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifact').handler;
       });
@@ -388,9 +389,10 @@ describe('tools: helper function branch coverage', () => {
       const responseText = response.content?.[0]?.text ?? '{}';
       const parsed = JSON.parse(responseText);
       // Error format from globalErrorHandler wraps the message
-      const errorMessage = typeof parsed.error === 'string'
-        ? parsed.error
-        : parsed.message ?? JSON.stringify(parsed);
+      const errorMessage =
+        typeof parsed.error === 'string'
+          ? parsed.error
+          : (parsed.message ?? JSON.stringify(parsed));
       expect(errorMessage).toContain('Streaming download did not return a readable stream');
     });
 
@@ -414,7 +416,7 @@ describe('tools: helper function branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifact').handler;
       });
@@ -433,9 +435,10 @@ describe('tools: helper function branch coverage', () => {
       const responseText = response.content?.[0]?.text ?? '{}';
       const parsed = JSON.parse(responseText);
       // Error format from globalErrorHandler wraps the message
-      const errorMessage = typeof parsed.error === 'string'
-        ? parsed.error
-        : parsed.message ?? JSON.stringify(parsed);
+      const errorMessage =
+        typeof parsed.error === 'string'
+          ? parsed.error
+          : (parsed.message ?? JSON.stringify(parsed));
       expect(errorMessage).toContain('Expected text artifact content as string');
     });
   });
@@ -455,7 +458,7 @@ describe('tools: helper function branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -473,9 +476,9 @@ describe('tools: helper function branch coverage', () => {
 
       // Should fail validation - Zod will catch this before toNormalizedArtifactRequests
       const responseText = response.content?.[0]?.text ?? '{}';
-      const parsed = JSON.parse(responseText);
+      const parsed = JSON.parse(responseText) as { error?: unknown; issues?: unknown };
       // The error could be from Zod validation or from toNormalizedArtifactRequests
-      expect(parsed.error || parsed.issues).toBeDefined();
+      expect(parsed.error !== undefined || parsed.issues !== undefined).toBe(true);
     });
   });
 });

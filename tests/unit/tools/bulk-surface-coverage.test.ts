@@ -143,7 +143,7 @@ describe('tools: bulk surface coverage for list & queue ops', () => {
             },
           }));
 
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getTool } = require('@/tools');
           const res = await getTool('set_build_configs_paused').handler({
             buildTypeIds: ['bt1', 'bt2'],

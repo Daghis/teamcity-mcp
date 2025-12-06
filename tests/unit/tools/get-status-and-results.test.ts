@@ -38,6 +38,7 @@ describe('tools: enhanced status and results', () => {
         }),
       },
     }));
+
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { getRequiredTool } = require('@/tools');
     const res = await getRequiredTool('get_build_status').handler({
@@ -120,7 +121,7 @@ describe('tools: enhanced status and results', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { getRequiredTool } = require('@/tools');
     const res = await getRequiredTool('get_build_status').handler({
       buildNumber: '123',
@@ -272,7 +273,7 @@ describe('tools: enhanced status and results', () => {
       })),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { getRequiredTool } = require('@/tools');
     const res = await getRequiredTool('get_build_results').handler({
       buildTypeId: 'SomeBuildType',
@@ -292,7 +293,7 @@ describe('tools: enhanced status and results', () => {
       })),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { getRequiredTool } = require('@/tools');
     const res = await getRequiredTool('get_build_results').handler({
       buildNumber: '123',
@@ -312,7 +313,7 @@ describe('tools: enhanced status and results', () => {
       })),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { getRequiredTool } = require('@/tools');
     const res = await getRequiredTool('get_build_results').handler({
       includeArtifacts: true,

@@ -85,7 +85,7 @@ describe('fetch_build_log buildNumber resolution - no build found scenarios', ()
     }));
 
     jest.isolateModules(() => {
-       
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { getRequiredTool } = require('@/tools');
       return getRequiredTool('fetch_build_log')
         .handler({
@@ -115,7 +115,12 @@ describe('fetch_build_log buildNumber resolution - no build found scenarios', ()
             }
             // Fallback search also returns builds but none match
             if (locator?.includes('branch:default:any,count:100')) {
-              return { build: [{ id: 5001, number: '100' }, { id: 5002, number: '200' }] };
+              return {
+                build: [
+                  { id: 5001, number: '100' },
+                  { id: 5002, number: '200' },
+                ],
+              };
             }
             return { build: [] };
           }),
@@ -125,7 +130,7 @@ describe('fetch_build_log buildNumber resolution - no build found scenarios', ()
     }));
 
     jest.isolateModules(() => {
-       
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { getRequiredTool } = require('@/tools');
       return getRequiredTool('fetch_build_log')
         .handler({

@@ -4,7 +4,7 @@
  * Focus on getErrorMessage() branch coverage through the download_build_artifacts tool
  * which captures individual artifact download errors.
  */
-import { AxiosError, type InternalAxiosRequestConfig, type AxiosResponse } from 'axios';
+import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 
 // Mock config to keep tools in dev mode without reading env
 jest.mock('@/config', () => ({
@@ -94,7 +94,8 @@ describe('tools: getErrorMessage branch coverage', () => {
         message: 'Request failed with status code 404',
       });
 
-      const downloadArtifact = jest.fn()
+      const downloadArtifact = jest
+        .fn()
         .mockResolvedValueOnce({
           name: 'good.txt',
           path: 'good.txt',
@@ -114,7 +115,7 @@ describe('tools: getErrorMessage branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -149,7 +150,8 @@ describe('tools: getErrorMessage branch coverage', () => {
         message: 'Request failed with status code 500',
       });
 
-      const downloadArtifact = jest.fn()
+      const downloadArtifact = jest
+        .fn()
         .mockResolvedValueOnce({
           name: 'good.txt',
           path: 'good.txt',
@@ -169,7 +171,7 @@ describe('tools: getErrorMessage branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -204,7 +206,8 @@ describe('tools: getErrorMessage branch coverage', () => {
         message: 'Request failed',
       });
 
-      const downloadArtifact = jest.fn()
+      const downloadArtifact = jest
+        .fn()
         .mockResolvedValueOnce({
           name: 'good.txt',
           path: 'good.txt',
@@ -224,7 +227,7 @@ describe('tools: getErrorMessage branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -255,7 +258,8 @@ describe('tools: getErrorMessage branch coverage', () => {
       // Remove response property entirely
       delete (axiosError as Partial<AxiosError>).response;
 
-      const downloadArtifact = jest.fn()
+      const downloadArtifact = jest
+        .fn()
         .mockResolvedValueOnce({
           name: 'good.txt',
           path: 'good.txt',
@@ -275,7 +279,7 @@ describe('tools: getErrorMessage branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -304,7 +308,8 @@ describe('tools: getErrorMessage branch coverage', () => {
         message: 'Forbidden',
       });
 
-      const downloadArtifact = jest.fn()
+      const downloadArtifact = jest
+        .fn()
         .mockResolvedValueOnce({
           name: 'good.txt',
           path: 'good.txt',
@@ -324,7 +329,7 @@ describe('tools: getErrorMessage branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -351,7 +356,8 @@ describe('tools: getErrorMessage branch coverage', () => {
     it('extracts message from plain Error object', async () => {
       const plainError = new Error('Plain error message');
 
-      const downloadArtifact = jest.fn()
+      const downloadArtifact = jest
+        .fn()
         .mockResolvedValueOnce({
           name: 'good.txt',
           path: 'good.txt',
@@ -371,7 +377,7 @@ describe('tools: getErrorMessage branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -396,7 +402,8 @@ describe('tools: getErrorMessage branch coverage', () => {
       // Non-Error object with message property
       const errorLikeObject = { message: 'Error-like object message', code: 'ERR_001' };
 
-      const downloadArtifact = jest.fn()
+      const downloadArtifact = jest
+        .fn()
         .mockResolvedValueOnce({
           name: 'good.txt',
           path: 'good.txt',
@@ -416,7 +423,7 @@ describe('tools: getErrorMessage branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -440,7 +447,8 @@ describe('tools: getErrorMessage branch coverage', () => {
     it('converts string error to itself', async () => {
       const stringError = 'Simple string error';
 
-      const downloadArtifact = jest.fn()
+      const downloadArtifact = jest
+        .fn()
         .mockResolvedValueOnce({
           name: 'good.txt',
           path: 'good.txt',
@@ -460,7 +468,7 @@ describe('tools: getErrorMessage branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -482,7 +490,8 @@ describe('tools: getErrorMessage branch coverage', () => {
     });
 
     it('converts null/undefined to "Unknown error"', async () => {
-      const downloadArtifact = jest.fn()
+      const downloadArtifact = jest
+        .fn()
         .mockResolvedValueOnce({
           name: 'good.txt',
           path: 'good.txt',
@@ -502,7 +511,7 @@ describe('tools: getErrorMessage branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -524,7 +533,8 @@ describe('tools: getErrorMessage branch coverage', () => {
     });
 
     it('converts number to string', async () => {
-      const downloadArtifact = jest.fn()
+      const downloadArtifact = jest
+        .fn()
         .mockResolvedValueOnce({
           name: 'good.txt',
           path: 'good.txt',
@@ -544,7 +554,7 @@ describe('tools: getErrorMessage branch coverage', () => {
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });

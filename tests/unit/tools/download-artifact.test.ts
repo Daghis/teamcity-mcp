@@ -183,7 +183,7 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -192,7 +192,9 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       const response = await handler({
         buildId: '123',
-        artifactPaths: [{ path: 'file.txt', buildId: '123', downloadUrl: 'https://tc.example/artifact.txt' }],
+        artifactPaths: [
+          { path: 'file.txt', buildId: '123', downloadUrl: 'https://tc.example/artifact.txt' },
+        ],
         encoding: 'text',
       });
 
@@ -200,11 +202,14 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
       expect(payload.artifacts[0].success).toBe(true);
       expect(payload.artifacts[0].encoding).toBe('text');
       expect(payload.artifacts[0].content).toBe('hello world text');
-      expect(mockGet).toHaveBeenCalledWith('https://tc.example/artifact.txt', { responseType: 'text' });
+      expect(mockGet).toHaveBeenCalledWith('https://tc.example/artifact.txt', {
+        responseType: 'text',
+      });
     });
 
     it('throws when text encoding receives non-string data', async () => {
-      const mockGet = jest.fn()
+      const mockGet = jest
+        .fn()
         .mockResolvedValueOnce({
           data: 'good content',
           headers: { 'content-type': 'text/plain', 'content-length': '12' },
@@ -225,7 +230,7 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -266,7 +271,7 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -275,7 +280,9 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       const response = await handler({
         buildId: '123',
-        artifactPaths: [{ path: 'file.bin', buildId: '123', downloadUrl: 'https://tc.example/artifact.bin' }],
+        artifactPaths: [
+          { path: 'file.bin', buildId: '123', downloadUrl: 'https://tc.example/artifact.bin' },
+        ],
         encoding: 'base64',
       });
 
@@ -306,7 +313,7 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -315,14 +322,18 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       const response = await handler({
         buildId: '123',
-        artifactPaths: [{ path: 'file.bin', buildId: '123', downloadUrl: 'https://tc.example/artifact.bin' }],
+        artifactPaths: [
+          { path: 'file.bin', buildId: '123', downloadUrl: 'https://tc.example/artifact.bin' },
+        ],
         encoding: 'base64',
       });
 
       const payload = JSON.parse(response.content?.[0]?.text ?? '{}');
       expect(payload.artifacts[0].success).toBe(true);
       expect(payload.artifacts[0].encoding).toBe('base64');
-      expect(Buffer.from(payload.artifacts[0].content, 'base64')).toEqual(Buffer.from([1, 2, 3, 4, 5, 6, 7, 8]));
+      expect(Buffer.from(payload.artifacts[0].content, 'base64')).toEqual(
+        Buffer.from([1, 2, 3, 4, 5, 6, 7, 8])
+      );
     });
 
     it('handles ArrayBufferView (Uint8Array) payload', async () => {
@@ -344,7 +355,7 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -353,7 +364,9 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       const response = await handler({
         buildId: '123',
-        artifactPaths: [{ path: 'file.bin', buildId: '123', downloadUrl: 'https://tc.example/artifact.bin' }],
+        artifactPaths: [
+          { path: 'file.bin', buildId: '123', downloadUrl: 'https://tc.example/artifact.bin' },
+        ],
         encoding: 'base64',
       });
 
@@ -363,7 +376,8 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
     });
 
     it('throws on unexpected binary payload type', async () => {
-      const mockGet = jest.fn()
+      const mockGet = jest
+        .fn()
         .mockResolvedValueOnce({
           data: Buffer.from('good'),
           headers: { 'content-type': 'application/octet-stream' },
@@ -384,7 +398,7 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -409,7 +423,8 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
   describe('maxSize validation', () => {
     it('throws when content-length exceeds maxSize', async () => {
-      const mockGet = jest.fn()
+      const mockGet = jest
+        .fn()
         .mockResolvedValueOnce({
           data: 'ok',
           headers: { 'content-type': 'text/plain', 'content-length': '2' },
@@ -430,7 +445,7 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -456,7 +471,8 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
     it('throws when text size exceeds maxSize', async () => {
       const largeText = 'x'.repeat(200);
-      const mockGet = jest.fn()
+      const mockGet = jest
+        .fn()
         .mockResolvedValueOnce({
           data: 'ok',
           headers: { 'content-type': 'text/plain' },
@@ -477,7 +493,7 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -502,7 +518,8 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
     it('throws when buffer size exceeds maxSize', async () => {
       const largeBuffer = Buffer.alloc(200);
-      const mockGet = jest.fn()
+      const mockGet = jest
+        .fn()
         .mockResolvedValueOnce({
           data: Buffer.from('ok'),
           headers: { 'content-type': 'application/octet-stream' },
@@ -523,7 +540,7 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -549,7 +566,8 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
   describe('stream encoding', () => {
     it('throws when stream encoding receives non-stream data', async () => {
-      const mockGet = jest.fn()
+      const mockGet = jest
+        .fn()
         .mockResolvedValueOnce({
           data: Readable.from(['stream', 'data']),
           headers: { 'content-type': 'application/octet-stream', 'content-length': '10' },
@@ -570,7 +588,7 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -584,8 +602,16 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
         const response = await handler({
           buildId: '123',
           artifactPaths: [
-            { path: 'good-stream.bin', buildId: '123', downloadUrl: 'https://tc.example/good-stream.bin' },
-            { path: 'not-stream.txt', buildId: '123', downloadUrl: 'https://tc.example/not-stream.txt' },
+            {
+              path: 'good-stream.bin',
+              buildId: '123',
+              downloadUrl: 'https://tc.example/good-stream.bin',
+            },
+            {
+              path: 'not-stream.txt',
+              buildId: '123',
+              downloadUrl: 'https://tc.example/not-stream.txt',
+            },
           ],
           encoding: 'stream',
           outputDir: targetDir,
@@ -618,7 +644,7 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
 
       let handler: ToolHandler | undefined;
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         handler = getRequiredTool('download_build_artifacts').handler;
       });
@@ -631,7 +657,13 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
       try {
         const response = await handler({
           buildId: '123',
-          artifactPaths: [{ path: 'streamed.bin', buildId: '123', downloadUrl: 'https://tc.example/streamed.bin' }],
+          artifactPaths: [
+            {
+              path: 'streamed.bin',
+              buildId: '123',
+              downloadUrl: 'https://tc.example/streamed.bin',
+            },
+          ],
           encoding: 'stream',
           outputDir: targetDir,
         });

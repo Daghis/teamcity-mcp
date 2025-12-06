@@ -19,6 +19,7 @@ describe('tools: agent admin & VCS', () => {
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: { getInstance: () => ({ agents: { setAuthorizedInfo } }) },
           }));
+
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
           const res = await getRequiredTool('authorize_agent').handler({
@@ -46,6 +47,7 @@ describe('tools: agent admin & VCS', () => {
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: { getInstance: () => ({ agents: { setAgentPool } }) },
           }));
+
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
           const res = await getRequiredTool('assign_agent_to_pool').handler({
@@ -73,6 +75,7 @@ describe('tools: agent admin & VCS', () => {
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: { getInstance: () => ({ buildTypes: { addVcsRootToBuildType } }) },
           }));
+
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
           const res = await getRequiredTool('add_vcs_root_to_build').handler({
@@ -101,6 +104,7 @@ describe('tools: agent admin & VCS', () => {
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: { getInstance: () => ({ vcsRoots: { addVcsRoot } }) },
           }));
+
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
           const res = await getRequiredTool('create_vcs_root').handler({
@@ -127,6 +131,7 @@ describe('tools: agent admin & VCS', () => {
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: { getInstance: () => ({ vcsRoots: { setVcsRootProperty } }) },
           }));
+
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
           const res = await getRequiredTool('set_vcs_root_property').handler({
@@ -161,6 +166,7 @@ describe('tools: agent admin & VCS', () => {
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: { getInstance: () => ({ vcsRoots: { deleteVcsRootProperty } }) },
           }));
+
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
           const res = await getRequiredTool('delete_vcs_root_property').handler({
@@ -189,6 +195,7 @@ describe('tools: agent admin & VCS', () => {
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: { getInstance: () => ({ vcsRoots: { setVcsRootProperties } }) },
           }));
+
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
           const res = await getRequiredTool('update_vcs_root_properties').handler({
@@ -240,7 +247,7 @@ describe('tools: agent admin & VCS', () => {
             },
           }));
 
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
           const res = await getRequiredTool('bulk_set_agents_enabled').handler({
             poolId: '1',
@@ -284,7 +291,7 @@ describe('tools: agent admin & VCS', () => {
             },
           }));
 
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
           const res = await getRequiredTool('bulk_set_agents_enabled').handler({
             locator: 'enabled:true',
@@ -296,9 +303,7 @@ describe('tools: agent admin & VCS', () => {
           expect(payload.total).toBe(3);
           expect(payload.succeeded).toBe(2);
           expect(payload.failed).toBe(1);
-          const failedResult = payload.results.find(
-            (r: { id: string; ok: boolean }) => !r.ok
-          );
+          const failedResult = payload.results.find((r: { id: string; ok: boolean }) => !r.ok);
           expect(failedResult.id).toBe('agent2');
           expect(failedResult.error).toBe('Permission denied');
           resolve();
@@ -312,7 +317,7 @@ describe('tools: agent admin & VCS', () => {
       jest.isolateModules(() => {
         (async () => {
           const setEnabledInfo = jest.fn(async () => {
-            // eslint-disable-next-line @typescript-eslint/only-throw-error
+            // eslint-disable-next-line no-throw-literal
             throw 'string error'; // Non-Error thrown
           });
           const getAllAgents = jest.fn(async () => ({
@@ -324,7 +329,7 @@ describe('tools: agent admin & VCS', () => {
             },
           }));
 
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
           const res = await getRequiredTool('bulk_set_agents_enabled').handler({
             poolId: '1',

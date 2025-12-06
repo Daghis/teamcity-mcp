@@ -18,14 +18,12 @@ describe('tool availability - mode filtering', () => {
       }));
 
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getAvailableTools } = require('@/tools');
         const tools = getAvailableTools();
 
         // In dev mode, no tool should have mode: 'full'
-        const fullModeTools = tools.filter(
-          (t: { mode?: 'dev' | 'full' }) => t.mode === 'full'
-        );
+        const fullModeTools = tools.filter((t: { mode?: 'dev' | 'full' }) => t.mode === 'full');
         expect(fullModeTools).toHaveLength(0);
 
         // Should have some tools available (dev tools without mode: 'full')
@@ -47,7 +45,7 @@ describe('tool availability - mode filtering', () => {
       }));
 
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getAvailableTools } = require('@/tools');
         const tools = getAvailableTools();
 
@@ -71,7 +69,7 @@ describe('tool availability - mode filtering', () => {
       }));
 
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getAvailableTools } = require('@/tools');
         const tools = getAvailableTools();
         const names = tools.map((t: { name: string }) => t.name);
@@ -92,7 +90,7 @@ describe('tool availability - mode filtering', () => {
       }));
 
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getTool } = require('@/tools');
         const tool = getTool('get_build');
         expect(tool).toBeDefined();
@@ -108,7 +106,7 @@ describe('tool availability - mode filtering', () => {
       }));
 
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getTool } = require('@/tools');
         const tool = getTool('non_existent_tool_xyz123');
         expect(tool).toBeUndefined();
@@ -123,7 +121,7 @@ describe('tool availability - mode filtering', () => {
       }));
 
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getTool } = require('@/tools');
         // create_project is a full-mode only tool (in FULL_MODE_TOOLS array)
         const tool = getTool('create_project');
@@ -141,7 +139,7 @@ describe('tool availability - mode filtering', () => {
       }));
 
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         const tool = getRequiredTool('get_build');
         expect(tool).toBeDefined();
@@ -157,7 +155,7 @@ describe('tool availability - mode filtering', () => {
       }));
 
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         expect(() => getRequiredTool('fake_tool_abc')).toThrow(
           'Tool not available in full mode or not registered: fake_tool_abc'
@@ -173,7 +171,7 @@ describe('tool availability - mode filtering', () => {
       }));
 
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getRequiredTool } = require('@/tools');
         // create_project is only in full mode (FULL_MODE_TOOLS array)
         expect(() => getRequiredTool('create_project')).toThrow(
@@ -192,7 +190,7 @@ describe('tool availability - mode filtering', () => {
       }));
 
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getToolNames } = require('@/tools');
         const names = getToolNames();
 
@@ -218,7 +216,7 @@ describe('tool availability - mode filtering', () => {
       }));
 
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getToolNames } = require('@/tools');
         devModeNames = getToolNames();
       });
@@ -232,7 +230,7 @@ describe('tool availability - mode filtering', () => {
       }));
 
       jest.isolateModules(() => {
-         
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { getToolNames } = require('@/tools');
         fullModeNames = getToolNames();
       });
