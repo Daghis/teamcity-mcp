@@ -7,6 +7,7 @@
 import type { Logger } from 'winston';
 
 import type { BuildType } from '@/teamcity-client';
+import { globToRegex } from '@/utils/pattern';
 
 import { type BranchSpec, BranchSpecificationParser } from './branch-specification-parser';
 import type { TeamCityUnifiedClient } from './types/client';
@@ -288,10 +289,8 @@ export class ConfigurationBranchMatcher {
       return spec.regex.test(branchName);
     }
 
-    // Fallback to simple pattern matching
-    const pattern = spec.pattern.replace(/\*/g, '.*').replace(/\?/g, '.');
-
-    const regex = new RegExp(`^${pattern}$`);
+    // Fallback to simple pattern matching (with proper escaping)
+    const regex = globToRegex(spec.pattern);
     return regex.test(branchName);
   }
 

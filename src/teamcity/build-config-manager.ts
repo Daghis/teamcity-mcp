@@ -7,6 +7,7 @@
 import type { Logger } from 'winston';
 
 import type { BuildType, BuildTypes } from '@/teamcity-client';
+import { globToRegex } from '@/utils/pattern';
 
 import type { TeamCityUnifiedClient } from './types/client';
 
@@ -345,9 +346,9 @@ export class BuildConfigManager {
     // Filter by name pattern
     if (filters.namePattern) {
       const pattern = filters.namePattern.toLowerCase();
-      if (pattern.includes('*')) {
-        // Wildcard pattern
-        const regex = new RegExp(`^${pattern.replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i');
+      if (pattern.includes('*') || pattern.includes('?')) {
+        // Wildcard pattern (case-insensitive)
+        const regex = globToRegex(pattern, 'i');
         filtered = filtered.filter((config) => regex.test(config.name));
       } else {
         // Simple contains

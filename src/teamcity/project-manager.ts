@@ -7,6 +7,7 @@
 import type { Logger } from 'winston';
 
 import type { Project, Projects } from '@/teamcity-client';
+import { globToRegex } from '@/utils/pattern';
 
 import type { TeamCityUnifiedClient } from './types/client';
 
@@ -406,8 +407,8 @@ export class ProjectManager {
     // Filter by name pattern
     if (filters.namePattern) {
       const pattern = filters.namePattern.toLowerCase();
-      if (pattern.includes('*')) {
-        const regex = new RegExp(`^${pattern.replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i');
+      if (pattern.includes('*') || pattern.includes('?')) {
+        const regex = globToRegex(pattern, 'i');
         filtered = filtered.filter((p) => regex.test(p.name));
       } else {
         filtered = filtered.filter((p) => p.name.toLowerCase().includes(pattern));
