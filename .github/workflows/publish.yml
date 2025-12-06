@@ -73,6 +73,7 @@ jobs:
         if: steps.exists.outputs.exists == 'false'
         env:
           NPM_CONFIG_PROVENANCE: 'true'
+          NODE_AUTH_TOKEN: ''  # Clear placeholder set by setup-node to enable OIDC
         run: npm publish --access public --provenance
 
       - name: Install MCP Publisher
