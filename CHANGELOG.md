@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.18](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.17...teamcity-mcp-v1.11.18) (2025-12-06)
+
+
+### Bug Fixes
+
+* **security:** address CodeQL regex injection alert in cleanup.ts ([#307](https://github.com/Daghis/teamcity-mcp/issues/307)) ([6d1b63c](https://github.com/Daghis/teamcity-mcp/commit/6d1b63c400e67042e98aeaa1465a92b9bb2babf9))
+
 ## [1.11.17](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.16...teamcity-mcp-v1.11.17) (2025-12-06)
 
 
