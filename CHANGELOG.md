@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.19](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.18...teamcity-mcp-v1.11.19) (2025-12-06)
+
+
+### Bug Fixes
+
+* **security:** address CodeQL shell command injection alerts ([#310](https://github.com/Daghis/teamcity-mcp/issues/310)) ([de8ff77](https://github.com/Daghis/teamcity-mcp/commit/de8ff77d4846dc950900db9200ac3b62bd1137b6))
+
 ## [1.11.18](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.17...teamcity-mcp-v1.11.18) (2025-12-06)
 
 
