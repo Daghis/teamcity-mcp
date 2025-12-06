@@ -11,7 +11,7 @@ const BT_NAME = `E2E Trigger BuildType ${ts}`;
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
-    (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
+  (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
 );
 
 describe('Build triggers: add and delete (full) with dev verification', () => {
