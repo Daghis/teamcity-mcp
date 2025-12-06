@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.10](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.9...teamcity-mcp-v1.11.10) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** correct mcp-publisher download URL format ([#286](https://github.com/Daghis/teamcity-mcp/issues/286)) ([5c58c7d](https://github.com/Daghis/teamcity-mcp/commit/5c58c7daf1c94598b99a42aae3689164c55489e6))
+
 ## [1.11.9](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.8...teamcity-mcp-v1.11.9) (2025-12-06)
 
 
