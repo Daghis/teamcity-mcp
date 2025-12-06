@@ -9,7 +9,6 @@ scripts/
 .eslintignore
 .prettierrc
 .prettierignore
-.commitlintrc.mjs
 jest.config.js
 jest.ci.config.js
 jest.setup.js
