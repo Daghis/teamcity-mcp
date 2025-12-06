@@ -54,9 +54,7 @@ export function createPropertyFixture(overrides: Partial<TeamCityProperty> = {})
 /**
  * Create a TeamCity properties collection
  */
-export function createPropertiesFixture(
-  properties: TeamCityProperty[] = []
-): TeamCityProperties {
+export function createPropertiesFixture(properties: TeamCityProperty[] = []): TeamCityProperties {
   return {
     count: properties.length,
     property: properties.length === 0 ? undefined : properties,
@@ -489,9 +487,10 @@ export function createAgentFixture(
 /**
  * Create an agents collection fixture
  */
-export function createAgentsFixture(
-  agents: TeamCityAgentFixture[] = []
-): { count: number; agent?: TeamCityAgentFixture[] } {
+export function createAgentsFixture(agents: TeamCityAgentFixture[] = []): {
+  count: number;
+  agent?: TeamCityAgentFixture[];
+} {
   return {
     count: agents.length,
     agent: agents.length === 0 ? undefined : agents,
@@ -558,9 +557,10 @@ export function createFailedTestFixture(
 /**
  * Create a test occurrences collection fixture
  */
-export function createTestOccurrencesFixture(
-  tests: TeamCityTestOccurrenceFixture[] = []
-): { count: number; testOccurrence?: TeamCityTestOccurrenceFixture[] } {
+export function createTestOccurrencesFixture(tests: TeamCityTestOccurrenceFixture[] = []): {
+  count: number;
+  testOccurrence?: TeamCityTestOccurrenceFixture[];
+} {
   return {
     count: tests.length,
     testOccurrence: tests.length === 0 ? undefined : tests,
