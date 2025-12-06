@@ -35,11 +35,24 @@ jobs:
         with:
           node-version: 20.x
           cache: 'npm'
-          # Note: registry-url is intentionally omitted to enable OIDC trusted publishing
-          # See: https://github.com/actions/setup-node/issues/1440
+
+      - name: Clear NODE_AUTH_TOKEN for OIDC
+        # actions/setup-node sets a placeholder NODE_AUTH_TOKEN that blocks OIDC
+        # See: https://github.com/actions/setup-node/issues/1440
+        run: echo "NODE_AUTH_TOKEN=" >> $GITHUB_ENV
 
       - name: Update npm for OIDC trusted publishing
         run: npm install -g npm@latest
+
+      - name: Configure npm registry
+        run: npm config set registry https://registry.npmjs.org/
+
+      - name: Verify npm configuration
+        run: |
+          echo "npm version: $(npm --version)"
+          echo "node version: $(node --version)"
+          echo "NODE_AUTH_TOKEN is set: $([[ -n \"$NODE_AUTH_TOKEN\" ]] && echo 'yes' || echo 'no')"
+          npm config list
 
       - name: Install dependencies
         run: npm ci
