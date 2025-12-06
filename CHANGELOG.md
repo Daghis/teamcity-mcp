@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.4](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.3...teamcity-mcp-v1.11.4) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** update npm for OIDC trusted publishing ([#273](https://github.com/Daghis/teamcity-mcp/issues/273)) ([6032c28](https://github.com/Daghis/teamcity-mcp/commit/6032c28b8cc6ccd47cf6cb167c360a47d98358a6))
+
 ## [1.11.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.2...teamcity-mcp-v1.11.3) (2025-12-06)
 
 
