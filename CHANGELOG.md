@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.12](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.11...teamcity-mcp-v1.11.12) (2025-12-06)
+
+
+### Bug Fixes
+
+* update MCP registry schema to 2025-10-17 ([#290](https://github.com/Daghis/teamcity-mcp/issues/290)) ([bc54888](https://github.com/Daghis/teamcity-mcp/commit/bc54888a6a483bf19b7c35518f88705dfe7e1ecd))
+
 ## [1.11.11](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.10...teamcity-mcp-v1.11.11) (2025-12-06)
 
 
