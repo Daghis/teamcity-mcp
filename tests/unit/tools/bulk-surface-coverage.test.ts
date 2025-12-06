@@ -113,4 +113,53 @@ describe('tools: bulk surface coverage for list & queue ops', () => {
       });
     });
   });
+
+  it('set_build_configs_paused skips queued builds with null id', async () => {
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const buildTypes = {
+            setBuildTypeField: jest.fn(async () => ({})),
+          };
+          const buildQueue = {
+            getAllQueuedBuilds: jest.fn(async () => ({
+              data: {
+                build: [
+                  { id: 1001, buildTypeId: 'bt1' },
+                  { buildTypeId: 'bt2' }, // No id - should be skipped
+                  { id: null, buildTypeId: 'bt1' }, // Null id - should be skipped
+                ],
+              },
+            })),
+            deleteQueuedBuild: jest.fn(async () => ({})),
+          };
+
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                buildTypes,
+                buildQueue,
+              }),
+            },
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getTool } = require('@/tools');
+          const res = await getTool('set_build_configs_paused').handler({
+            buildTypeIds: ['bt1', 'bt2'],
+            paused: true,
+            cancelQueued: true,
+          });
+
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload.success).toBe(true);
+          expect(payload.updated).toBe(2); // Both bt1 and bt2 paused
+          expect(payload.canceled).toBe(1); // Only the build with id 1001 was canceled
+          expect(buildQueue.deleteQueuedBuild).toHaveBeenCalledTimes(1);
+          expect(buildQueue.deleteQueuedBuild).toHaveBeenCalledWith('1001');
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
 });
