@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.1...teamcity-mcp-v1.11.2) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** clarify id-token permission for trusted publishing ([#269](https://github.com/Daghis/teamcity-mcp/issues/269)) ([5e54da9](https://github.com/Daghis/teamcity-mcp/commit/5e54da9fa9cc46561aaf2673d632d7762776ad23))
+
 ## [1.11.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.0...teamcity-mcp-v1.11.1) (2025-11-04)
 
 
