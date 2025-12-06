@@ -8,6 +8,21 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { getConfig } from '@/config';
 import { createMCPServer } from '@/server';
 
+import {
+  createMockStdin,
+  createMockStdout,
+  injectMockStreams,
+} from '../../test-utils/mock-transport';
+
+/**
+ * Helper to access server's internal properties for testing.
+ * These are implementation details that may change between versions.
+ */
+interface ServerInternals {
+  serverInfo?: { name?: string; version?: string };
+  _capabilities?: Record<string, unknown>;
+}
+
 describe('MCP Server Lifecycle', () => {
   let server: Server | undefined;
   let originalEnv: NodeJS.ProcessEnv;
@@ -39,10 +54,9 @@ describe('MCP Server Lifecycle', () => {
       expect(server).toBeDefined();
       expect(server).toBeInstanceOf(Server);
 
-      // Check server info
-      const serverInfo = (server as unknown as { serverInfo?: { name?: string; version?: string } })
-        .serverInfo;
-      expect(serverInfo).toEqual({
+      // Check server info - accessing internal property for verification
+      const serverInternal = server as unknown as ServerInternals;
+      expect(serverInternal.serverInfo).toEqual({
         name: 'teamcity-mcp',
         version: expect.any(String),
       });
@@ -56,8 +70,8 @@ describe('MCP Server Lifecycle', () => {
       expect(server).toBeDefined();
 
       // Verify capabilities are set based on config
-      const capabilities = (server as unknown as { _capabilities?: Record<string, unknown> })
-        ._capabilities;
+      const serverInternal = server as unknown as ServerInternals;
+      const capabilities = serverInternal._capabilities;
       if (config.mcp.capabilities.tools) {
         expect(capabilities?.['tools']).toBeDefined();
       }
@@ -91,26 +105,8 @@ describe('MCP Server Lifecycle', () => {
       server = createMCPServer();
       const transport = new StdioServerTransport();
 
-      // Mock stdin/stdout for testing
-      const mockStdin = {
-        on: jest.fn(),
-        once: jest.fn(),
-        removeListener: jest.fn(),
-        setEncoding: jest.fn(),
-        pause: jest.fn(),
-        resume: jest.fn(),
-      };
-
-      const mockStdout = {
-        write: jest.fn((_: unknown, callback?: () => void) => {
-          if (typeof callback === 'function') callback();
-          return true;
-        }),
-        on: jest.fn(),
-      };
-
-      (transport as unknown as { input: unknown; output: unknown }).input = mockStdin;
-      (transport as unknown as { input: unknown; output: unknown }).output = mockStdout;
+      // Use test utility to inject mock streams
+      injectMockStreams(transport);
 
       await expect(server.connect(transport)).resolves.not.toThrow();
     });
@@ -125,35 +121,14 @@ describe('MCP Server Lifecycle', () => {
     it('should handle multiple start attempts', async () => {
       server = createMCPServer();
       const transport = new StdioServerTransport();
-
-      // Mock transport
-      const mockStdin = {
-        on: jest.fn(),
-        once: jest.fn(),
-        removeListener: jest.fn(),
-        setEncoding: jest.fn(),
-        pause: jest.fn(),
-        resume: jest.fn(),
-      };
-
-      const mockStdout = {
-        write: jest.fn((_: unknown, callback?: () => void) => {
-          if (typeof callback === 'function') callback();
-          return true;
-        }),
-        on: jest.fn(),
-      };
-
-      (transport as unknown as { input: unknown; output: unknown }).input = mockStdin;
-      (transport as unknown as { input: unknown; output: unknown }).output = mockStdout;
+      injectMockStreams(transport);
 
       // First connection should succeed
       await server.connect(transport);
 
       // Second connection attempt should be handled
       const transport2 = new StdioServerTransport();
-      (transport2 as unknown as { input: unknown; output: unknown }).input = mockStdin;
-      (transport2 as unknown as { input: unknown; output: unknown }).output = mockStdout;
+      injectMockStreams(transport2);
 
       // This might throw or be ignored depending on implementation
       // Accept either resolution or rejection
@@ -168,9 +143,9 @@ describe('MCP Server Lifecycle', () => {
       // Test server lifecycle management
       // The server should be created and ready for connections
       expect(server).toBeDefined();
-      const meta = (server as unknown as { serverInfo?: { name?: string } }).serverInfo;
-      expect(meta).toBeDefined();
-      expect(meta?.name).toBe('teamcity-mcp');
+      const serverInternal = server as unknown as ServerInternals;
+      expect(serverInternal.serverInfo).toBeDefined();
+      expect(serverInternal.serverInfo?.name).toBe('teamcity-mcp');
 
       // Server should have proper methods for lifecycle management
       expect(typeof server.connect).toBe('function');
@@ -187,7 +162,8 @@ describe('MCP Server Lifecycle', () => {
       server = createMCPServer();
 
       // Check initial state
-      expect((server as unknown as { serverInfo?: unknown }).serverInfo).toBeDefined();
+      const serverInternal = server as unknown as ServerInternals;
+      expect(serverInternal.serverInfo).toBeDefined();
 
       // Server should have proper structure
       expect(server.setRequestHandler).toBeDefined();
@@ -201,31 +177,28 @@ describe('MCP Server Lifecycle', () => {
       server = createMCPServer();
       const transport = new StdioServerTransport();
 
-      // Mock transport with error simulation
-      const mockStdin = {
-        on: jest.fn((event: string, handler: (err: Error) => void) => {
-          if (event === 'error') {
-            // Simulate error after connection
-            setTimeout(() => handler(new Error('Transport error')), 10);
-          }
-        }),
-        once: jest.fn(),
-        removeListener: jest.fn(),
-        setEncoding: jest.fn(),
-        pause: jest.fn(),
-        resume: jest.fn(),
-      };
+      // Create mock stdin with error simulation
+      const mockStdin = createMockStdin();
+      mockStdin.on.mockImplementation((event: string, handler: (err: Error) => void) => {
+        if (event === 'error') {
+          // Simulate error after connection
+          setTimeout(() => handler(new Error('Transport error')), 10);
+        }
+      });
 
-      const mockStdout = {
-        write: jest.fn((_: unknown, callback?: () => void) => {
-          if (typeof callback === 'function') callback();
-          return true;
-        }),
-        on: jest.fn(),
-      };
+      const mockStdout = createMockStdout();
 
-      (transport as unknown as { input: unknown; output: unknown }).input = mockStdin;
-      (transport as unknown as { input: unknown; output: unknown }).output = mockStdout;
+      // Inject mocks into transport
+      const transportWithPrivates = transport as unknown as {
+        _stdin?: unknown;
+        _stdout?: unknown;
+        input?: unknown;
+        output?: unknown;
+      };
+      transportWithPrivates._stdin = mockStdin;
+      transportWithPrivates._stdout = mockStdout;
+      transportWithPrivates.input = mockStdin;
+      transportWithPrivates.output = mockStdout;
 
       // Connection should handle errors gracefully
       await server.connect(transport);
@@ -242,27 +215,7 @@ describe('MCP Server Lifecycle', () => {
       // Create and start server
       server = createMCPServer();
       const transport1 = new StdioServerTransport();
-
-      // Mock first transport
-      const mockStdin1 = {
-        on: jest.fn(),
-        once: jest.fn(),
-        removeListener: jest.fn(),
-        setEncoding: jest.fn(),
-        pause: jest.fn(),
-        resume: jest.fn(),
-      };
-
-      const mockStdout1 = {
-        write: jest.fn((_: unknown, callback?: () => void) => {
-          if (typeof callback === 'function') callback();
-          return true;
-        }),
-        on: jest.fn(),
-      };
-
-      (transport1 as unknown as { input: unknown; output: unknown }).input = mockStdin1;
-      (transport1 as unknown as { input: unknown; output: unknown }).output = mockStdout1;
+      injectMockStreams(transport1);
 
       await server.connect(transport1);
 
@@ -272,27 +225,7 @@ describe('MCP Server Lifecycle', () => {
       // Create new server instance
       server = createMCPServer();
       const transport2 = new StdioServerTransport();
-
-      // Mock second transport
-      const mockStdin2 = {
-        on: jest.fn(),
-        once: jest.fn(),
-        removeListener: jest.fn(),
-        setEncoding: jest.fn(),
-        pause: jest.fn(),
-        resume: jest.fn(),
-      };
-
-      const mockStdout2 = {
-        write: jest.fn((_: unknown, callback?: () => void) => {
-          if (typeof callback === 'function') callback();
-          return true;
-        }),
-        on: jest.fn(),
-      };
-
-      (transport2 as unknown as { input: unknown; output: unknown }).input = mockStdin2;
-      (transport2 as unknown as { input: unknown; output: unknown }).output = mockStdout2;
+      injectMockStreams(transport2);
 
       // Should be able to start again
       await expect(server.connect(transport2)).resolves.not.toThrow();
