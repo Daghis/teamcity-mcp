@@ -1,6 +1,6 @@
 {
   "name": "@daghis/teamcity-mcp",
-  "version": "1.11.13",
+  "version": "1.11.17",
   "description": "Model Control Protocol server for TeamCity CI/CD integration with AI coding assistants",
   "mcpName": "io.github.Daghis/teamcity",
   "main": "dist/index.js",
@@ -59,8 +59,12 @@
     "type": "git",
     "url": "git+https://github.com/Daghis/teamcity-mcp.git"
   },
+  "homepage": "https://github.com/Daghis/teamcity-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/Daghis/teamcity-mcp/issues"
+  },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.21.0",
+    "@modelcontextprotocol/sdk": "^1.24.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "axios": "^1.13.2",

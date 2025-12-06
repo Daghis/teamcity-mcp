@@ -98,11 +98,12 @@ describe('MCP stdio transport compliance', () => {
       ]);
 
       // Verify we got a valid initialize response
-      expect(initResponse).toBeDefined();
-      expect(initResponse.result).toHaveProperty('serverInfo');
-      expect(initResponse.result.serverInfo.name).toBe('teamcity-mcp');
-      expect(initResponse.result.serverInfo.version).toMatch(/^\d+\.\d+\.\d+/);
-      expect(initResponse.result.protocolVersion).toBe('2024-11-05');
+      expect(initResponse).not.toBeNull();
+      const response = initResponse!;
+      expect(response.result).toHaveProperty('serverInfo');
+      expect(response.result?.serverInfo?.name).toBe('teamcity-mcp');
+      expect(response.result?.serverInfo?.version).toMatch(/^\d+\.\d+\.\d+/);
+      expect(response.result?.protocolVersion).toBe('2024-11-05');
 
       // Verify stderr contains logging (not stdout)
       expect(stderrData).toContain('TeamCity MCP Server');

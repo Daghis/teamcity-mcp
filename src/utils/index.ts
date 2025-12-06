@@ -33,6 +33,10 @@ export {
 } from './validation';
 export type { ValidationResult } from './validation';
 
+// Pattern utilities exports
+export * from './pattern';
+export { globToRegex, REGEX_SPECIAL_CHARS } from './pattern';
+
 // Async utilities exports
 export * from './async';
 export {
