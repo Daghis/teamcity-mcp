@@ -250,3 +250,171 @@ describe('tools: build actions and status/basic info', () => {
     });
   });
 });
+
+describe('tools: trigger_build XML fallback coverage', () => {
+  /**
+   * Helper to create a mock axios-like http instance.
+   * The adapter needs http.defaults for configuration resolution.
+   */
+  const createMockHttp = (postFn: jest.Mock) => ({
+    post: postFn,
+    defaults: {
+      baseURL: 'https://example.test',
+      timeout: 30000,
+      headers: { common: { Authorization: 'Bearer test-token' } },
+    },
+  });
+
+  it('falls back to XML when JSON API fails', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn().mockRejectedValue(new Error('JSON API unsupported'));
+          const httpPost = jest.fn().mockResolvedValue({
+            data: {
+              id: 999,
+              state: 'queued',
+              status: 'UNKNOWN',
+              branchName: 'main',
+            },
+          });
+
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: {
+                  buildQueue: { addBuildToQueue },
+                },
+                http: createMockHttp(httpPost),
+                getBaseUrl: () => 'https://example.test',
+              }),
+            },
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('trigger_build').handler({
+            buildTypeId: 'bt_fallback',
+            branchName: 'main',
+          });
+
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload.success).toBe(true);
+          expect(payload.buildId).toBe('999');
+          expect(payload.fallback).toEqual({
+            mode: 'xml',
+            reason: 'JSON API unsupported',
+          });
+
+          // Verify XML endpoint was called
+          expect(httpPost).toHaveBeenCalledTimes(1);
+          expect(httpPost).toHaveBeenCalledWith(
+            '/app/rest/buildQueue',
+            expect.stringContaining('<?xml version="1.0"'),
+            expect.objectContaining({
+              headers: { 'Content-Type': 'application/xml', Accept: 'application/json' },
+            })
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('escapes XML special characters in branch, comment, and properties', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn().mockRejectedValue(new Error('Force XML'));
+          const httpPost = jest.fn().mockResolvedValue({
+            data: { id: 1000, state: 'queued' },
+          });
+
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: {
+                  buildQueue: { addBuildToQueue },
+                },
+                http: createMockHttp(httpPost),
+                getBaseUrl: () => 'https://example.test',
+              }),
+            },
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          await getRequiredTool('trigger_build').handler({
+            buildTypeId: 'bt<>&"\'test',
+            branchName: 'feature/<script>',
+            comment: 'Build & Deploy "now"',
+            properties: {
+              'key<>': 'value&"special\'chars',
+            },
+          });
+
+          expect(httpPost).toHaveBeenCalledTimes(1);
+          const xmlPayload = httpPost.mock.calls[0][1] as string;
+
+          // Verify XML escaping
+          expect(xmlPayload).toContain('bt&lt;&gt;&amp;&quot;&apos;test');
+          expect(xmlPayload).toContain('<branchName>feature/&lt;script&gt;</branchName>');
+          expect(xmlPayload).toContain('<text>Build &amp; Deploy &quot;now&quot;</text>');
+          expect(xmlPayload).toContain('name="key&lt;&gt;"');
+          expect(xmlPayload).toContain('value="value&amp;&quot;special&apos;chars"');
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('includes comment and properties in XML fallback payload', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn().mockRejectedValue(new Error('Force XML'));
+          const httpPost = jest.fn().mockResolvedValue({
+            data: { id: 1001, state: 'queued' },
+          });
+
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: {
+                  buildQueue: { addBuildToQueue },
+                },
+                http: createMockHttp(httpPost),
+                getBaseUrl: () => 'https://example.test',
+              }),
+            },
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          await getRequiredTool('trigger_build').handler({
+            buildTypeId: 'btWithProps',
+            comment: 'Test comment',
+            properties: {
+              'env.NODE_ENV': 'production',
+              'system.debug': 'true',
+            },
+          });
+
+          expect(httpPost).toHaveBeenCalledTimes(1);
+          const xmlPayload = httpPost.mock.calls[0][1] as string;
+
+          // Verify structure
+          expect(xmlPayload).toContain('<comment><text>Test comment</text></comment>');
+          expect(xmlPayload).toContain('<properties>');
+          expect(xmlPayload).toContain('<property name="env.NODE_ENV" value="production"/>');
+          expect(xmlPayload).toContain('<property name="system.debug" value="true"/>');
+          expect(xmlPayload).toContain('</properties>');
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+});

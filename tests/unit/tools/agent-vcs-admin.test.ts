@@ -218,4 +218,126 @@ describe('tools: agent admin & VCS', () => {
       });
     });
   });
+
+  it('bulk_set_agents_enabled skips agents with no id', async () => {
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const setEnabledInfo = jest.fn(async () => ({}));
+          const getAllAgents = jest.fn(async () => ({
+            data: {
+              agent: [
+                { id: 'agent1', name: 'Agent 1' },
+                { name: 'Agent No ID' }, // No id - should be skipped
+                { id: '', name: 'Empty ID' }, // Empty id - should be skipped
+                { id: 'agent2', name: 'Agent 2' },
+              ],
+            },
+          }));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({ agents: { getAllAgents, setEnabledInfo } }),
+            },
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('bulk_set_agents_enabled').handler({
+            poolId: '1',
+            enabled: false,
+            comment: 'Maintenance',
+          });
+
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload.success).toBe(true);
+          expect(payload.total).toBe(2); // Only agent1 and agent2 counted
+          expect(payload.succeeded).toBe(2);
+          expect(setEnabledInfo).toHaveBeenCalledTimes(2);
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('bulk_set_agents_enabled catches errors and reports failed agents', async () => {
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const setEnabledInfo = jest.fn(async (agentId: string) => {
+            if (agentId === 'agent2') {
+              throw new Error('Permission denied');
+            }
+            return {};
+          });
+          const getAllAgents = jest.fn(async () => ({
+            data: {
+              agent: [
+                { id: 'agent1', name: 'Agent 1' },
+                { id: 'agent2', name: 'Agent 2' },
+                { id: 'agent3', name: 'Agent 3' },
+              ],
+            },
+          }));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({ agents: { getAllAgents, setEnabledInfo } }),
+            },
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('bulk_set_agents_enabled').handler({
+            locator: 'enabled:true',
+            enabled: false,
+          });
+
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload.success).toBe(true);
+          expect(payload.total).toBe(3);
+          expect(payload.succeeded).toBe(2);
+          expect(payload.failed).toBe(1);
+          const failedResult = payload.results.find(
+            (r: { id: string; ok: boolean }) => !r.ok
+          );
+          expect(failedResult.id).toBe('agent2');
+          expect(failedResult.error).toBe('Permission denied');
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('bulk_set_agents_enabled handles non-Error exceptions', async () => {
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const setEnabledInfo = jest.fn(async () => {
+            // eslint-disable-next-line @typescript-eslint/only-throw-error
+            throw 'string error'; // Non-Error thrown
+          });
+          const getAllAgents = jest.fn(async () => ({
+            data: { agent: [{ id: 'agent1', name: 'Agent 1' }] },
+          }));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({ agents: { getAllAgents, setEnabledInfo } }),
+            },
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('bulk_set_agents_enabled').handler({
+            poolId: '1',
+            enabled: true,
+          });
+
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload.success).toBe(true);
+          expect(payload.failed).toBe(1);
+          expect(payload.results[0].error).toBe('Unknown error');
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
 });

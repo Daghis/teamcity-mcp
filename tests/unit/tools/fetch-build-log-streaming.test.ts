@@ -105,4 +105,65 @@ describe('tools: fetch_build_log streaming', () => {
       await fs.rm(targetPath, { force: true });
     }
   });
+
+  it('rejects streaming mode with tail queries', async () => {
+    const getInstance = jest.fn().mockReturnValue({});
+    jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance } }));
+
+    let handler:
+      | ((args: unknown) => Promise<{ content?: Array<{ text?: string }>; success?: boolean }>)
+      | undefined;
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getRequiredTool } = require('@/tools');
+      handler = getRequiredTool('fetch_build_log').handler;
+    });
+
+    if (!handler) {
+      throw new Error('fetch_build_log handler not found');
+    }
+
+    const response = await handler({
+      buildId: '123',
+      encoding: 'stream',
+      tail: true,
+    });
+
+    const payload = JSON.parse(response.content?.[0]?.text ?? '{}');
+    expect(payload.success).toBe(false);
+    expect(payload.error?.code).toBe('VALIDATION_ERROR');
+    const issues = (payload.error?.data ?? []) as Array<{ message?: string }>;
+    expect(issues.some((issue) => issue?.message?.includes('Streaming mode'))).toBe(true);
+    expect(issues.some((issue) => issue?.message?.includes('tail'))).toBe(true);
+  });
+
+  it('rejects when neither buildId nor buildNumber is provided', async () => {
+    const getInstance = jest.fn().mockReturnValue({});
+    jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance } }));
+
+    let handler:
+      | ((args: unknown) => Promise<{ content?: Array<{ text?: string }>; success?: boolean }>)
+      | undefined;
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getRequiredTool } = require('@/tools');
+      handler = getRequiredTool('fetch_build_log').handler;
+    });
+
+    if (!handler) {
+      throw new Error('fetch_build_log handler not found');
+    }
+
+    const response = await handler({
+      encoding: 'text',
+      page: 1,
+      pageSize: 100,
+    });
+
+    const payload = JSON.parse(response.content?.[0]?.text ?? '{}');
+    expect(payload.success).toBe(false);
+    expect(payload.error?.code).toBe('VALIDATION_ERROR');
+    const issues = (payload.error?.data ?? []) as Array<{ message?: string }>;
+    expect(issues.some((issue) => issue?.message?.includes('buildId or buildNumber'))).toBe(true);
+  });
 });

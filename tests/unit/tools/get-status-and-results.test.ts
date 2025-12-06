@@ -98,6 +98,41 @@ describe('tools: enhanced status and results', () => {
     );
   });
 
+  it('get_build_status rejects when buildNumber provided without buildTypeId', async () => {
+    jest.doMock('@/teamcity/build-status-manager', () => ({
+      BuildStatusManager: jest.fn().mockImplementation(() => ({
+        getBuildStatus: jest.fn(),
+      })),
+    }));
+
+    jest.doMock('@/api-client', () => ({
+      TeamCityAPI: {
+        getInstance: () => ({
+          builds: {},
+          buildQueue: {},
+          listBuildArtifacts: jest.fn(),
+          downloadBuildArtifact: jest.fn(),
+          getBuildStatistics: jest.fn(),
+          listChangesForBuild: jest.fn(),
+          listSnapshotDependencies: jest.fn(),
+          getBaseUrl: () => 'https://example.test',
+        }),
+      },
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getRequiredTool } = require('@/tools');
+    const res = await getRequiredTool('get_build_status').handler({
+      buildNumber: '123',
+    });
+
+    const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+    expect(payload.success).toBe(false);
+    expect(payload.error?.code).toBe('VALIDATION_ERROR');
+    const issues = (payload.error?.data ?? []) as Array<{ message?: string }>;
+    expect(issues.some((issue) => issue?.message?.includes('buildTypeId is required'))).toBe(true);
+  });
+
   it('get_build_status rejects when neither buildId nor buildNumber is provided', async () => {
     jest.doMock('@/teamcity/build-status-manager', () => ({
       BuildStatusManager: jest.fn().mockImplementation(() => ({
@@ -228,5 +263,65 @@ describe('tools: enhanced status and results', () => {
     expect(payload.success).toBe(false);
     expect(payload.error?.message).toMatch(/Infrastructure_DeployCrossroads[^]*number\s*60/i);
     expect(payload.error?.code).toBe('TEAMCITY_ERROR');
+  });
+
+  it('get_build_results rejects when only buildTypeId provided without buildNumber', async () => {
+    jest.doMock('@/teamcity/build-results-manager', () => ({
+      BuildResultsManager: jest.fn().mockImplementation(() => ({
+        getBuildResults: jest.fn(),
+      })),
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getRequiredTool } = require('@/tools');
+    const res = await getRequiredTool('get_build_results').handler({
+      buildTypeId: 'SomeBuildType',
+    });
+
+    const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+    expect(payload.success).toBe(false);
+    expect(payload.error?.code).toBe('VALIDATION_ERROR');
+    const issues = (payload.error?.data ?? []) as Array<{ message?: string }>;
+    expect(issues.some((issue) => issue?.message?.includes('together'))).toBe(true);
+  });
+
+  it('get_build_results rejects when only buildNumber provided without buildTypeId', async () => {
+    jest.doMock('@/teamcity/build-results-manager', () => ({
+      BuildResultsManager: jest.fn().mockImplementation(() => ({
+        getBuildResults: jest.fn(),
+      })),
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getRequiredTool } = require('@/tools');
+    const res = await getRequiredTool('get_build_results').handler({
+      buildNumber: '123',
+    });
+
+    const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+    expect(payload.success).toBe(false);
+    expect(payload.error?.code).toBe('VALIDATION_ERROR');
+    const issues = (payload.error?.data ?? []) as Array<{ message?: string }>;
+    expect(issues.some((issue) => issue?.message?.includes('together'))).toBe(true);
+  });
+
+  it('get_build_results rejects when neither buildId nor buildTypeId+buildNumber provided', async () => {
+    jest.doMock('@/teamcity/build-results-manager', () => ({
+      BuildResultsManager: jest.fn().mockImplementation(() => ({
+        getBuildResults: jest.fn(),
+      })),
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getRequiredTool } = require('@/tools');
+    const res = await getRequiredTool('get_build_results').handler({
+      includeArtifacts: true,
+    });
+
+    const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+    expect(payload.success).toBe(false);
+    expect(payload.error?.code).toBe('VALIDATION_ERROR');
+    const issues = (payload.error?.data ?? []) as Array<{ message?: string }>;
+    expect(issues.some((issue) => issue?.message?.includes('buildId or buildTypeId'))).toBe(true);
   });
 });

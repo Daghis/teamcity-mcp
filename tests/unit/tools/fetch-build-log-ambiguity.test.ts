@@ -68,3 +68,81 @@ describe('fetch_build_log buildNumber resolution edge cases', () => {
     expect(payload.lines[0]).toBe('resolved 2002');
   });
 });
+
+describe('fetch_build_log buildNumber resolution - no build found scenarios', () => {
+  beforeEach(() => {
+    jest.resetModules();
+  });
+
+  it('errors when no build found without buildTypeId', async () => {
+    jest.doMock('@/api-client', () => ({
+      TeamCityAPI: {
+        getInstance: () => ({
+          listBuilds: jest.fn().mockResolvedValue({ build: [] }),
+          getBuildLogChunk: jest.fn(),
+        }),
+      },
+    }));
+
+    jest.isolateModules(() => {
+       
+      const { getRequiredTool } = require('@/tools');
+      return getRequiredTool('fetch_build_log')
+        .handler({
+          buildNumber: '999',
+          page: 1,
+          pageSize: 10,
+        })
+        .then((res: { content?: Array<{ text?: string }> }) => {
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload.success).toBe(false);
+          const errObj = (payload as { error?: { message?: unknown } }).error;
+          const message =
+            typeof errObj?.message === 'string' ? errObj.message : String(errObj?.message ?? '');
+          expect(message).toContain('No build found with number 999');
+        });
+    });
+  });
+
+  it('errors when fallback search also returns no match', async () => {
+    jest.doMock('@/api-client', () => ({
+      TeamCityAPI: {
+        getInstance: () => ({
+          listBuilds: jest.fn().mockImplementation(async (locator?: string) => {
+            // Direct search returns empty
+            if (locator?.includes('number:888')) {
+              return { build: [] };
+            }
+            // Fallback search also returns builds but none match
+            if (locator?.includes('branch:default:any,count:100')) {
+              return { build: [{ id: 5001, number: '100' }, { id: 5002, number: '200' }] };
+            }
+            return { build: [] };
+          }),
+          getBuildLogChunk: jest.fn(),
+        }),
+      },
+    }));
+
+    jest.isolateModules(() => {
+       
+      const { getRequiredTool } = require('@/tools');
+      return getRequiredTool('fetch_build_log')
+        .handler({
+          buildNumber: '888',
+          buildTypeId: 'BT_NO_MATCH',
+          page: 1,
+          pageSize: 10,
+        })
+        .then((res: { content?: Array<{ text?: string }> }) => {
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload.success).toBe(false);
+          const errObj = (payload as { error?: { message?: unknown } }).error;
+          const message =
+            typeof errObj?.message === 'string' ? errObj.message : String(errObj?.message ?? '');
+          expect(message).toContain('No build found with number 888');
+          expect(message).toContain('BT_NO_MATCH');
+        });
+    });
+  });
+});
