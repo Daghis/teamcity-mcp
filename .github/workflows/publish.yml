@@ -16,7 +16,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # for npm provenance
+  id-token: write # for npm trusted publishing (OIDC) and provenance
 
 jobs:
   publish:
