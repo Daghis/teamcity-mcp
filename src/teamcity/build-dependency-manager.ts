@@ -550,9 +550,9 @@ export class BuildDependencyManager {
   private isNotFound(error: unknown): boolean {
     return Boolean(
       typeof error === 'object' &&
-        error !== null &&
-        'response' in error &&
-        (error as { response?: { status?: number } }).response?.status === 404
+      error !== null &&
+      'response' in error &&
+      (error as { response?: { status?: number } }).response?.status === 404
     );
   }
 }
