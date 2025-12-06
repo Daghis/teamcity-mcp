@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.8](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.7...teamcity-mcp-v1.11.8) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** simplify OIDC workflow to match npm docs ([#282](https://github.com/Daghis/teamcity-mcp/issues/282)) ([b3e8493](https://github.com/Daghis/teamcity-mcp/commit/b3e84935cd61cceb41a6a773ca2b7aa3081306f6))
+
 ## [1.11.7](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.6...teamcity-mcp-v1.11.7) (2025-12-06)
 
 
