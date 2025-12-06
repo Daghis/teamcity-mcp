@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.17](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.16...teamcity-mcp-v1.11.17) (2025-12-06)
+
+
+### Bug Fixes
+
+* **security:** address CodeQL incomplete string escaping alert ([#305](https://github.com/Daghis/teamcity-mcp/issues/305)) ([24071ed](https://github.com/Daghis/teamcity-mcp/commit/24071ed1e308d699f8f5e52075eb0d53b91f6a2e))
+
 ## [1.11.16](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.15...teamcity-mcp-v1.11.16) (2025-12-06)
 
 
