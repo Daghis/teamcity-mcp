@@ -39,7 +39,12 @@ jobs:
       - name: Clear NODE_AUTH_TOKEN for OIDC
         # actions/setup-node sets a placeholder NODE_AUTH_TOKEN that blocks OIDC
         # See: https://github.com/actions/setup-node/issues/1440
-        run: echo "NODE_AUTH_TOKEN=" >> $GITHUB_ENV
+        run: |
+          # Unset the environment variable
+          echo "NODE_AUTH_TOKEN=" >> $GITHUB_ENV
+          # Remove any .npmrc files that might contain auth token references
+          rm -f ~/.npmrc
+          rm -f .npmrc
 
       - name: Update npm for OIDC trusted publishing
         run: npm install -g npm@latest
@@ -51,7 +56,12 @@ jobs:
         run: |
           echo "npm version: $(npm --version)"
           echo "node version: $(node --version)"
-          echo "NODE_AUTH_TOKEN is set: $([[ -n \"$NODE_AUTH_TOKEN\" ]] && echo 'yes' || echo 'no')"
+          echo "NODE_AUTH_TOKEN value: '${NODE_AUTH_TOKEN}'"
+          echo "--- ~/.npmrc ---"
+          cat ~/.npmrc 2>/dev/null || echo "(no ~/.npmrc)"
+          echo "--- .npmrc ---"
+          cat .npmrc 2>/dev/null || echo "(no .npmrc)"
+          echo "--- npm config ---"
           npm config list
 
       - name: Install dependencies
