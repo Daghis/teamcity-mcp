@@ -36,13 +36,6 @@ type SnapshotDependencyWithOptions = SnapshotDependency & {
   options?: SnapshotDependencyOptions;
 };
 
-const JSON_HEADERS: RawAxiosRequestConfig = {
-  headers: {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  },
-};
-
 const XML_HEADERS: RawAxiosRequestConfig = {
   headers: {
     'Content-Type': 'application/xml',
@@ -299,9 +292,9 @@ const dependencyToXml = (
 
 const prepareArtifactRequest = (
   payload: ArtifactDependency
-): { body: ArtifactDependency; headers: RawAxiosRequestConfig } => ({
-  body: payload,
-  headers: JSON_HEADERS,
+): { body: string; headers: RawAxiosRequestConfig } => ({
+  body: dependencyToXml('artifact', payload),
+  headers: XML_HEADERS,
 });
 
 const prepareSnapshotRequest = (
@@ -367,7 +360,7 @@ export class BuildDependencyManager {
       await this.client.modules.buildTypes.deleteArtifactDependency(
         buildTypeId,
         dependencyId,
-        JSON_HEADERS
+        JSON_GET_HEADERS
       );
       return;
     }
@@ -375,7 +368,7 @@ export class BuildDependencyManager {
     await this.client.modules.buildTypes.deleteSnapshotDependency(
       buildTypeId,
       dependencyId,
-      JSON_HEADERS
+      JSON_GET_HEADERS
     );
   }
 
@@ -386,10 +379,11 @@ export class BuildDependencyManager {
   ): Promise<AxiosResponse<DependencyResource>> {
     if (dependencyType === 'artifact') {
       const { body, headers } = prepareArtifactRequest(payload as ArtifactDependency);
+      // Generated client expects an ArtifactDependency body, but the endpoint requires XML.
       return this.client.modules.buildTypes.addArtifactDependencyToBuildType(
         buildTypeId,
         undefined,
-        body,
+        body as unknown as ArtifactDependency,
         headers
       );
     }
@@ -412,11 +406,12 @@ export class BuildDependencyManager {
   ): Promise<AxiosResponse<DependencyResource>> {
     if (dependencyType === 'artifact') {
       const { body, headers } = prepareArtifactRequest(payload as ArtifactDependency);
+      // Generated client expects an ArtifactDependency body, but the endpoint requires XML.
       return this.client.modules.buildTypes.replaceArtifactDependency(
         buildTypeId,
         dependencyId,
         undefined,
-        body,
+        body as unknown as ArtifactDependency,
         headers
       );
     }

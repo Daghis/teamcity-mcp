@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.14](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.13...teamcity-mcp-v1.11.14) (2025-12-06)
+
+
+### Bug Fixes
+
+* Convert agent requirements and artifact dependencies to use XML format ([#294](https://github.com/Daghis/teamcity-mcp/issues/294)) ([a9bd9b7](https://github.com/Daghis/teamcity-mcp/commit/a9bd9b7a5710e03a0b8d2f2f35e703fc08aa5e85))
+
 ## [1.11.13](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.12...teamcity-mcp-v1.11.13) (2025-12-06)
 
 
