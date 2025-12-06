@@ -34,9 +34,9 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 20.x
-          registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
-          scope: '@daghis'
+          # Note: registry-url is intentionally omitted to enable OIDC trusted publishing
+          # See: https://github.com/actions/setup-node/issues/1440
 
       - name: Update npm for OIDC trusted publishing
         run: npm install -g npm@latest
@@ -71,9 +71,6 @@ jobs:
 
       - name: Publish to npm
         if: steps.exists.outputs.exists == 'false'
-        env:
-          NPM_CONFIG_PROVENANCE: 'true'
-          NODE_AUTH_TOKEN: ''  # Clear placeholder set by setup-node to enable OIDC
         run: npm publish --access public --provenance
 
       - name: Install MCP Publisher
