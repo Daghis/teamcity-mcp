@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.5...teamcity-mcp-v1.11.6) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** remove registry-url to enable npm OIDC trusted publishing ([#277](https://github.com/Daghis/teamcity-mcp/issues/277)) ([de2adbb](https://github.com/Daghis/teamcity-mcp/commit/de2adbbc422973eb3bbfe724163a627eb0d08780))
+
 ## [1.11.5](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.4...teamcity-mcp-v1.11.5) (2025-12-06)
 
 
