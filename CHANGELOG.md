@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.2...teamcity-mcp-v1.11.3) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** use Node.js 22 for npm trusted publishing ([#271](https://github.com/Daghis/teamcity-mcp/issues/271)) ([3573f1e](https://github.com/Daghis/teamcity-mcp/commit/3573f1e523f441a8607050708bf42ce17fb355b0))
+
 ## [1.11.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.1...teamcity-mcp-v1.11.2) (2025-12-06)
 
 
