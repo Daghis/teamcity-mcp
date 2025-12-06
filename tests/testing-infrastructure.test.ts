@@ -2,7 +2,7 @@
  * Meta-tests for Testing Framework
  * Tests that verify Jest is properly configured and working
  */
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -91,7 +91,7 @@ describe('Temporary Test', () => {
 
       try {
         // Run the test
-        const result = execSync(`npx jest ${tempTestFile} --silent`, {
+        const result = execFileSync('npx', ['jest', tempTestFile, '--silent'], {
           stdio: 'pipe',
         });
         expect(result).toBeDefined();
@@ -128,7 +128,7 @@ describe('TypeScript Test', () => {
       fs.writeFileSync(tempTestFile, tempTestContent);
 
       try {
-        const result = execSync(`npx jest ${tempTestFile} --silent`, {
+        const result = execFileSync('npx', ['jest', tempTestFile, '--silent'], {
           stdio: 'pipe',
         });
         expect(result).toBeDefined();
