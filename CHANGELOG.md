@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.13](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.12...teamcity-mcp-v1.11.13) (2025-12-06)
+
+
+### Bug Fixes
+
+* correct MCP name case to match GitHub username ([#292](https://github.com/Daghis/teamcity-mcp/issues/292)) ([7dd59c4](https://github.com/Daghis/teamcity-mcp/commit/7dd59c41df18b134a764d1ad3e90efa5e2a9ba30))
+
 ## [1.11.12](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.11...teamcity-mcp-v1.11.12) (2025-12-06)
 
 
