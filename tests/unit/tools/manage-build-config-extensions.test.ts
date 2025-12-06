@@ -97,25 +97,28 @@ describe('build configuration extended management tools', () => {
             dependencyType: 'artifact',
             dependencyId: 'artifactDep-1',
           });
-          expect(addArtifactDependencyToBuildType).toHaveBeenCalledWith(
-            'Config_A',
-            undefined,
-            expect.objectContaining({
-              'source-buildType': { id: 'Upstream_Config' },
-              properties: {
-                property: expect.arrayContaining([
-                  { name: 'cleanDestinationDirectory', value: 'true' },
-                  { name: 'pathRules', value: 'artifacts.zip=>deploy' },
-                ]),
-              },
+          // Verify XML request was sent
+          const call = addArtifactDependencyToBuildType.mock.calls[0];
+          expect(call).toBeDefined();
+          const [buildTypeId, fields, xmlBody, headers] = call as [
+            string,
+            unknown,
+            string,
+            unknown,
+          ];
+          expect(buildTypeId).toBe('Config_A');
+          expect(fields).toBeUndefined();
+          expect(xmlBody).toContain('<artifact-dependency');
+          expect(xmlBody).toContain('<source-buildType id="Upstream_Config"');
+          expect(xmlBody).toContain('<properties>');
+          expect(xmlBody).toContain('name="cleanDestinationDirectory" value="true"');
+          expect(xmlBody).toContain('name="pathRules" value="artifacts.zip=&gt;deploy"');
+          expect(headers).toMatchObject({
+            headers: expect.objectContaining({
+              'Content-Type': 'application/xml',
+              Accept: 'application/json',
             }),
-            expect.objectContaining({
-              headers: expect.objectContaining({
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              }),
-            })
-          );
+          });
 
           res = await getRequiredTool('manage_build_dependencies').handler({
             buildTypeId: 'Config_A',
@@ -172,25 +175,28 @@ describe('build configuration extended management tools', () => {
               headers: expect.objectContaining({ Accept: 'application/json' }),
             })
           );
-          expect(replaceArtifactDependency).toHaveBeenCalledWith(
-            'Config_A',
-            'artifactDep-1',
-            undefined,
-            expect.objectContaining({
-              properties: {
-                property: expect.arrayContaining([
-                  { name: 'cleanDestinationDirectory', value: 'false' },
-                  { name: 'revisionName', value: 'lastSuccessful' },
-                ]),
-              },
+          // Verify XML update request was sent
+          const updateCall = replaceArtifactDependency.mock.calls[0];
+          expect(updateCall).toBeDefined();
+          const [
+            updateBuildTypeId,
+            updateDependencyId,
+            updateFields,
+            updateXmlBody,
+            updateHeaders,
+          ] = updateCall as [string, string, unknown, string, unknown];
+          expect(updateBuildTypeId).toBe('Config_A');
+          expect(updateDependencyId).toBe('artifactDep-1');
+          expect(updateFields).toBeUndefined();
+          expect(updateXmlBody).toContain('<artifact-dependency');
+          expect(updateXmlBody).toContain('name="cleanDestinationDirectory" value="false"');
+          expect(updateXmlBody).toContain('name="revisionName" value="lastSuccessful"');
+          expect(updateHeaders).toMatchObject({
+            headers: expect.objectContaining({
+              'Content-Type': 'application/xml',
+              Accept: 'application/json',
             }),
-            expect.objectContaining({
-              headers: expect.objectContaining({
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              }),
-            })
-          );
+          });
 
           res = await getRequiredTool('manage_build_dependencies').handler({
             buildTypeId: 'Config_A',
@@ -535,24 +541,27 @@ describe('build configuration extended management tools', () => {
             operation: 'add',
             requirementId: 'REQ_5',
           });
-          expect(addAgentRequirementToBuildType).toHaveBeenCalledWith(
-            'Cfg_C',
-            undefined,
-            expect.objectContaining({
-              properties: {
-                property: expect.arrayContaining([
-                  { name: 'property-name', value: 'env.ANSIBLE' },
-                  { name: 'condition', value: 'exists' },
-                ]),
-              },
+          // Verify XML request was sent
+          const call = addAgentRequirementToBuildType.mock.calls[0];
+          expect(call).toBeDefined();
+          const [buildTypeId, fields, xmlBody, headers] = call as [
+            string,
+            unknown,
+            string,
+            unknown,
+          ];
+          expect(buildTypeId).toBe('Cfg_C');
+          expect(fields).toBeUndefined();
+          expect(xmlBody).toContain('<agent-requirement');
+          expect(xmlBody).toContain('<properties>');
+          expect(xmlBody).toContain('name="property-name" value="env.ANSIBLE"');
+          expect(xmlBody).toContain('name="condition" value="exists"');
+          expect(headers).toMatchObject({
+            headers: expect.objectContaining({
+              'Content-Type': 'application/xml',
+              Accept: 'application/json',
             }),
-            expect.objectContaining({
-              headers: expect.objectContaining({
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              }),
-            })
-          );
+          });
 
           res = await getRequiredTool('manage_agent_requirements').handler({
             buildTypeId: 'Cfg_C',
@@ -577,25 +586,28 @@ describe('build configuration extended management tools', () => {
               headers: expect.objectContaining({ Accept: 'application/json' }),
             })
           );
-          expect(replaceAgentRequirement).toHaveBeenCalledWith(
-            'Cfg_C',
-            'REQ_5',
-            undefined,
-            expect.objectContaining({
-              properties: {
-                property: expect.arrayContaining([
-                  { name: 'property-name', value: 'env.TERRAFORM' },
-                  { name: 'condition', value: 'exists' },
-                ]),
-              },
+          // Verify XML update request was sent
+          const updateCall = replaceAgentRequirement.mock.calls[0];
+          expect(updateCall).toBeDefined();
+          const [
+            updateBuildTypeId,
+            updateRequirementId,
+            updateFields,
+            updateXmlBody,
+            updateHeaders,
+          ] = updateCall as [string, string, unknown, string, unknown];
+          expect(updateBuildTypeId).toBe('Cfg_C');
+          expect(updateRequirementId).toBe('REQ_5');
+          expect(updateFields).toBeUndefined();
+          expect(updateXmlBody).toContain('<agent-requirement');
+          expect(updateXmlBody).toContain('name="property-name" value="env.TERRAFORM"');
+          expect(updateXmlBody).toContain('name="condition" value="exists"');
+          expect(updateHeaders).toMatchObject({
+            headers: expect.objectContaining({
+              'Content-Type': 'application/xml',
+              Accept: 'application/json',
             }),
-            expect.objectContaining({
-              headers: expect.objectContaining({
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              }),
-            })
-          );
+          });
 
           res = await getRequiredTool('manage_agent_requirements').handler({
             buildTypeId: 'Cfg_C',
