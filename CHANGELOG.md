@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.16](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.15...teamcity-mcp-v1.11.16) (2025-12-06)
+
+
+### Bug Fixes
+
+* update @modelcontextprotocol/sdk to 1.24.0 to address CVE-2025-66414 ([#302](https://github.com/Daghis/teamcity-mcp/issues/302)) ([851ad8f](https://github.com/Daghis/teamcity-mcp/commit/851ad8fc4b037195243c60aec44711072d3d7ca7))
+
 ## [1.11.15](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.14...teamcity-mcp-v1.11.15) (2025-12-06)
 
 
