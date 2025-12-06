@@ -2,7 +2,7 @@
  * Tests for Development Tooling and Code Quality
  * Verifies that linting and formatting rules are properly configured
  */
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -79,7 +79,7 @@ export function testFunction(value: string): string {
       try {
         const eslintJs = path.join(process.cwd(), 'node_modules', 'eslint', 'bin', 'eslint.js');
         const node = process.execPath;
-        execSync(`"${node}" "${eslintJs}" ${tempFile}`, { stdio: 'pipe' });
+        execFileSync(node, [eslintJs, tempFile], { stdio: 'pipe' });
         // If no error is thrown, linting passed
         expect(true).toBe(true);
       } catch (error: unknown) {
@@ -104,7 +104,7 @@ export function testFunction(value: any): any {
       try {
         const eslintJs = path.join(process.cwd(), 'node_modules', 'eslint', 'bin', 'eslint.js');
         const node = process.execPath;
-        execSync(`"${node}" "${eslintJs}" ${tempFile}`, { stdio: 'pipe' });
+        execFileSync(node, [eslintJs, tempFile], { stdio: 'pipe' });
         // Should have thrown an error
         expect(true).toBe(false);
       } catch (error: unknown) {
@@ -148,7 +148,7 @@ export function testFunction(value: any): any {
           'prettier.cjs'
         );
         const node = process.execPath;
-        execSync(`"${node}" "${prettierJs}" --write ${tempFile}`, { stdio: 'pipe' });
+        execFileSync(node, [prettierJs, '--write', tempFile], { stdio: 'pipe' });
         const formattedCode = fs.readFileSync(tempFile, 'utf-8');
 
         // Check that code was formatted
@@ -217,7 +217,7 @@ export function testFunction(value: any): any {
           'prettier.cjs'
         );
         const node = process.execPath;
-        const result = execSync(`"${node}" "${prettierJs}" --check "src/**/*.{ts,tsx}"`, {
+        const result = execFileSync(node, [prettierJs, '--check', 'src/**/*.{ts,tsx}'], {
           stdio: 'pipe',
         });
         expect(result).toBeDefined();
