@@ -57,7 +57,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Daghis/teamcity-mcp.git"
+    "url": "git+https://github.com/Daghis/teamcity-mcp.git"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.21.0",
