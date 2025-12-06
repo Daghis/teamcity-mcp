@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.11.15](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.14...teamcity-mcp-v1.11.15) (2025-12-06)
+
+
+### Bug Fixes
+
+* package hygiene - exclude unnecessary files from npm package ([#300](https://github.com/Daghis/teamcity-mcp/issues/300)) ([da79eb6](https://github.com/Daghis/teamcity-mcp/commit/da79eb6c8a3d661f771d7268b976276628038502))
+
+## [1.11.14](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.13...teamcity-mcp-v1.11.14) (2025-12-06)
+
+
+### Bug Fixes
+
+* Convert agent requirements and artifact dependencies to use XML format ([#294](https://github.com/Daghis/teamcity-mcp/issues/294)) ([a9bd9b7](https://github.com/Daghis/teamcity-mcp/commit/a9bd9b7a5710e03a0b8d2f2f35e703fc08aa5e85))
+
 ## [1.11.13](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.12...teamcity-mcp-v1.11.13) (2025-12-06)
 
 
