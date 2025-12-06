@@ -33,43 +33,6 @@
 - PRs: link issues/tickets, describe scope and testing, include relevant logs or CLI output. Require green CI and `npm run check` locally.
 - PR descriptions should use Markdown with proper newlines. When scripting, prefer `gh pr edit --body-file` (or `--body` with actual newlines) to ensure bullets and paragraphs render correctly.
 
-### Commitlint Rules (CI-enforced)
-- Allowed types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`, `deps`.
-- Format: `type(scope?): subject` (scope optional). Examples:
-  - `fix(tools): delete_parameter uses correct endpoint`
-  - `feat(utils): add TeamCity service message escaping`
-- Subject length: ≤ 100 characters. Keep details in the body, not the subject.
-- Style: imperative mood, no trailing period, lowercase `type`.
-- Breaking changes: `feat!: subject` or add footer `BREAKING CHANGE: ...`.
-- Reverts: use conventional form, not Git’s default. Example: `revert: feat(utils): add service message escaping` and explain in body.
-
-Notes and tips
-- CI checks only the last commit on a PR (`commitDepth: 1`). Ensure your most recent commit message conforms.
-- If needed, amend the last commit: `git commit --amend -m "fix(scope): concise subject"` (keep body bullets below).
-- For multi-commit PRs, prefer squashing locally or set a good PR title and use “Squash and merge”. PR titles must also follow the same convention and ≤ 100 chars because they become the squash message.
-- Put specifics in the body:
-  - Bullets of what changed
-  - Rationale/links (e.g., `Closes #NN`)
-  - Any migration notes
-
-Examples
-- Good single-commit message:
-  - `fix(teamcity): authorize_agent uses authorizedInfo JSON endpoint`
-    
-    Body:
-    - Switch to `/app/rest/agents/{locator}/authorizedInfo` with JSON
-    - Set `Content-Type: application/json`
-    
-    Closes #78
-
-- Good PR title (squash merge):
-  - `fix(tools): delete_parameter uses correct endpoint + arg order`
-
-- Good revert:
-  - `revert: feat(utils): add TeamCity service message escaping`
-    
-    Body: reverts commit `<sha>` due to CI failure; will reintroduce behind a flag.
-
 ## Security & Configuration Tips
 - Never commit secrets. Configure via `.env` (e.g., `TEAMCITY_URL`, `TEAMCITY_TOKEN`, `MCP_MODE`). Use provided TeamCity client/managers; respect rate limits and retries.
 
@@ -161,6 +124,6 @@ Bullets
 Closes #18.
 MD`
   - Apply: `gh pr edit 31 --body-file /tmp/pr.md`
-- Keep commit subjects under 100 chars (commitlint default via `@commitlint/config-conventional`).
+- Keep commit subjects under 100 chars.
 - For Dependabot PRs: repository secrets aren’t available. Our CI skips Codecov uploads for `dependabot[bot]` but still runs tests and checks.
 - For forked PRs: treat as untrusted (no secrets). Avoid running steps that require secrets or write permissions unless guarded.
