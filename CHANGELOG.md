@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.5](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.4...teamcity-mcp-v1.11.5) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** clear NODE_AUTH_TOKEN for npm OIDC trusted publishing ([#275](https://github.com/Daghis/teamcity-mcp/issues/275)) ([689d499](https://github.com/Daghis/teamcity-mcp/commit/689d499b8198dfb4d647f1c22e039477c8913b2e))
+
 ## [1.11.4](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.3...teamcity-mcp-v1.11.4) (2025-12-06)
 
 
