@@ -86,7 +86,7 @@
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/morgan": "^1.9.9",
-    "@types/node": "^24.10.0",
+    "@types/node": "^25.0.2",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
     "axios-retry": "^4.5.0",
