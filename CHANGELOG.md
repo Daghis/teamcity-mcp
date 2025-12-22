@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.13.0...teamcity-mcp-v1.13.1) (2025-12-22)
+
+
+### Bug Fixes
+
+* tune codecov PR comment behavior ([#329](https://github.com/Daghis/teamcity-mcp/issues/329)) ([a790ab1](https://github.com/Daghis/teamcity-mcp/commit/a790ab18cf08a755f930ed73639c958c7b096b55))
+
 ## [1.13.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.12.1...teamcity-mcp-v1.13.0) (2025-12-22)
 
 
