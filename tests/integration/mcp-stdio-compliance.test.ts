@@ -16,6 +16,11 @@ import { join } from 'path';
 
 import packageJson from '../../package.json';
 
+/** Type for MCP initialize response */
+interface InitializeResponse {
+  result?: { serverInfo?: { name: string; version: string }; protocolVersion?: string };
+}
+
 describe('MCP stdio transport compliance', () => {
   const serverPath = join(__dirname, '../../dist/index.js');
   const timeout = 10000;
@@ -35,9 +40,7 @@ describe('MCP stdio transport compliance', () => {
 
       let stdoutData = '';
       let stderrData = '';
-      let initResponse: {
-        result?: { serverInfo?: { name: string; version: string }; protocolVersion?: string };
-      } | null = null;
+      let initResponse: InitializeResponse | null = null;
 
       const stdoutPromise = new Promise<void>((resolve, reject) => {
         server.stdout.on('data', (data) => {
@@ -102,10 +105,12 @@ describe('MCP stdio transport compliance', () => {
       if (initResponse === null) {
         throw new Error('initResponse should not be null');
       }
-      expect(initResponse.result).toHaveProperty('serverInfo');
-      expect(initResponse.result?.serverInfo?.name).toBe('teamcity-mcp');
-      expect(initResponse.result?.serverInfo?.version).toMatch(/^\d+\.\d+\.\d+/);
-      expect(initResponse.result?.protocolVersion).toBe('2024-11-05');
+      // TypeScript doesn't track mutations inside async callbacks, so we need to help it
+      const response = initResponse as InitializeResponse;
+      expect(response.result).toHaveProperty('serverInfo');
+      expect(response.result?.serverInfo?.name).toBe('teamcity-mcp');
+      expect(response.result?.serverInfo?.version).toMatch(/^\d+\.\d+\.\d+/);
+      expect(response.result?.protocolVersion).toBe('2024-11-05');
 
       // Verify stderr contains logging (not stdout)
       expect(stderrData).toContain('TeamCity MCP Server');
