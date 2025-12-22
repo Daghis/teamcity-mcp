@@ -6,6 +6,30 @@ import type { TeamCityClientAdapter } from './client-adapter';
 import { BuildAccessDeniedError, BuildNotFoundError } from './errors';
 
 /**
+ * Check if an error is an Axios 404 response
+ */
+function isAxios404(error: unknown): boolean {
+  return (
+    error != null &&
+    typeof error === 'object' &&
+    'response' in error &&
+    (error as { response?: { status?: number } }).response?.status === 404
+  );
+}
+
+/**
+ * Check if an error is an Axios 403 response
+ */
+function isAxios403(error: unknown): boolean {
+  return (
+    error != null &&
+    typeof error === 'object' &&
+    'response' in error &&
+    (error as { response?: { status?: number } }).response?.status === 403
+  );
+}
+
+/**
  * Options for querying build status
  */
 export interface BuildStatusOptions {
@@ -39,6 +63,7 @@ export interface BuildStatusResult {
   estimatedTotalSeconds?: number;
   estimatedStartTime?: Date;
   queuePosition?: number;
+  waitReason?: string;
   failureReason?: string;
   canceledBy?: string;
   canceledDate?: Date;
@@ -136,7 +161,11 @@ export class BuildStatusManager {
   }
 
   /**
-   * Get build status by ID or number
+   * Get build status by ID or number.
+   * Uses 3-step fallback to handle builds in queue and race conditions:
+   * 1. Try builds endpoint
+   * 2. On 404, try build queue (build may be queued)
+   * 3. On 404 again, retry builds endpoint (build may have left queue between checks)
    */
   async getBuildStatus(options: BuildStatusOptions): Promise<BuildStatusResult> {
     // Validate input
@@ -157,64 +186,137 @@ export class BuildStatusManager {
       }
     }
 
+    // Step 1: Try builds endpoint
     try {
-      let buildData: BuildApiBuild | undefined;
-
-      if (options.buildId) {
-        // Query by build ID
-        const response = await this.client.builds.getBuild(
-          `id:${options.buildId}`,
-          this.getFieldSelection(options)
-        );
-        buildData = response.data as BuildApiBuild;
-      } else {
-        // Query by build number and type using direct build locator
-        const locator = this.buildLocator(options);
-        const response = await this.client.builds.getBuild(
-          locator,
-          this.getFieldSelection(options)
-        );
-        buildData = response.data as BuildApiBuild;
-      }
-
-      if (buildData == null) {
-        throw new BuildNotFoundError('Build data is undefined');
-      }
-
-      // Transform response to standardized format
-      const result = this.transformBuildResponse(buildData as BuildApiBuild, options);
-
-      // Cache if build is completed
-      if (result.state === 'finished' || result.state === 'canceled') {
-        this.setCachedResult(cacheKey, result);
-      }
-
-      return result;
+      return await this.getBuildStatusFromBuildsEndpoint(options, cacheKey);
     } catch (error: unknown) {
-      // Handle specific error cases
-      if (
-        error != null &&
-        typeof error === 'object' &&
-        'response' in error &&
-        (error as { response?: { status?: number } }).response?.status === 404
-      ) {
-        throw new BuildNotFoundError(`Build not found: ${options.buildId ?? options.buildNumber}`);
+      // Only continue to queue fallback for 404 errors on buildId queries
+      if (!isAxios404(error) || !options.buildId) {
+        this.handleBuildStatusError(error, options);
       }
-
-      if (
-        error != null &&
-        typeof error === 'object' &&
-        'response' in error &&
-        (error as { response?: { status?: number } }).response?.status === 403
-      ) {
-        throw new BuildAccessDeniedError(
-          `Access denied to build: ${options.buildId ?? options.buildNumber}`
-        );
-      }
-
-      // Re-throw other errors
-      throw error;
+      // Build not in builds endpoint - might be queued
     }
+
+    // Step 2: Try build queue (only for buildId queries)
+    // Note: We only reach here if options.buildId is defined (due to guard above)
+    const buildId = options.buildId as string;
+    try {
+      return await this.getQueuedBuildStatus(buildId);
+    } catch (queueError: unknown) {
+      if (!isAxios404(queueError)) {
+        // Non-404 error from queue - throw it
+        this.handleBuildStatusError(queueError, options);
+      }
+      // Build not in queue either - race condition: it may have moved between our checks
+    }
+
+    // Step 3: Retry builds endpoint (build may have left queue between step 1 and 2)
+    try {
+      return await this.getBuildStatusFromBuildsEndpoint(options, cacheKey);
+    } catch (error: unknown) {
+      // This is the final attempt - throw appropriate error
+      this.handleBuildStatusError(error, options);
+    }
+  }
+
+  /**
+   * Get build status from the builds endpoint
+   */
+  private async getBuildStatusFromBuildsEndpoint(
+    options: BuildStatusOptions,
+    cacheKey: string
+  ): Promise<BuildStatusResult> {
+    let buildData: BuildApiBuild | undefined;
+
+    if (options.buildId) {
+      // Query by build ID
+      const response = await this.client.builds.getBuild(
+        `id:${options.buildId}`,
+        this.getFieldSelection(options)
+      );
+      buildData = response.data as BuildApiBuild;
+    } else {
+      // Query by build number and type using direct build locator
+      const locator = this.buildLocator(options);
+      const response = await this.client.builds.getBuild(locator, this.getFieldSelection(options));
+      buildData = response.data as BuildApiBuild;
+    }
+
+    if (buildData == null) {
+      throw new BuildNotFoundError('Build data is undefined');
+    }
+
+    // Transform response to standardized format
+    const result = this.transformBuildResponse(buildData as BuildApiBuild, options);
+
+    // Cache if build is completed
+    if (result.state === 'finished' || result.state === 'canceled') {
+      this.setCachedResult(cacheKey, result);
+    }
+
+    return result;
+  }
+
+  /**
+   * Get build status from the build queue
+   */
+  private async getQueuedBuildStatus(buildId: string): Promise<BuildStatusResult> {
+    const response = await this.client.modules.buildQueue.getQueuedBuild(
+      buildId,
+      'id,number,state,status,buildTypeId,branchName,webUrl,queuedDate,waitReason'
+    );
+
+    const queuedBuild = response.data as {
+      id?: string | number;
+      number?: string;
+      state?: string;
+      status?: string;
+      buildTypeId?: string;
+      branchName?: string;
+      webUrl?: string;
+      queuedDate?: string;
+      waitReason?: string;
+    };
+
+    if (queuedBuild == null) {
+      throw new BuildNotFoundError('Queued build data is undefined');
+    }
+
+    const result: BuildStatusResult = {
+      buildId: String(queuedBuild.id),
+      buildNumber: queuedBuild.number,
+      buildTypeId: queuedBuild.buildTypeId,
+      state: 'queued',
+      status: undefined,
+      percentageComplete: 0,
+      branchName: queuedBuild.branchName,
+      webUrl: queuedBuild.webUrl,
+      waitReason: queuedBuild.waitReason,
+    };
+
+    if (queuedBuild.queuedDate) {
+      result.queuedDate = this.parseDate(queuedBuild.queuedDate);
+    }
+
+    return result;
+  }
+
+  /**
+   * Handle and re-throw build status errors with appropriate error types
+   */
+  private handleBuildStatusError(error: unknown, options: BuildStatusOptions): never {
+    if (isAxios404(error)) {
+      throw new BuildNotFoundError(`Build not found: ${options.buildId ?? options.buildNumber}`);
+    }
+
+    if (isAxios403(error)) {
+      throw new BuildAccessDeniedError(
+        `Access denied to build: ${options.buildId ?? options.buildNumber}`
+      );
+    }
+
+    // Re-throw other errors
+    throw error;
   }
 
   /**

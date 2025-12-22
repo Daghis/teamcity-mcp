@@ -44,6 +44,12 @@ import { TeamCityAPI } from './api-client';
 const isReadableStream = (value: unknown): value is Readable =>
   typeof value === 'object' && value !== null && typeof (value as Readable).pipe === 'function';
 
+/**
+ * Check if an error is an Axios 404 response
+ */
+const isAxios404 = (error: unknown): boolean =>
+  isAxiosError(error) && error.response?.status === 404;
+
 interface ArtifactPayloadBase {
   name: string;
   path: string;
@@ -687,7 +693,8 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'get_build',
-    description: 'Get details of a specific build',
+    description:
+      'Get details of a specific build (works for both queued and running/finished builds)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -702,6 +709,29 @@ const DEV_TOOLS: ToolDefinition[] = [
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+
+          // Step 1: Try builds endpoint
+          try {
+            const build = (await adapter.getBuild(typed.buildId)) as {
+              status?: string;
+              statusText?: string;
+            };
+            return json(build);
+          } catch (error) {
+            if (!isAxios404(error)) throw error;
+            // Build not in builds endpoint - might be queued
+          }
+
+          // Step 2: Try build queue
+          try {
+            const qb = await adapter.modules.buildQueue.getQueuedBuild(typed.buildId);
+            return json({ ...qb.data, state: 'queued' });
+          } catch (queueError) {
+            if (!isAxios404(queueError)) throw queueError;
+            // Build not in queue either - race condition
+          }
+
+          // Step 3: Retry builds endpoint (build may have left queue between checks)
           const build = (await adapter.getBuild(typed.buildId)) as {
             status?: string;
             statusText?: string;
@@ -986,18 +1016,19 @@ const DEV_TOOLS: ToolDefinition[] = [
               enrich.canMoveToTop = result.queuePosition > 1;
             }
 
-            if (typed.includeQueueTotals) {
-              try {
-                const countResp = await adapter.modules.buildQueue.getAllQueuedBuilds(
-                  undefined,
-                  'count'
-                );
-                enrich.totalQueued = (countResp.data as { count?: number }).count;
-              } catch {
-                /* ignore */
-              }
+            // Always include queue totals for queued builds
+            try {
+              const countResp = await adapter.modules.buildQueue.getAllQueuedBuilds(
+                undefined,
+                'count'
+              );
+              enrich.totalQueued = (countResp.data as { count?: number }).count;
+            } catch {
+              /* ignore */
             }
-            if (typed.includeQueueReason) {
+
+            // Always include wait reason for queued builds (if not already set by BuildStatusManager)
+            if (!result.waitReason) {
               try {
                 const targetBuildId = typed.buildId ?? result.buildId;
                 if (targetBuildId) {
