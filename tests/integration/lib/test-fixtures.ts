@@ -5,7 +5,7 @@
  * and matching teardown functions that clean them up, designed to be used with beforeAll/afterAll.
  */
 import type { ActionResult, BuildRef, TriggerBuildResult } from '../../types/tool-results';
-import { callTool, callToolsBatch, callToolsBatchExpect } from './mcp-runner';
+import { type ToolBatchStep, callTool, callToolsBatch, callToolsBatchExpect } from './mcp-runner';
 
 /** Check if TeamCity environment variables are configured */
 export const hasTeamCityEnv = Boolean(
@@ -103,7 +103,7 @@ export async function setupProjectFixture(config: ProjectFixtureConfig): Promise
   const buildTypeId = `${config.prefix}_BT_${ts}`;
   const buildTypeName = `${config.namePrefix} BuildType ${ts}`;
 
-  const batchSteps = [
+  const batchSteps: ToolBatchStep[] = [
     {
       tool: 'create_project',
       args: {
@@ -245,7 +245,7 @@ export async function setupVcsFixture(config: VcsFixtureConfig): Promise<VcsFixt
   const vcsRootId = `${config.prefix}_VCS_${ts}`;
   const vcsRootName = `${config.namePrefix} VCS Root ${ts}`;
 
-  const batchSteps = [
+  const batchSteps: ToolBatchStep[] = [
     {
       tool: 'create_project',
       args: {
