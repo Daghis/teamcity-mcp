@@ -15,7 +15,7 @@ The TeamCity MCP Server allows developers using AI-powered coding assistants (Cl
 
 ### 🚀 Two Operational Modes
 
-- **Dev Mode**: Safe CI/CD operations
+- **Dev Mode** (default): Safe CI/CD operations
   - Trigger builds
   - Monitor build status and progress
   - Fetch build logs
@@ -29,6 +29,8 @@ The TeamCity MCP Server allows developers using AI-powered coding assistants (Cl
   - Configure VCS roots and agents
   - Set up new projects
   - Modify infrastructure settings
+
+See the [Tools Mode Matrix](docs/mcp-tools-mode-matrix.md) for the complete list of 77 tools and their availability by mode.
 
 ### 🎯 Key Capabilities
 
@@ -295,9 +297,33 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 
 ## Security
 
-- Configure `TEAMCITY_TOKEN` via environment (see `.env.example`); never commit real tokens
-- Token-based authentication only
-- Logs redact sensitive values
+### Token Management
+
+- Configure `TEAMCITY_TOKEN` via environment variable or config file (see `.env.example`); never commit real tokens
+- Use a token with minimal required permissions; read-only tokens work for most Dev mode operations
+- Token-based authentication only; the MCP server does not support username/password
+- Logs redact sensitive values including tokens
+
+### Mode Selection
+
+- Prefer **Dev mode** unless Full mode is explicitly needed—this limits the blast radius of any misconfiguration or prompt injection
+- Full mode enables destructive operations (project deletion, agent management) that cannot be easily undone
+
+### Network Security
+
+- Always use HTTPS for TeamCity connections; the server does not enforce this but strongly recommends it
+- The MCP server connects only to the configured TeamCity URL; no other network calls are made
+
+### AI Assistant Considerations
+
+- AI assistants could be manipulated via prompt injection in build logs, test output, or other TeamCity data
+- Dev mode's limited tool set reduces the impact of such attacks
+- All actions appear in TeamCity's audit log under the token's associated user
+- Build logs and test failure details may contain sensitive information (secrets, paths, internal URLs) that become visible to the AI assistant
+
+### Repository Security
+
+This repository has GitHub secret scanning and push protection enabled. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Support
 
@@ -309,6 +335,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 - JetBrains TeamCity for the excellent CI/CD platform
 - Anthropic for the Model Control Protocol specification
 - The open-source community for continuous support
+- See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party licenses
 
 ---
 
