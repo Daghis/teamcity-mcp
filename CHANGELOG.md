@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.12.1...teamcity-mcp-v1.13.0) (2025-12-22)
+
+
+### Features
+
+* add CLI argument support for Windows workaround ([#320](https://github.com/Daghis/teamcity-mcp/issues/320)) ([#326](https://github.com/Daghis/teamcity-mcp/issues/326)) ([cc05a4d](https://github.com/Daghis/teamcity-mcp/commit/cc05a4dd19c1d7e1f547cdd35bb910035141909d))
+
 ## [1.12.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.12.0...teamcity-mcp-v1.12.1) (2025-12-22)
 
 
