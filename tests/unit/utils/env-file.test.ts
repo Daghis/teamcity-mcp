@@ -127,6 +127,34 @@ TEAMCITY_TOKEN=token
       expect(result.error).toContain('Disk error');
       expect(result.values).toBeUndefined();
     });
+
+    it('should handle non-Error thrown values', () => {
+      // Some libraries throw strings or other non-Error values
+      mockReadFileSync.mockImplementation(() => {
+        // eslint-disable-next-line no-throw-literal
+        throw 'string error message';
+      });
+
+      const result = loadEnvFile('/path/to/config.env');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Failed to read');
+      expect(result.error).toContain('string error message');
+      expect(result.values).toBeUndefined();
+    });
+
+    it('should handle thrown objects that are not Error instances', () => {
+      mockReadFileSync.mockImplementation(() => {
+        // eslint-disable-next-line no-throw-literal
+        throw { custom: 'error object' };
+      });
+
+      const result = loadEnvFile('/path/to/config.env');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Failed to read');
+      expect(result.values).toBeUndefined();
+    });
   });
 
   describe('path handling', () => {

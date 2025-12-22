@@ -1,4 +1,13 @@
+import * as fs from 'fs';
+
 import { type CliArgs, getHelpText, getVersion, parseCliArgs } from '@/utils/cli-args';
+
+// Mock fs for getVersion tests
+jest.mock('fs', () => ({
+  readFileSync: jest.fn(),
+}));
+
+const mockReadFileSync = fs.readFileSync as jest.MockedFunction<typeof fs.readFileSync>;
 
 describe('parseCliArgs', () => {
   describe('boolean flags', () => {
@@ -188,22 +197,68 @@ describe('parseCliArgs', () => {
 });
 
 describe('getVersion', () => {
-  it('should return a version string', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should return a version string when package.json exists', () => {
+    mockReadFileSync.mockReturnValue(JSON.stringify({ version: '1.2.3' }));
     const version = getVersion();
     expect(typeof version).toBe('string');
-    expect(version.length).toBeGreaterThan(0);
+    expect(version).toBe('1.2.3');
   });
 
   it('should return a semver-like version', () => {
+    mockReadFileSync.mockReturnValue(JSON.stringify({ version: '1.2.3' }));
     const version = getVersion();
-    // Either a valid semver or 'unknown'
-    if (version !== 'unknown') {
-      expect(version).toMatch(/^\d+\.\d+\.\d+/);
-    }
+    expect(version).toMatch(/^\d+\.\d+\.\d+/);
+  });
+
+  it('should try multiple paths and return first valid version', () => {
+    // First path fails, second succeeds
+    mockReadFileSync
+      .mockImplementationOnce(() => {
+        throw new Error('ENOENT');
+      })
+      .mockReturnValueOnce(JSON.stringify({ version: '2.0.0' }));
+
+    const version = getVersion();
+    expect(version).toBe('2.0.0');
+    expect(mockReadFileSync).toHaveBeenCalledTimes(2);
+  });
+
+  it('should return unknown when package.json has no version field', () => {
+    // Package.json exists but has no version
+    mockReadFileSync.mockReturnValue(JSON.stringify({ name: 'test-package' }));
+
+    const version = getVersion();
+    expect(version).toBe('unknown');
+  });
+
+  it('should return unknown when all paths fail', () => {
+    mockReadFileSync.mockImplementation(() => {
+      throw new Error('ENOENT: no such file');
+    });
+
+    const version = getVersion();
+    expect(version).toBe('unknown');
+  });
+
+  it('should return unknown when JSON parsing fails', () => {
+    mockReadFileSync.mockReturnValue('not valid json');
+
+    const version = getVersion();
+    expect(version).toBe('unknown');
   });
 });
 
 describe('getHelpText', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Default mock for getHelpText tests
+    mockReadFileSync.mockReturnValue(JSON.stringify({ version: '1.0.0' }));
+  });
+
   it('should return help text', () => {
     const help = getHelpText();
     expect(typeof help).toBe('string');
@@ -255,5 +310,11 @@ describe('getHelpText', () => {
     expect(help).toContain('CONFIG FILE FORMAT');
     expect(help).toContain('TEAMCITY_URL=');
     expect(help).toContain('TEAMCITY_TOKEN=');
+  });
+
+  it('should include version in help text', () => {
+    mockReadFileSync.mockReturnValue(JSON.stringify({ version: '2.5.0' }));
+    const help = getHelpText();
+    expect(help).toContain('v2.5.0');
   });
 });
