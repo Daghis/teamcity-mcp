@@ -85,9 +85,39 @@ npx -y @daghis/teamcity-mcp
   - `claude mcp add [-s user] teamcity -- npx -y @daghis/teamcity-mcp`
 - With env vars (if not using .env):
   - `claude mcp add [-s user] teamcity -- env TEAMCITY_URL="https://teamcity.example.com" TEAMCITY_TOKEN="tc_<your_token>" MCP_MODE=dev npx -y @daghis/teamcity-mcp`
+- With CLI arguments (recommended for Windows):
+  - `claude mcp add [-s user] teamcity -- npx -y @daghis/teamcity-mcp --url "https://teamcity.example.com" --token "tc_<your_token>" --mode dev`
 - Context usage (Opus 4.1, estimates):
   - Dev (default): ~14k tokens for MCP tools
   - Full (`MCP_MODE=full`): ~26k tokens for MCP tools
+
+### Windows Users
+
+On Windows, Claude Code's MCP configuration may not properly merge environment variables. Use CLI arguments as a workaround:
+
+```json
+{
+  "mcpServers": {
+    "teamcity": {
+      "command": "npx",
+      "args": ["-y", "@daghis/teamcity-mcp", "--url", "https://teamcity.example.com", "--token", "YOUR_TOKEN"]
+    }
+  }
+}
+```
+
+Or use a config file for better security (token not visible in process list):
+
+```json
+{
+  "mcpServers": {
+    "teamcity": {
+      "command": "npx",
+      "args": ["-y", "@daghis/teamcity-mcp", "--config", "C:\\path\\to\\teamcity.env"]
+    }
+  }
+}
+```
 
 ## Configuration
 
