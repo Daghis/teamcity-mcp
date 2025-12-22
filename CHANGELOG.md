@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.13.1...teamcity-mcp-v2.0.0) (2025-12-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* 15 tools moved from Dev mode to Full-only mode.
+
+### Features
+
+* reduce dev mode tool surface ([#332](https://github.com/Daghis/teamcity-mcp/issues/332)) ([3a2bd6d](https://github.com/Daghis/teamcity-mcp/commit/3a2bd6dd72cc4b2d8c5cca1bb22867b1c7e19d12))
+
 ## [1.13.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.13.0...teamcity-mcp-v1.13.1) (2025-12-22)
 
 
