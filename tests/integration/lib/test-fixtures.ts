@@ -5,7 +5,7 @@
  * and matching teardown functions that clean them up, designed to be used with beforeAll/afterAll.
  */
 import type { ActionResult, BuildRef, TriggerBuildResult } from '../../types/tool-results';
-import { callTool, callToolsBatch, callToolsBatchExpect, type ToolBatchStep } from './mcp-runner';
+import { type ToolBatchStep, callTool, callToolsBatch, callToolsBatchExpect } from './mcp-runner';
 
 /** Check if TeamCity environment variables are configured */
 export const hasTeamCityEnv = Boolean(
