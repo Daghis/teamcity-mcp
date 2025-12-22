@@ -68,6 +68,16 @@ export * from './error-logger';
 export * from './lru-cache';
 export * from './teamcity-service-messages';
 
+// CLI argument parsing
+export * from './cli-args';
+export { parseCliArgs, getHelpText, getVersion } from './cli-args';
+export type { CliArgs } from './cli-args';
+
+// Environment file loading
+export * from './env-file';
+export { loadEnvFile } from './env-file';
+export type { EnvFileResult } from './env-file';
+
 // Add deprecation notice for legacy import pattern
 const warnLegacyImport = () => {
   // Legacy import deprecation warning - removed as part of simplification
