@@ -93,7 +93,7 @@ npx -y @daghis/teamcity-mcp
 
 ### Windows Users
 
-On Windows, Claude Code's MCP configuration may not properly merge environment variables. Use CLI arguments as a workaround:
+On Windows, Claude Code's MCP configuration [may not properly merge environment variables](https://github.com/anthropics/claude-code/issues/1254). Use CLI arguments as a workaround:
 
 ```json
 {
