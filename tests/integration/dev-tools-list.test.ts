@@ -8,6 +8,7 @@ const hasTeamCityEnv = Boolean(
 );
 
 // Expected dev-mode tools as per docs/mcp-tools-mode-matrix.md
+// Note: 27 dev-mode tools focused on developer workflows; admin/infrastructure tools moved to full mode
 const EXPECTED_DEV_TOOLS = new Set([
   'ping',
   // Projects
@@ -31,35 +32,16 @@ const EXPECTED_DEV_TOOLS = new Set([
   'list_problem_occurrences',
   'list_investigations',
   'list_muted_tests',
-  'get_versioned_settings_status',
   // Build Configs
   'list_build_configs',
   'get_build_config',
   // Tests
   'list_test_failures',
   'get_test_details',
-  // VCS
-  'list_vcs_roots',
-  'get_vcs_root',
   // Queue
   'list_queued_builds',
   // Server
   'get_server_info',
-  'check_teamcity_connection',
-  'check_availability_guard',
-  // Agents (read-only)
-  'list_agents',
-  'list_agent_pools',
-  'get_agent_enabled_info',
-  // Users & roles
-  'list_users',
-  'list_roles',
-  // Compatibility (read-only)
-  'get_compatible_build_types_for_agent',
-  'get_incompatible_build_types_for_agent',
-  'get_compatible_agents_for_build_type',
-  'count_compatible_agents_for_build_type',
-  'get_compatible_agents_for_queued_build',
   // Branches & Params
   'list_branches',
   'list_parameters',
