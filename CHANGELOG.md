@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.12.0...teamcity-mcp-v1.12.1) (2025-12-22)
+
+
+### Bug Fixes
+
+* handle queued builds in get_build and get_build_status ([#324](https://github.com/Daghis/teamcity-mcp/issues/324)) ([4cb2dab](https://github.com/Daghis/teamcity-mcp/commit/4cb2dabfc9161e07708a899622d78b886742459d))
+
 ## [1.12.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.20...teamcity-mcp-v1.12.0) (2025-12-06)
 
 
