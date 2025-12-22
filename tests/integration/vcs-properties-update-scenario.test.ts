@@ -4,7 +4,7 @@ import type { ActionResult, ListResult } from '../types/tool-results';
 import { callTool, callToolsBatch, callToolsBatchExpect } from './lib/mcp-runner';
 import { hasTeamCityEnv, teardownProjectFixture } from './lib/test-fixtures';
 
-describe('VCS root property updates: full writes + dev reads', () => {
+describe('VCS root property updates: full mode', () => {
   const ts = Date.now();
   const projectId = `E2E_VCS_PROPS_${ts}`;
   const vcsId = `E2E_VCS_ROOT_PROPS_${ts}`;
@@ -48,7 +48,7 @@ describe('VCS root property updates: full writes + dev reads', () => {
     }
   });
 
-  it('updates branch and branchSpec via MCP and verifies with dev', async () => {
+  it('updates branch and branchSpec via MCP and verifies', async () => {
     if (!hasTeamCityEnv || !created) return expect(true).toBe(true);
 
     const update = await callTool<ActionResult>('full', 'update_vcs_root_properties', {
@@ -58,7 +58,8 @@ describe('VCS root property updates: full writes + dev reads', () => {
     });
     expect(update).toMatchObject({ success: true, action: 'update_vcs_root_properties' });
 
-    const devBatch = await callToolsBatch('dev', [
+    // VCS tools are now full-only
+    const devBatch = await callToolsBatch('full', [
       { tool: 'get_vcs_root', args: { id: vcsId } },
       { tool: 'list_vcs_roots', args: { projectId } },
     ]);
@@ -98,7 +99,8 @@ describe('VCS root property updates: full writes + dev reads', () => {
     });
     expect(update2).toMatchObject({ success: true, action: 'update_vcs_root_properties' });
 
-    const get2 = (await callTool('dev', 'get_vcs_root', { id: vcsId })) as unknown as {
+    // VCS tools are now full-only
+    const get2 = (await callTool('full', 'get_vcs_root', { id: vcsId })) as unknown as {
       id: string;
       properties?: { property?: Array<{ name?: string; value?: string }> };
     };

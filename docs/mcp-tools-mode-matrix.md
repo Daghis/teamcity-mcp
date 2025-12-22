@@ -36,27 +36,27 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Parameters | `add_parameter` | No | Yes |
 | Parameters | `update_parameter` | No | Yes |
 | Parameters | `delete_parameter` | No | Yes |
-| VCS | `list_vcs_roots` | Yes | Yes |
-| VCS | `get_vcs_root` | Yes | Yes |
-| VCS | `get_versioned_settings_status` | Yes | Yes |
+| VCS | `list_vcs_roots` | No | Yes |
+| VCS | `get_vcs_root` | No | Yes |
+| VCS | `get_versioned_settings_status` | No | Yes |
 | VCS | `create_vcs_root` | No | Yes |
 | VCS | `add_vcs_root_to_build` | No | Yes |
 | VCS | `set_vcs_root_property` | No | Yes |
 | VCS | `delete_vcs_root_property` | No | Yes |
 | VCS | `update_vcs_root_properties` | No | Yes |
-| Agents | `list_agents` | Yes | Yes |
-| Agents | `list_agent_pools` | Yes | Yes |
-| Agents | `get_agent_enabled_info` | Yes | Yes |
+| Agents | `list_agents` | No | Yes |
+| Agents | `list_agent_pools` | No | Yes |
+| Agents | `get_agent_enabled_info` | No | Yes |
 | Agents | `authorize_agent` | No | Yes |
 | Agents | `assign_agent_to_pool` | No | Yes |
 | Agents | `set_agent_enabled` | No | Yes |
 | Agents | `bulk_set_agents_enabled` | No | Yes |
 | Agents | `manage_agent_requirements` | No | Yes |
-| Compatibility | `get_compatible_agents_for_build_type` | Yes | Yes |
-| Compatibility | `count_compatible_agents_for_build_type` | Yes | Yes |
-| Compatibility | `get_compatible_agents_for_queued_build` | Yes | Yes |
-| Compatibility | `get_compatible_build_types_for_agent` | Yes | Yes |
-| Compatibility | `get_incompatible_build_types_for_agent` | Yes | Yes |
+| Compatibility | `get_compatible_agents_for_build_type` | No | Yes |
+| Compatibility | `count_compatible_agents_for_build_type` | No | Yes |
+| Compatibility | `get_compatible_agents_for_queued_build` | No | Yes |
+| Compatibility | `get_compatible_build_types_for_agent` | No | Yes |
+| Compatibility | `get_incompatible_build_types_for_agent` | No | Yes |
 | Queue | `list_queued_builds` | Yes | Yes |
 | Queue | `move_queued_build_to_top` | No | Yes |
 | Queue | `reorder_queued_builds` | No | Yes |
@@ -65,8 +65,8 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Queue | `pause_queue_for_pool` | No | Yes |
 | Queue | `resume_queue_for_pool` | No | Yes |
 | Server | `get_server_info` | Yes | Yes |
-| Server | `check_teamcity_connection` | Yes | Yes |
-| Server | `check_availability_guard` | Yes | Yes |
+| Server | `check_teamcity_connection` | No | Yes |
+| Server | `check_availability_guard` | No | Yes |
 | Server | `get_server_metrics` | No | Yes |
 | Server | `list_server_health_items` | No | Yes |
 | Server | `get_server_health_item` | No | Yes |
@@ -79,10 +79,11 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Problems | `list_problem_occurrences` | Yes | Yes |
 | Investigations | `list_investigations` | Yes | Yes |
 | Branches | `list_branches` | Yes | Yes |
-| Users & Roles | `list_users` | Yes | Yes |
-| Users & Roles | `list_roles` | Yes | Yes |
+| Users & Roles | `list_users` | No | Yes |
+| Users & Roles | `list_roles` | No | Yes |
 
-**Summary:** 77 tools total — 42 available in Dev mode, 35 Full-only.
+**Summary:** 77 tools total — 27 available in Dev mode, 50 Full-only.
 
 Notes:
-- Dev mode excludes TeamCity administration and agent/pool management tools to reduce surface and context size, while keeping all read operations and developer workflows (including `trigger_build`).
+- Dev mode focuses on developer workflows (builds, tests, logs) and excludes infrastructure/admin tools to reduce context size (~4-5k tokens saved).
+- Admin tools (agents, VCS roots, users, compatibility checks) require Full mode.

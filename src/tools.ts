@@ -1585,6 +1585,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   {
@@ -1619,6 +1620,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   {
@@ -2019,6 +2021,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   // === Agent Compatibility (read-only lookups) ===
@@ -2043,6 +2046,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
   {
     name: 'get_incompatible_build_types_for_agent',
@@ -2065,6 +2069,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
   {
     name: 'get_agent_enabled_info',
@@ -2087,6 +2092,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
   {
     name: 'get_compatible_agents_for_build_type',
@@ -2121,6 +2127,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
   {
     name: 'count_compatible_agents_for_build_type',
@@ -2156,6 +2163,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
   {
     name: 'get_compatible_agents_for_queued_build',
@@ -2194,6 +2202,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
   {
     name: 'check_teamcity_connection',
@@ -2204,6 +2213,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       const ok = await adapter.testConnection();
       return json({ ok });
     },
+    mode: 'full',
   },
 
   // === Agent Tools ===
@@ -2269,6 +2279,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   {
@@ -2333,6 +2344,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   // === Additional Tools from Complex Implementation ===
@@ -3232,6 +3244,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   {
@@ -3301,6 +3314,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   {
@@ -3329,6 +3343,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   {

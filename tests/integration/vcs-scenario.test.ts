@@ -54,10 +54,11 @@ describe('VCS roots: full writes + dev reads', () => {
     }
   });
 
-  it('verifies VCS root with get/list (dev)', async () => {
+  it('verifies VCS root with get/list (full)', async () => {
     if (!hasTeamCityEnv || !created) return expect(true).toBe(true);
 
-    const devBatch = await callToolsBatch('dev', [
+    // VCS tools are now full-only
+    const devBatch = await callToolsBatch('full', [
       { tool: 'get_vcs_root', args: { id: vcsId } },
       { tool: 'list_vcs_roots', args: { projectId } },
     ]);

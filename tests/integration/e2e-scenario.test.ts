@@ -108,10 +108,11 @@ serialDescribe('E2E scenario: full setup → dev reads → full teardown', () =>
     }
   }, 90_000);
 
-  it('lists agents and compatibility (dev)', async () => {
+  it('lists agents and compatibility (full)', async () => {
     if (!hasTeamCityEnv || !fixture) return expect(true).toBe(true);
 
-    const agentResults = await callToolsBatchExpect('dev', [
+    // Agent and compatibility tools are now full-only
+    const agentResults = await callToolsBatchExpect('full', [
       { tool: 'list_agents', args: { pageSize: 10 } },
       { tool: 'get_compatible_agents_for_build_type', args: { buildTypeId: fixture.buildTypeId } },
       {

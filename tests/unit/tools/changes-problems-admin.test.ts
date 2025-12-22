@@ -1,5 +1,12 @@
 import { type ToolDefinition, getRequiredTool } from '@/tools';
 
+// Full mode needed for list_users, list_roles, get_versioned_settings_status
+jest.mock('@/config', () => ({
+  getTeamCityUrl: () => 'https://example.test',
+  getTeamCityToken: () => 'token',
+  getMCPMode: () => 'full',
+}));
+
 type PaginatedMock = jest.Mock<Promise<{ data: Record<string, unknown> }>, [string?]>;
 
 const createPaginatedMock = (items: unknown[], key: string): PaginatedMock =>
