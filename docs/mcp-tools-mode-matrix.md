@@ -14,17 +14,22 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Builds | `list_builds` | Yes | Yes |
 | Builds | `get_build` | Yes | Yes |
 | Builds | `get_build_status` | Yes | Yes |
-| Builds | `fetch_build_log` | Yes | Yes |
 | Builds | `get_build_results` | Yes | Yes |
+| Builds | `fetch_build_log` | Yes | Yes |
 | Builds | `analyze_build_problems` | Yes | Yes |
 | Builds | `trigger_build` | Yes | Yes |
 | Builds | `cancel_queued_build` | Yes | Yes |
+| Builds | `download_build_artifact` | Yes | Yes |
+| Builds | `download_build_artifacts` | Yes | Yes |
 | Build Configs | `list_build_configs` | Yes | Yes |
 | Build Configs | `get_build_config` | Yes | Yes |
 | Build Configs | `create_build_config` | No | Yes |
 | Build Configs | `clone_build_config` | No | Yes |
 | Build Configs | `update_build_config` | No | Yes |
+| Build Configs | `set_build_config_state` | No | Yes |
 | Build Configs | `set_build_configs_paused` | No | Yes |
+| Build Configs | `manage_build_dependencies` | No | Yes |
+| Build Configs | `manage_build_features` | No | Yes |
 | Steps & Triggers | `manage_build_steps` | No | Yes |
 | Steps & Triggers | `manage_build_triggers` | No | Yes |
 | Parameters | `list_parameters` | Yes | Yes |
@@ -33,15 +38,20 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Parameters | `delete_parameter` | No | Yes |
 | VCS | `list_vcs_roots` | Yes | Yes |
 | VCS | `get_vcs_root` | Yes | Yes |
+| VCS | `get_versioned_settings_status` | Yes | Yes |
 | VCS | `create_vcs_root` | No | Yes |
 | VCS | `add_vcs_root_to_build` | No | Yes |
+| VCS | `set_vcs_root_property` | No | Yes |
+| VCS | `delete_vcs_root_property` | No | Yes |
+| VCS | `update_vcs_root_properties` | No | Yes |
 | Agents | `list_agents` | Yes | Yes |
 | Agents | `list_agent_pools` | Yes | Yes |
+| Agents | `get_agent_enabled_info` | Yes | Yes |
 | Agents | `authorize_agent` | No | Yes |
 | Agents | `assign_agent_to_pool` | No | Yes |
-| Agents | `get_agent_enabled_info` | Yes | Yes |
 | Agents | `set_agent_enabled` | No | Yes |
 | Agents | `bulk_set_agents_enabled` | No | Yes |
+| Agents | `manage_agent_requirements` | No | Yes |
 | Compatibility | `get_compatible_agents_for_build_type` | Yes | Yes |
 | Compatibility | `count_compatible_agents_for_build_type` | Yes | Yes |
 | Compatibility | `get_compatible_agents_for_queued_build` | Yes | Yes |
@@ -62,7 +72,17 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Server | `get_server_health_item` | No | Yes |
 | Tests | `list_test_failures` | Yes | Yes |
 | Tests | `get_test_details` | Yes | Yes |
+| Tests | `list_muted_tests` | Yes | Yes |
+| Tests | `mute_tests` | No | Yes |
+| Changes | `list_changes` | Yes | Yes |
+| Problems | `list_problems` | Yes | Yes |
+| Problems | `list_problem_occurrences` | Yes | Yes |
+| Investigations | `list_investigations` | Yes | Yes |
 | Branches | `list_branches` | Yes | Yes |
+| Users & Roles | `list_users` | Yes | Yes |
+| Users & Roles | `list_roles` | Yes | Yes |
 
-Notes
+**Summary:** 77 tools total — 42 available in Dev mode, 35 Full-only.
+
+Notes:
 - Dev mode excludes TeamCity administration and agent/pool management tools to reduce surface and context size, while keeping all read operations and developer workflows (including `trigger_build`).
