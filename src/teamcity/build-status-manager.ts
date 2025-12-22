@@ -262,7 +262,7 @@ export class BuildStatusManager {
    */
   private async getQueuedBuildStatus(buildId: string): Promise<BuildStatusResult> {
     const response = await this.client.modules.buildQueue.getQueuedBuild(
-      buildId,
+      `id:${buildId}`,
       'id,number,state,status,buildTypeId,branchName,webUrl,queuedDate,waitReason'
     );
 

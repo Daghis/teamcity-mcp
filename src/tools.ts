@@ -724,7 +724,7 @@ const DEV_TOOLS: ToolDefinition[] = [
 
           // Step 2: Try build queue
           try {
-            const qb = await adapter.modules.buildQueue.getQueuedBuild(typed.buildId);
+            const qb = await adapter.modules.buildQueue.getQueuedBuild(`id:${typed.buildId}`);
             return json({ ...qb.data, state: 'queued' });
           } catch (queueError) {
             if (!isAxios404(queueError)) throw queueError;
@@ -1032,7 +1032,7 @@ const DEV_TOOLS: ToolDefinition[] = [
               try {
                 const targetBuildId = typed.buildId ?? result.buildId;
                 if (targetBuildId) {
-                  const qb = await adapter.modules.buildQueue.getQueuedBuild(targetBuildId);
+                  const qb = await adapter.modules.buildQueue.getQueuedBuild(`id:${targetBuildId}`);
                   enrich.waitReason = (qb.data as { waitReason?: string }).waitReason;
                 }
               } catch {
