@@ -4,14 +4,13 @@
  * Provides reusable setup functions that create TeamCity resources (projects, build configs, etc.)
  * and matching teardown functions that clean them up, designed to be used with beforeAll/afterAll.
  */
-
 import type { ActionResult, BuildRef, TriggerBuildResult } from '../../types/tool-results';
 import { callTool, callToolsBatch, callToolsBatchExpect } from './mcp-runner';
 
 /** Check if TeamCity environment variables are configured */
 export const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
-    (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
+  (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
 );
 
 /** Check if running in the serial worker (for tests that need exclusive access) */
@@ -19,7 +18,8 @@ export const isSerialWorker =
   process.env['JEST_WORKER_ID'] === '1' || process.env['SERIAL_BUILD_TESTS'] === 'true';
 
 /** Sleep helper */
-export const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+export const wait = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Configuration for creating a basic project fixture
@@ -184,7 +184,9 @@ export async function setupProjectFixture(config: ProjectFixtureConfig): Promise
  * triggers a build, and waits for completion.
  * Call in beforeAll with a generous timeout (~120s).
  */
-export async function setupArtifactFixture(config: ArtifactFixtureConfig): Promise<ArtifactFixture> {
+export async function setupArtifactFixture(
+  config: ArtifactFixtureConfig
+): Promise<ArtifactFixture> {
   const fixture = await setupProjectFixture({
     ...config,
     stepScript: config.artifactScript,

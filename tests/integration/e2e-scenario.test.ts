@@ -114,7 +114,10 @@ serialDescribe('E2E scenario: full setup → dev reads → full teardown', () =>
     const agentResults = await callToolsBatchExpect('dev', [
       { tool: 'list_agents', args: { pageSize: 10 } },
       { tool: 'get_compatible_agents_for_build_type', args: { buildTypeId: fixture.buildTypeId } },
-      { tool: 'count_compatible_agents_for_build_type', args: { buildTypeId: fixture.buildTypeId } },
+      {
+        tool: 'count_compatible_agents_for_build_type',
+        args: { buildTypeId: fixture.buildTypeId },
+      },
     ]);
 
     const agents = agentResults[0]?.result as Record<string, unknown> | undefined;
