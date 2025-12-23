@@ -3842,7 +3842,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           }
           if (typedArgs.artifactRules !== undefined) {
             await setArtifactRulesWithFallback(
-              adapter.modules.buildTypes,
+              adapter.http,
               typedArgs.buildTypeId,
               typedArgs.artifactRules
             );
@@ -3866,7 +3866,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         }
         if (typedArgs.artifactRules !== undefined) {
           await setArtifactRulesWithFallback(
-            adapter.modules.buildTypes,
+            adapter.http,
             typedArgs.buildTypeId,
             typedArgs.artifactRules
           );
