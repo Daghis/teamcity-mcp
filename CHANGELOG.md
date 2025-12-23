@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.0...teamcity-mcp-v2.0.1) (2025-12-23)
+
+
+### Bug Fixes
+
+* resolve HTTP 400 when updating artifactRules via update_build_config ([#335](https://github.com/Daghis/teamcity-mcp/issues/335)) ([21614ad](https://github.com/Daghis/teamcity-mcp/commit/21614ad9af4e7a519a0ece0d7c41b90a10f74a73))
+
 ## [2.0.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.13.1...teamcity-mcp-v2.0.0) (2025-12-22)
 
 
