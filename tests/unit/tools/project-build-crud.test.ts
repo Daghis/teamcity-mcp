@@ -239,8 +239,17 @@ describe('tools: project/build CRUD & updates', () => {
       jest.isolateModules(() => {
         (async () => {
           const setBuildTypeField = jest.fn(async () => ({}));
+          const mockPut = jest.fn(async () => ({ data: 'OK' }));
           jest.doMock('@/api-client', () => ({
-            TeamCityAPI: { getInstance: () => ({ buildTypes: { setBuildTypeField } }) },
+            TeamCityAPI: {
+              getInstance: () => ({
+                http: {
+                  put: mockPut,
+                  defaults: { baseURL: 'https://test.local', timeout: 30000 },
+                },
+                buildTypes: { setBuildTypeField },
+              }),
+            },
           }));
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { getRequiredTool } = require('@/tools');
