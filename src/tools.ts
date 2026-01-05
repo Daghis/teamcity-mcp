@@ -3830,14 +3830,16 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             await adapter.modules.buildTypes.setBuildTypeField(
               typedArgs.buildTypeId,
               'name',
-              typedArgs.name
+              typedArgs.name,
+              { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
             );
           }
           if (typedArgs.description !== undefined) {
             await adapter.modules.buildTypes.setBuildTypeField(
               typedArgs.buildTypeId,
               'description',
-              typedArgs.description
+              typedArgs.description,
+              { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
             );
           }
           if (typedArgs.artifactRules !== undefined) {
@@ -3854,14 +3856,16 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           await adapter.modules.buildTypes.setBuildTypeField(
             typedArgs.buildTypeId,
             'name',
-            typedArgs.name
+            typedArgs.name,
+            { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
           );
         }
         if (typedArgs.description !== undefined) {
           await adapter.modules.buildTypes.setBuildTypeField(
             typedArgs.buildTypeId,
             'description',
-            typedArgs.description
+            typedArgs.description,
+            { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
           );
         }
         if (typedArgs.artifactRules !== undefined) {
@@ -3878,7 +3882,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         await adapter.modules.buildTypes.setBuildTypeField(
           typedArgs.buildTypeId,
           'paused',
-          String(typedArgs.paused)
+          String(typedArgs.paused),
+          { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
         );
       }
 
@@ -4285,7 +4290,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             {
               headers: {
                 'Content-Type': 'text/plain',
-                Accept: 'application/json',
+                Accept: 'text/plain',
               },
             }
           );
