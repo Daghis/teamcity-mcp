@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.1...teamcity-mcp-v2.0.2) (2026-01-05)
+
+
+### Bug Fixes
+
+* resolve HTTP 406 when updating build configuration fields ([#339](https://github.com/Daghis/teamcity-mcp/issues/339)) ([#341](https://github.com/Daghis/teamcity-mcp/issues/341)) ([16b1dd2](https://github.com/Daghis/teamcity-mcp/commit/16b1dd207978d63ad9824c9b7eecbbd4a9badc94))
+
 ## [2.0.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.0...teamcity-mcp-v2.0.1) (2025-12-23)
 
 
