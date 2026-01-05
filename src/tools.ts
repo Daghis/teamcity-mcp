@@ -4172,9 +4172,33 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           type: 'string',
           description: 'Requirement ID (required for update/delete)',
         },
+        type: {
+          type: 'string',
+          enum: [
+            'exists',
+            'not-exists',
+            'equals',
+            'does-not-equal',
+            'more-than',
+            'less-than',
+            'no-more-than',
+            'no-less-than',
+            'ver-more-than',
+            'ver-less-than',
+            'ver-no-more-than',
+            'ver-no-less-than',
+            'contains',
+            'does-not-contain',
+            'starts-with',
+            'ends-with',
+            'matches',
+            'does-not-match',
+          ],
+          description: 'Requirement type (e.g., exists, equals, contains, starts-with, matches)',
+        },
         properties: {
           type: 'object',
-          description: 'Requirement properties (e.g. property-name, condition, value)',
+          description: 'Requirement properties (e.g. property-name, property-value)',
         },
         disabled: { type: 'boolean', description: 'Disable or enable the requirement' },
       },
@@ -4182,11 +4206,32 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     },
     handler: async (args: unknown) => {
       const propertyValue = z.union([z.string(), z.number(), z.boolean()]);
+      const requirementTypes = [
+        'exists',
+        'not-exists',
+        'equals',
+        'does-not-equal',
+        'more-than',
+        'less-than',
+        'no-more-than',
+        'no-less-than',
+        'ver-more-than',
+        'ver-less-than',
+        'ver-no-more-than',
+        'ver-no-less-than',
+        'contains',
+        'does-not-contain',
+        'starts-with',
+        'ends-with',
+        'matches',
+        'does-not-match',
+      ] as const;
       const schema = z
         .object({
           buildTypeId: z.string().min(1),
           action: z.enum(['add', 'update', 'delete']),
           requirementId: z.string().min(1).optional(),
+          type: z.enum(requirementTypes).optional(),
           properties: z.record(z.string(), propertyValue).optional(),
           disabled: z.boolean().optional(),
         })
@@ -4212,6 +4257,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             case 'add': {
               const result = await manager.addRequirement({
                 buildTypeId: typed.buildTypeId,
+                type: typed.type,
                 properties: typed.properties,
                 disabled: typed.disabled,
               });
@@ -4226,6 +4272,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             case 'update': {
               const result = await manager.updateRequirement(typed.requirementId as string, {
                 buildTypeId: typed.buildTypeId,
+                type: typed.type,
                 properties: typed.properties,
                 disabled: typed.disabled,
               });

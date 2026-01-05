@@ -9,6 +9,7 @@ type StringMap = Record<string, string>;
 interface ManageRequirementInput {
   buildTypeId: string;
   requirementId?: string;
+  type?: string;
   properties?: Record<string, unknown>;
   disabled?: boolean;
 }
@@ -243,6 +244,7 @@ export class AgentRequirementsManager {
     const mergedProps = mergeRecords(baseProps, toStringRecord(input.properties));
     const payload: AgentRequirement = {
       ...(existing ?? {}),
+      type: input.type ?? existing?.type,
       disabled: input.disabled ?? existing?.disabled,
     };
 
