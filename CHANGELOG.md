@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.7](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.6...teamcity-mcp-v2.0.7) (2026-01-05)
+
+
+### Bug Fixes
+
+* revert to 2025-12-11 schema (compatible with mcp-publisher v1.4.0) ([#352](https://github.com/Daghis/teamcity-mcp/issues/352)) ([05e05c2](https://github.com/Daghis/teamcity-mcp/commit/05e05c2a8b7e70326a43a7b6554987378da17c9a))
+
 ## [2.0.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.5...teamcity-mcp-v2.0.6) (2026-01-05)
 
 
