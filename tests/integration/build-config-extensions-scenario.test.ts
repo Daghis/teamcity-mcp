@@ -195,9 +195,9 @@ describe('Build configuration dependency/feature management (full)', () => {
       const requirementAdd = await callTool<ActionResult>('full', 'manage_agent_requirements', {
         buildTypeId: TARGET_BT_ID,
         action: 'add',
+        type: 'exists',
         properties: {
           'property-name': 'env.ANSIBLE',
-          condition: 'exists',
         },
       });
       expect(requirementAdd).toMatchObject({
