@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.5...teamcity-mcp-v2.0.6) (2026-01-05)
+
+
+### Bug Fixes
+
+* update mcp-publisher to v1.4.0 ([#350](https://github.com/Daghis/teamcity-mcp/issues/350)) ([a4fb2b9](https://github.com/Daghis/teamcity-mcp/commit/a4fb2b960d04b8e9668232413119026fd79ba9d0))
+
 ## [2.0.5](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.4...teamcity-mcp-v2.0.5) (2026-01-05)
 
 
