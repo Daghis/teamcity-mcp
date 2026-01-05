@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.2...teamcity-mcp-v2.0.3) (2026-01-05)
+
+
+### Bug Fixes
+
+* add type parameter to manage_agent_requirements ([#338](https://github.com/Daghis/teamcity-mcp/issues/338)) ([#343](https://github.com/Daghis/teamcity-mcp/issues/343)) ([5545257](https://github.com/Daghis/teamcity-mcp/commit/5545257823f442cf27e9313f11f1dd0b71115af3))
+
 ## [2.0.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.1...teamcity-mcp-v2.0.2) (2026-01-05)
 
 
