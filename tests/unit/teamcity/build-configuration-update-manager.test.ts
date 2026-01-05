@@ -194,12 +194,14 @@ describe('BuildConfigurationUpdateManager', () => {
       expect(mockClient.buildTypes.setBuildTypeField).toHaveBeenCalledWith(
         'cfg1',
         'name',
-        'Renamed Config'
+        'Renamed Config',
+        { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
       );
       expect(mockClient.buildTypes.setBuildTypeField).toHaveBeenCalledWith(
         'cfg1',
         'settings/buildNumberPattern',
-        '%build.number%'
+        '%build.number%',
+        { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
       );
       expect(mockClient.buildTypes.deleteBuildParameterOfBuildType_2).toHaveBeenCalledWith(
         'token',
@@ -230,13 +232,13 @@ describe('BuildConfigurationUpdateManager', () => {
         1,
         '/app/rest/buildTypes/cfg1/settings/artifactRules',
         'dist/** => archive.zip',
-        { headers: { 'Content-Type': 'text/plain' } }
+        { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
       );
       expect(mockClient.http.put).toHaveBeenNthCalledWith(
         2,
         '/app/rest/buildTypes/cfg1/artifactRules',
         'dist/** => archive.zip',
-        { headers: { 'Content-Type': 'text/plain' } }
+        { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
       );
 
       retrieveSpy.mockRestore();

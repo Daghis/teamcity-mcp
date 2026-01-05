@@ -77,24 +77,27 @@ describe('Tool: update_build_config', () => {
     expect(setBuildTypeField).toHaveBeenCalledWith(
       'HoneycombHaven_ApiGatewayBuild',
       'name',
-      'New Name'
+      'New Name',
+      { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
     );
     expect(setBuildTypeField).toHaveBeenCalledWith(
       'HoneycombHaven_ApiGatewayBuild',
       'description',
-      'New description'
+      'New description',
+      { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
     );
     expect(setBuildTypeField).toHaveBeenCalledWith(
       'HoneycombHaven_ApiGatewayBuild',
       'paused',
-      'true'
+      'true',
+      { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
     );
 
     // Artifact rules should use direct HTTP PUT with unencoded slashes in path
     expect(mockPut).toHaveBeenCalledWith(
       '/app/rest/buildTypes/HoneycombHaven_ApiGatewayBuild/settings/artifactRules',
       'dist/** => api-gateway-%build.number%.zip',
-      { headers: { 'Content-Type': 'text/plain' } }
+      { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
     );
 
     // setBuildTypeField should NOT be called for artifact rules
@@ -131,7 +134,7 @@ describe('Tool: update_build_config', () => {
       1,
       '/app/rest/buildTypes/HoneycombHaven_ApiGatewayBuild/settings/artifactRules',
       'dist/** => legacy.zip',
-      { headers: { 'Content-Type': 'text/plain' } }
+      { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
     );
 
     // Fallback: artifactRules (legacy path)
@@ -139,7 +142,7 @@ describe('Tool: update_build_config', () => {
       2,
       '/app/rest/buildTypes/HoneycombHaven_ApiGatewayBuild/artifactRules',
       'dist/** => legacy.zip',
-      { headers: { 'Content-Type': 'text/plain' } }
+      { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
     );
   });
 
@@ -162,7 +165,7 @@ describe('Tool: update_build_config', () => {
     expect(mockPut).toHaveBeenCalledWith(
       '/app/rest/buildTypes/Project_Build%20With%20Spaces/settings/artifactRules',
       'output/** => build.zip',
-      { headers: { 'Content-Type': 'text/plain' } }
+      { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
     );
   });
 });

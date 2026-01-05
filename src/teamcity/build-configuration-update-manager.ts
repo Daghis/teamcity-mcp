@@ -34,7 +34,7 @@ export const setArtifactRulesWithFallback = async (
   try {
     // Primary path: settings/artifactRules (modern TeamCity)
     await http.put(`/app/rest/buildTypes/${encodedId}/settings/artifactRules`, artifactRules, {
-      headers: { 'Content-Type': 'text/plain' },
+      headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' },
     });
   } catch (err) {
     if (!isArtifactRulesRetryableError(err)) {
@@ -50,7 +50,7 @@ export const setArtifactRulesWithFallback = async (
     try {
       // Fallback path: artifactRules (older TeamCity servers)
       await http.put(`/app/rest/buildTypes/${encodedId}/artifactRules`, artifactRules, {
-        headers: { 'Content-Type': 'text/plain' },
+        headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' },
       });
     } catch (fallbackError) {
       debug('Legacy artifact rules update failed', {
@@ -402,14 +402,16 @@ export class BuildConfigurationUpdateManager {
           await this.client.modules.buildTypes.setBuildTypeField(
             currentConfig.id,
             'name',
-            updates.name
+            updates.name,
+            { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
           );
         }
         if (updates.description !== undefined) {
           await this.client.modules.buildTypes.setBuildTypeField(
             currentConfig.id,
             'description',
-            updates.description ?? ''
+            updates.description ?? '',
+            { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
           );
         }
       }
@@ -427,7 +429,8 @@ export class BuildConfigurationUpdateManager {
           await this.client.modules.buildTypes.setBuildTypeField(
             currentConfig.id,
             `settings/${setting.name}`,
-            setting.value
+            setting.value,
+            { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
           );
         }
         /* eslint-enable no-await-in-loop */
@@ -457,7 +460,8 @@ export class BuildConfigurationUpdateManager {
           await this.client.modules.buildTypes.setBuildTypeField(
             currentConfig.id,
             `parameters/${name}`,
-            value
+            value,
+            { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
           );
         }
         /* eslint-enable no-await-in-loop */

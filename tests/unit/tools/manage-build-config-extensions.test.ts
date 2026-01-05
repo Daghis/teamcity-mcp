@@ -688,7 +688,7 @@ describe('build configuration extended management tools', () => {
             expect.objectContaining({
               headers: expect.objectContaining({
                 'Content-Type': 'text/plain',
-                Accept: 'application/json',
+                Accept: 'text/plain',
               }),
             })
           );
@@ -711,7 +711,7 @@ describe('build configuration extended management tools', () => {
             expect.objectContaining({
               headers: expect.objectContaining({
                 'Content-Type': 'text/plain',
-                Accept: 'application/json',
+                Accept: 'text/plain',
               }),
             })
           );
