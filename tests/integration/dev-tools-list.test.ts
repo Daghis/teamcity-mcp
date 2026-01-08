@@ -8,9 +8,12 @@ const hasTeamCityEnv = Boolean(
 );
 
 // Expected dev-mode tools as per docs/mcp-tools-mode-matrix.md
-// Note: 27 dev-mode tools focused on developer workflows; admin/infrastructure tools moved to full mode
+// Note: 29 dev-mode tools focused on developer workflows; admin/infrastructure tools moved to full mode
 const EXPECTED_DEV_TOOLS = new Set([
   'ping',
+  // Mode management
+  'get_mcp_mode',
+  'set_mcp_mode',
   // Projects
   'list_projects',
   'get_project',
