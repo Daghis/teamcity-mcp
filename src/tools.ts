@@ -12,7 +12,7 @@ import { pipeline } from 'node:stream/promises';
 import { isAxiosError } from 'axios';
 import { z } from 'zod';
 
-import { getMCPMode as getMCPModeFromConfig } from '@/config';
+import { getMCPMode as getMCPModeFromConfig, getServerInstance, setMCPMode } from '@/config';
 import { type Build, type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import type { Step } from '@/teamcity-client/models/step';
 import { AgentRequirementsManager } from '@/teamcity/agent-requirements-manager';
@@ -485,6 +485,75 @@ const DEV_TOOLS: ToolDefinition[] = [
           {
             type: 'text',
             text: `pong${typedArgs.message ? `: ${typedArgs.message}` : ''}`,
+          },
+        ],
+      };
+    },
+  },
+
+  // === Mode Management Tools ===
+  {
+    name: 'get_mcp_mode',
+    description:
+      'Get current MCP mode. Dev mode: read-only tools for safe exploration. Full mode: all tools including admin operations.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+    handler: async () => {
+      const mode = getMCPMode();
+      const toolCount = getAvailableTools().length;
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ mode, toolCount }, null, 2),
+          },
+        ],
+      };
+    },
+  },
+  {
+    name: 'set_mcp_mode',
+    description:
+      'Switch MCP mode at runtime. Dev mode: safe read-only operations. Full mode: all operations including writes. Clients are notified of tool list changes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: {
+          type: 'string',
+          enum: ['dev', 'full'],
+          description: 'Target mode: dev (read-only) or full (all operations)',
+        },
+      },
+      required: ['mode'],
+    },
+    handler: async (args: unknown) => {
+      const typed = args as { mode: 'dev' | 'full' };
+      const previousMode = getMCPMode();
+
+      setMCPMode(typed.mode);
+
+      const server = getServerInstance();
+      if (server) {
+        await server.sendToolListChanged();
+      }
+
+      const toolCount = getAvailableTools().length;
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                previousMode,
+                currentMode: typed.mode,
+                toolCount,
+                message: `Mode switched. ${toolCount} tools now available.`,
+              },
+              null,
+              2
+            ),
           },
         ],
       };

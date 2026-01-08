@@ -152,12 +152,56 @@ export function isTest(): boolean {
 }
 
 /**
+ * Runtime MCP mode override (null = use process.env)
+ */
+let runtimeMCPMode: 'dev' | 'full' | null = null;
+
+/**
+ * Server instance for sending notifications
+ */
+let serverInstance: import('@modelcontextprotocol/sdk/server/index.js').Server | null = null;
+
+/**
  * Get MCP mode (dev or full)
+ * Checks runtime override first, then falls back to environment variable
  */
 export function getMCPMode(): 'dev' | 'full' {
-  // Always respect explicit MCP_MODE; default to 'dev'.
-  // Unit tests that need full mode should mock getMCPMode or set MCP_MODE explicitly.
+  if (runtimeMCPMode !== null) {
+    return runtimeMCPMode;
+  }
   return (process.env['MCP_MODE'] as 'dev' | 'full') ?? 'dev';
+}
+
+/**
+ * Set MCP mode at runtime
+ */
+export function setMCPMode(mode: 'dev' | 'full'): void {
+  runtimeMCPMode = mode;
+}
+
+/**
+ * Register server instance for runtime mode switching
+ */
+export function setServerInstance(
+  server: import('@modelcontextprotocol/sdk/server/index.js').Server
+): void {
+  serverInstance = server;
+}
+
+/**
+ * Get registered server instance
+ */
+export function getServerInstance():
+  | import('@modelcontextprotocol/sdk/server/index.js').Server
+  | null {
+  return serverInstance;
+}
+
+/**
+ * Reset runtime mode (for testing)
+ */
+export function resetMCPMode(): void {
+  runtimeMCPMode = null;
 }
 
 /**

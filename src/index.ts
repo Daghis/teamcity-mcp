@@ -6,7 +6,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import * as dotenv from 'dotenv';
 
-import { getTeamCityToken, getTeamCityUrl } from '@/config';
+import { getTeamCityToken, getTeamCityUrl, setServerInstance } from '@/config';
 import { startServerLifecycle } from '@/server-runner';
 import { getHelpText, getVersion, parseCliArgs } from '@/utils/cli-args';
 import { loadEnvFile } from '@/utils/env-file';
@@ -122,6 +122,7 @@ async function main() {
     const lifecycle = startServerLifecycle(server, transport);
 
     activeServer = server;
+    setServerInstance(server);
     lifecyclePromise = lifecycle;
     process.stderr.write('TeamCity MCP Server is running and ready to accept connections\n');
 

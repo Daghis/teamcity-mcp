@@ -37,7 +37,9 @@ export function createSimpleServer(): Server {
     },
     {
       capabilities: {
-        tools: {},
+        tools: {
+          listChanged: true,
+        },
         prompts: undefined,
         resources: undefined,
       },
