@@ -2,9 +2,14 @@
  * Tests for runtime MCP mode switching
  * Validates get_mcp_mode and set_mcp_mode tools
  */
-
 // Import directly for config function tests (these test actual state changes)
-import { getMCPMode, setMCPMode, resetMCPMode, setServerInstance, getServerInstance } from '@/config';
+import {
+  getMCPMode,
+  getServerInstance,
+  resetMCPMode,
+  setMCPMode,
+  setServerInstance,
+} from '@/config';
 
 describe('runtime mode switching', () => {
   const originalMCPMode = process.env['MCP_MODE'];
@@ -44,7 +49,9 @@ describe('runtime mode switching', () => {
 
     it('setServerInstance and getServerInstance work correctly', () => {
       // Set mock server
-      const mockServer = { sendToolListChanged: jest.fn() } as unknown as import('@modelcontextprotocol/sdk/server/index.js').Server;
+      const mockServer = {
+        sendToolListChanged: jest.fn(),
+      } as unknown as import('@modelcontextprotocol/sdk/server/index.js').Server;
       setServerInstance(mockServer);
       expect(getServerInstance()).toBe(mockServer);
     });
