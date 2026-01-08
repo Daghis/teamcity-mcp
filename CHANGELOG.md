@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.7...teamcity-mcp-v2.1.0) (2026-01-08)
+
+
+### Features
+
+* add runtime MCP mode switching with list_changed notifications ([#355](https://github.com/Daghis/teamcity-mcp/issues/355)) ([873ba82](https://github.com/Daghis/teamcity-mcp/commit/873ba82e1329b0bc6271c15ec042093daa92499a))
+
 ## [2.0.7](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.6...teamcity-mcp-v2.0.7) (2026-01-05)
 
 
