@@ -423,13 +423,53 @@ interface AddParameterArgs {
   buildTypeId: string;
   name: string;
   value: string;
+  type?: string;
 }
 interface UpdateParameterArgs {
   buildTypeId: string;
   name: string;
   value: string;
+  type?: string;
 }
 interface DeleteParameterArgs {
+  buildTypeId: string;
+  name: string;
+}
+// Project parameter interfaces
+interface ListProjectParametersArgs {
+  projectId: string;
+}
+interface AddProjectParameterArgs {
+  projectId: string;
+  name: string;
+  value: string;
+  type?: string;
+}
+interface UpdateProjectParameterArgs {
+  projectId: string;
+  name: string;
+  value: string;
+  type?: string;
+}
+interface DeleteProjectParameterArgs {
+  projectId: string;
+  name: string;
+}
+// Output parameter interfaces
+interface ListOutputParametersArgs {
+  buildTypeId: string;
+}
+interface AddOutputParameterArgs {
+  buildTypeId: string;
+  name: string;
+  value: string;
+}
+interface UpdateOutputParameterArgs {
+  buildTypeId: string;
+  name: string;
+  value: string;
+}
+interface DeleteOutputParameterArgs {
   buildTypeId: string;
   name: string;
 }
@@ -3477,7 +3517,14 @@ const DEV_TOOLS: ToolDefinition[] = [
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const buildType = (await adapter.getBuildType(typed.buildTypeId)) as {
-            parameters?: { property?: Array<{ name?: string; value?: string }> };
+            parameters?: {
+              property?: Array<{
+                name?: string;
+                value?: string;
+                inherited?: boolean;
+                type?: { rawValue?: string };
+              }>;
+            };
           };
           return json({
             parameters: buildType.parameters?.property ?? [],
@@ -4482,6 +4529,11 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         buildTypeId: { type: 'string', description: 'Build type ID' },
         name: { type: 'string', description: 'Parameter name' },
         value: { type: 'string', description: 'Parameter value' },
+        type: {
+          type: 'string',
+          description:
+            'Parameter type spec (optional): "password", "text", "checkbox checkedValue=\'true\' uncheckedValue=\'false\'", "select data_1=\'opt1\' data_2=\'opt2\'"',
+        },
       },
       required: ['buildTypeId', 'name', 'value'],
     },
@@ -4489,11 +4541,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       const typedArgs = args as AddParameterArgs;
 
       const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-      const parameter = {
+      const parameter: { name: string; value: string; type?: { rawValue: string } } = {
         name: typedArgs.name,
         value: typedArgs.value,
       };
-      await adapter.modules.buildTypes.createBuildParameterOfBuildType(
+      if (typedArgs.type) {
+        parameter.type = { rawValue: typedArgs.type };
+      }
+      await adapter.modules.buildTypes.createBuildParameterOfBuildType_1(
         typedArgs.buildTypeId,
         undefined,
         parameter,
@@ -4518,6 +4573,11 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         buildTypeId: { type: 'string', description: 'Build type ID' },
         name: { type: 'string', description: 'Parameter name' },
         value: { type: 'string', description: 'New parameter value' },
+        type: {
+          type: 'string',
+          description:
+            'Parameter type spec (optional): "password", "text", "checkbox checkedValue=\'true\' uncheckedValue=\'false\'", "select data_1=\'opt1\' data_2=\'opt2\'"',
+        },
       },
       required: ['buildTypeId', 'name', 'value'],
     },
@@ -4525,14 +4585,18 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       const typedArgs = args as UpdateParameterArgs;
 
       const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-      await adapter.modules.buildTypes.updateBuildParameterOfBuildType(
+      const parameter: { name: string; value: string; type?: { rawValue: string } } = {
+        name: typedArgs.name,
+        value: typedArgs.value,
+      };
+      if (typedArgs.type) {
+        parameter.type = { rawValue: typedArgs.type };
+      }
+      await adapter.modules.buildTypes.updateBuildParameterOfBuildType_7(
         typedArgs.name,
         typedArgs.buildTypeId,
         undefined,
-        {
-          name: typedArgs.name,
-          value: typedArgs.value,
-        },
+        parameter,
         { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
       );
       return json({
@@ -4567,6 +4631,291 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       return json({
         success: true,
         action: 'delete_parameter',
+        buildTypeId: typedArgs.buildTypeId,
+        name: typedArgs.name,
+      });
+    },
+    mode: 'full',
+  },
+
+  // === Project Parameter Management ===
+  {
+    name: 'list_project_parameters',
+    description: 'List parameters for a project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+      },
+      required: ['projectId'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as ListProjectParametersArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      const response = (await adapter.modules.projects.getBuildParameters(typedArgs.projectId)) as {
+        data?: {
+          property?: Array<{
+            name?: string;
+            value?: string;
+            inherited?: boolean;
+            type?: { rawValue?: string };
+          }>;
+        };
+      };
+      const parameters = response.data?.property ?? [];
+      return json({
+        parameters,
+        count: parameters.length,
+      });
+    },
+  },
+
+  {
+    name: 'add_project_parameter',
+    description: 'Add a parameter to a project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+        name: { type: 'string', description: 'Parameter name' },
+        value: { type: 'string', description: 'Parameter value' },
+        type: {
+          type: 'string',
+          description:
+            'Parameter type spec (optional): "password", "text", "checkbox checkedValue=\'true\' uncheckedValue=\'false\'", "select data_1=\'opt1\' data_2=\'opt2\'"',
+        },
+      },
+      required: ['projectId', 'name', 'value'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as AddProjectParameterArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      const parameter: { name: string; value: string; type?: { rawValue: string } } = {
+        name: typedArgs.name,
+        value: typedArgs.value,
+      };
+      if (typedArgs.type) {
+        parameter.type = { rawValue: typedArgs.type };
+      }
+      await adapter.modules.projects.createBuildParameter(
+        typedArgs.projectId,
+        undefined,
+        parameter,
+        {
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        }
+      );
+      return json({
+        success: true,
+        action: 'add_project_parameter',
+        projectId: typedArgs.projectId,
+        name: typedArgs.name,
+      });
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'update_project_parameter',
+    description: 'Update a project parameter',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+        name: { type: 'string', description: 'Parameter name' },
+        value: { type: 'string', description: 'New parameter value' },
+        type: {
+          type: 'string',
+          description:
+            'Parameter type spec (optional): "password", "text", "checkbox checkedValue=\'true\' uncheckedValue=\'false\'", "select data_1=\'opt1\' data_2=\'opt2\'"',
+        },
+      },
+      required: ['projectId', 'name', 'value'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as UpdateProjectParameterArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      const parameter: { name: string; value: string; type?: { rawValue: string } } = {
+        name: typedArgs.name,
+        value: typedArgs.value,
+      };
+      if (typedArgs.type) {
+        parameter.type = { rawValue: typedArgs.type };
+      }
+      await adapter.modules.projects.updateBuildParameter(
+        typedArgs.name,
+        typedArgs.projectId,
+        undefined,
+        parameter,
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+      );
+      return json({
+        success: true,
+        action: 'update_project_parameter',
+        projectId: typedArgs.projectId,
+        name: typedArgs.name,
+      });
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'delete_project_parameter',
+    description: 'Delete a parameter from a project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+        name: { type: 'string', description: 'Parameter name' },
+      },
+      required: ['projectId', 'name'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as DeleteProjectParameterArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      await adapter.modules.projects.deleteBuildParameter(typedArgs.name, typedArgs.projectId);
+      return json({
+        success: true,
+        action: 'delete_project_parameter',
+        projectId: typedArgs.projectId,
+        name: typedArgs.name,
+      });
+    },
+    mode: 'full',
+  },
+
+  // === Output Parameter Management ===
+  {
+    name: 'list_output_parameters',
+    description: 'List output parameters for a build configuration',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildTypeId: { type: 'string', description: 'Build type ID' },
+      },
+      required: ['buildTypeId'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as ListOutputParametersArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      const buildType = (await adapter.getBuildType(typedArgs.buildTypeId)) as {
+        'output-parameters'?: {
+          property?: Array<{
+            name?: string;
+            value?: string;
+          }>;
+        };
+      };
+      const parameters = buildType['output-parameters']?.property ?? [];
+      return json({
+        parameters,
+        count: parameters.length,
+      });
+    },
+  },
+
+  {
+    name: 'add_output_parameter',
+    description: 'Add an output parameter to a build configuration (for build chains)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildTypeId: { type: 'string', description: 'Build type ID' },
+        name: { type: 'string', description: 'Parameter name' },
+        value: { type: 'string', description: 'Parameter value' },
+      },
+      required: ['buildTypeId', 'name', 'value'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as AddOutputParameterArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      const parameter = {
+        name: typedArgs.name,
+        value: typedArgs.value,
+      };
+      // Note: output parameters do not support types
+      await adapter.modules.buildTypes.createBuildParameterOfBuildType(
+        typedArgs.buildTypeId,
+        undefined,
+        parameter,
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+      );
+      return json({
+        success: true,
+        action: 'add_output_parameter',
+        buildTypeId: typedArgs.buildTypeId,
+        name: typedArgs.name,
+      });
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'update_output_parameter',
+    description: 'Update an output parameter in a build configuration',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildTypeId: { type: 'string', description: 'Build type ID' },
+        name: { type: 'string', description: 'Parameter name' },
+        value: { type: 'string', description: 'New parameter value' },
+      },
+      required: ['buildTypeId', 'name', 'value'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as UpdateOutputParameterArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      // Note: output parameters do not support types
+      await adapter.modules.buildTypes.updateBuildParameterOfBuildType(
+        typedArgs.name,
+        typedArgs.buildTypeId,
+        undefined,
+        {
+          name: typedArgs.name,
+          value: typedArgs.value,
+        },
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+      );
+      return json({
+        success: true,
+        action: 'update_output_parameter',
+        buildTypeId: typedArgs.buildTypeId,
+        name: typedArgs.name,
+      });
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'delete_output_parameter',
+    description: 'Delete an output parameter from a build configuration',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildTypeId: { type: 'string', description: 'Build type ID' },
+        name: { type: 'string', description: 'Parameter name' },
+      },
+      required: ['buildTypeId', 'name'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as DeleteOutputParameterArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      // Uses the original deleteBuildParameterOfBuildType which targets /output-parameters
+      await adapter.modules.buildTypes.deleteBuildParameterOfBuildType(
+        typedArgs.name,
+        typedArgs.buildTypeId
+      );
+      return json({
+        success: true,
+        action: 'delete_output_parameter',
         buildTypeId: typedArgs.buildTypeId,
         name: typedArgs.name,
       });
