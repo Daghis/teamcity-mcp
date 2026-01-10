@@ -114,6 +114,55 @@ describe('tools: parameters, steps, triggers', () => {
     });
   });
 
+  it('update_parameter with type support', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const updateBuildParamMock = jest.fn(async () => ({}));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                buildTypes: {
+                  updateBuildParameterOfBuildType_7: updateBuildParamMock,
+                },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('update_parameter').handler({
+            buildTypeId: 'bt',
+            name: 'env.SECRET',
+            value: 'newvalue',
+            type: 'text',
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'update_parameter',
+            buildTypeId: 'bt',
+            name: 'env.SECRET',
+          });
+          // Verify the API was called with type
+          // Note: API method takes (name, buildTypeId, fields, body, options)
+          expect(updateBuildParamMock).toHaveBeenCalledWith(
+            'env.SECRET',
+            'bt',
+            undefined,
+            expect.objectContaining({
+              name: 'env.SECRET',
+              value: 'newvalue',
+              type: { rawValue: 'text' },
+            }),
+            expect.any(Object)
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
   it('project parameters: add/update/delete', async () => {
     jest.resetModules();
     await new Promise<void>((resolve, reject) => {
@@ -169,7 +218,7 @@ describe('tools: parameters, steps, triggers', () => {
             expect.any(Object)
           );
 
-          // Test update
+          // Test update without type
           res = await getRequiredTool('update_project_parameter').handler({
             projectId: 'proj',
             name: 'env.VAR',
@@ -182,6 +231,34 @@ describe('tools: parameters, steps, triggers', () => {
             projectId: 'proj',
             name: 'env.VAR',
           });
+
+          // Test update with type
+          res = await getRequiredTool('update_project_parameter').handler({
+            projectId: 'proj',
+            name: 'env.VAR',
+            value: 'val3',
+            type: 'checkbox checkedValue=true uncheckedValue=false',
+          });
+          payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'update_project_parameter',
+            projectId: 'proj',
+            name: 'env.VAR',
+          });
+          // Verify the API was called with type
+          // Note: API method takes (name, projectId, fields, body, options)
+          expect(updateBuildParameter).toHaveBeenLastCalledWith(
+            'env.VAR',
+            'proj',
+            undefined,
+            expect.objectContaining({
+              name: 'env.VAR',
+              value: 'val3',
+              type: { rawValue: 'checkbox checkedValue=true uncheckedValue=false' },
+            }),
+            expect.any(Object)
+          );
 
           // Test delete
           res = await getRequiredTool('delete_project_parameter').handler({
