@@ -10,18 +10,17 @@ describe('tools: parameters, steps, triggers', () => {
     await new Promise<void>((resolve, reject) => {
       jest.isolateModules(() => {
         (async () => {
-          const createBuildParameterOfBuildType = jest.fn(async () => ({}));
-          const updateBuildParameterOfBuildType = jest.fn(async () => ({}));
-          const deleteBuildParameterOfBuildType = jest.fn(async () => ({}));
-          const deleteBuildParameterOfBuildType2 = jest.fn(async () => ({}));
+          // Mock the API methods that target /parameters (input parameters)
+          const createBuildParam = jest.fn(async () => ({}));
+          const updateBuildParam = jest.fn(async () => ({}));
+          const deleteBuildParam = jest.fn(async () => ({}));
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: {
               getInstance: () => ({
                 buildTypes: {
-                  createBuildParameterOfBuildType,
-                  updateBuildParameterOfBuildType,
-                  deleteBuildParameterOfBuildType,
-                  deleteBuildParameterOfBuildType_2: deleteBuildParameterOfBuildType2,
+                  createBuildParameterOfBuildType_1: createBuildParam,
+                  updateBuildParameterOfBuildType_7: updateBuildParam,
+                  deleteBuildParameterOfBuildType_2: deleteBuildParam,
                 },
               }),
             },
@@ -61,6 +60,226 @@ describe('tools: parameters, steps, triggers', () => {
             action: 'delete_parameter',
             buildTypeId: 'bt',
             name: 'k',
+          });
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('add_parameter with type support', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const createBuildParamMock = jest.fn(async () => ({}));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                buildTypes: {
+                  createBuildParameterOfBuildType_1: createBuildParamMock,
+                },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('add_parameter').handler({
+            buildTypeId: 'bt',
+            name: 'env.SECRET',
+            value: 'secret123',
+            type: 'password',
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'add_parameter',
+            buildTypeId: 'bt',
+            name: 'env.SECRET',
+          });
+          // Verify the API was called with type
+          expect(createBuildParamMock).toHaveBeenCalledWith(
+            'bt',
+            undefined,
+            expect.objectContaining({
+              name: 'env.SECRET',
+              value: 'secret123',
+              type: { rawValue: 'password' },
+            }),
+            expect.any(Object)
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('project parameters: add/update/delete', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const createBuildParameter = jest.fn(async () => ({}));
+          const updateBuildParameter = jest.fn(async () => ({}));
+          const deleteBuildParameter = jest.fn(async () => ({}));
+          const getBuildParameters = jest.fn(async () => ({
+            data: { property: [{ name: 'k', value: 'v', inherited: false }] },
+          }));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                projects: {
+                  createBuildParameter,
+                  updateBuildParameter,
+                  deleteBuildParameter,
+                  getBuildParameters,
+                },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+
+          // Test list
+          let res = await getRequiredTool('list_project_parameters').handler({
+            projectId: 'proj',
+          });
+          let payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({ count: 1 });
+          expect(payload.parameters[0]).toMatchObject({ name: 'k', value: 'v' });
+
+          // Test add with type
+          res = await getRequiredTool('add_project_parameter').handler({
+            projectId: 'proj',
+            name: 'env.VAR',
+            value: 'val',
+            type: 'password',
+          });
+          payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'add_project_parameter',
+            projectId: 'proj',
+            name: 'env.VAR',
+          });
+          expect(createBuildParameter).toHaveBeenCalledWith(
+            'proj',
+            undefined,
+            expect.objectContaining({ type: { rawValue: 'password' } }),
+            expect.any(Object)
+          );
+
+          // Test update
+          res = await getRequiredTool('update_project_parameter').handler({
+            projectId: 'proj',
+            name: 'env.VAR',
+            value: 'val2',
+          });
+          payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'update_project_parameter',
+            projectId: 'proj',
+            name: 'env.VAR',
+          });
+
+          // Test delete
+          res = await getRequiredTool('delete_project_parameter').handler({
+            projectId: 'proj',
+            name: 'env.VAR',
+          });
+          payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'delete_project_parameter',
+            projectId: 'proj',
+            name: 'env.VAR',
+          });
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('output parameters: add/update/delete', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          // Output parameters use the non-suffixed methods (target /output-parameters)
+          const createBuildParameterOfBuildType = jest.fn(async () => ({}));
+          const updateBuildParameterOfBuildType = jest.fn(async () => ({}));
+          const deleteBuildParameterOfBuildType = jest.fn(async () => ({}));
+          // getBuildType is a top-level method on the API, not under buildTypes
+          // Note: TeamCityAPI.getBuildType already extracts response.data, so return unwrapped
+          const getBuildType = jest.fn(async () => ({
+            'output-parameters': {
+              property: [{ name: 'out.var', value: 'outval' }],
+            },
+          }));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                // Top-level method for adapter.getBuildType()
+                getBuildType,
+                buildTypes: {
+                  createBuildParameterOfBuildType,
+                  updateBuildParameterOfBuildType,
+                  deleteBuildParameterOfBuildType,
+                },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+
+          // Test list
+          let res = await getRequiredTool('list_output_parameters').handler({
+            buildTypeId: 'bt',
+          });
+          let payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({ count: 1 });
+          expect(payload.parameters[0]).toMatchObject({ name: 'out.var', value: 'outval' });
+
+          // Test add (no type support for output params)
+          res = await getRequiredTool('add_output_parameter').handler({
+            buildTypeId: 'bt',
+            name: 'out.new',
+            value: 'newval',
+          });
+          payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'add_output_parameter',
+            buildTypeId: 'bt',
+            name: 'out.new',
+          });
+
+          // Test update
+          res = await getRequiredTool('update_output_parameter').handler({
+            buildTypeId: 'bt',
+            name: 'out.new',
+            value: 'updated',
+          });
+          payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'update_output_parameter',
+            buildTypeId: 'bt',
+            name: 'out.new',
+          });
+
+          // Test delete
+          res = await getRequiredTool('delete_output_parameter').handler({
+            buildTypeId: 'bt',
+            name: 'out.new',
+          });
+          payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'delete_output_parameter',
+            buildTypeId: 'bt',
+            name: 'out.new',
           });
           resolve();
         })().catch(reject);
