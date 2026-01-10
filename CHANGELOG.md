@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.0...teamcity-mcp-v2.1.1) (2026-01-10)
+
+
+### Bug Fixes
+
+* correct parameter endpoints and add full CRUD for all parameter types ([#358](https://github.com/Daghis/teamcity-mcp/issues/358)) ([79e92ba](https://github.com/Daghis/teamcity-mcp/commit/79e92ba1c1a9642a0253bf9d040c15d0ec072803))
+
 ## [2.1.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.7...teamcity-mcp-v2.1.0) (2026-01-08)
 
 
