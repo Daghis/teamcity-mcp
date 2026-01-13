@@ -11,26 +11,29 @@ A Model Control Protocol (MCP) server that bridges AI coding assistants with Jet
 
 The TeamCity MCP Server allows developers using AI-powered coding assistants (Claude Code, Cursor, Windsurf) to interact with TeamCity directly from their development environment via MCP tools.
 
+> **Upgrading from 1.x?** Version 2.0.0 moved 15 tools from Dev to Full mode, including queue management, agent compatibility checks, and server health monitoring. If you relied on these tools in Dev mode, switch to `MCP_MODE=full` or use runtime mode switching (v2.1.0+). See [CHANGELOG.md](CHANGELOG.md) for details.
+
 ## Features
 
 ### 🚀 Two Operational Modes
 
-- **Dev Mode** (default): Safe CI/CD operations
-  - Trigger builds
-  - Monitor build status and progress
-  - Fetch build logs
-  - Investigate test failures
-  - List projects and configurations
+- **Dev Mode** (default): Safe CI/CD operations (31 tools, ~14k context tokens)
+  - Trigger builds and monitor status
+  - Fetch build logs and inspect test failures
+  - List projects, configurations, and queue
+  - Read parameters and investigate problems
 
-- **Full Mode**: Complete infrastructure management
+- **Full Mode**: Complete infrastructure management (87 tools, ~26k context tokens)
   - All Dev mode features, plus:
   - Create and clone build configurations
-  - Manage build steps and triggers
+  - Manage build steps, triggers, and dependencies
   - Configure VCS roots and agents
-  - Set up new projects
-  - Modify infrastructure settings
+  - Full CRUD for parameters (build config, project, and output parameters)
+  - Queue management and server administration
 
-See the [Tools Mode Matrix](docs/mcp-tools-mode-matrix.md) for the complete list of 77 tools and their availability by mode.
+**Runtime Mode Switching (v2.1.0+):** Switch between modes at runtime using the `get_mcp_mode` and `set_mcp_mode` tools—no restart required. MCP clients that support notifications will see the tool list update automatically.
+
+See the [Tools Mode Matrix](docs/mcp-tools-mode-matrix.md) for the complete list of 87 tools and their availability by mode.
 
 ### 🎯 Key Capabilities
 
@@ -44,7 +47,7 @@ See the [Tools Mode Matrix](docs/mcp-tools-mode-matrix.md) for the complete list
 
 ### Prerequisites
 
-- Node.js >= 20.10.0
+- Node.js >= 20.10.0 and < 21
 - TeamCity Server 2020.1+ with REST API access
 - TeamCity authentication token
 
@@ -248,14 +251,18 @@ The CI workflow runs `npm run build:bundle` and uploads the generated `coverage/
 
 ```
 teamcity-mcp/
-├── src/               # Source code
-│   ├── tools/        # MCP tool implementations
-│   ├── utils/        # Utility functions
-│   ├── types/        # TypeScript type definitions
-│   └── config/       # Configuration management
-├── tests/            # Test files
-├── docs/             # Documentation
-└── .agent-os/        # Agent OS specifications
+├── src/                    # Source code
+│   ├── tools.ts           # All 87 MCP tool definitions
+│   ├── server.ts          # MCP server setup
+│   ├── api-client.ts      # TeamCity API singleton
+│   ├── config/            # Configuration with Zod validation
+│   ├── teamcity/          # Domain logic (build, agent, config managers)
+│   ├── teamcity-client/   # Auto-generated OpenAPI client
+│   ├── types/             # TypeScript type definitions
+│   └── utils/             # Logger, MCP helpers, pagination
+├── tests/                  # Unit and integration tests
+├── docs/                   # Documentation
+└── scripts/                # Build and maintenance scripts
 ```
 
 ## API Documentation

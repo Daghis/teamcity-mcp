@@ -5,6 +5,8 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Category | Tool | Dev | Full |
 |---|---|---|---|
 | Basic | `ping` | Yes | Yes |
+| Basic | `get_mcp_mode` | Yes | Yes |
+| Basic | `set_mcp_mode` | Yes | Yes |
 | Projects | `list_projects` | Yes | Yes |
 | Projects | `get_project` | Yes | Yes |
 | Projects | `list_project_hierarchy` | Yes | Yes |
@@ -36,6 +38,14 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Parameters | `add_parameter` | No | Yes |
 | Parameters | `update_parameter` | No | Yes |
 | Parameters | `delete_parameter` | No | Yes |
+| Parameters (Project) | `list_project_parameters` | Yes | Yes |
+| Parameters (Project) | `add_project_parameter` | No | Yes |
+| Parameters (Project) | `update_project_parameter` | No | Yes |
+| Parameters (Project) | `delete_project_parameter` | No | Yes |
+| Parameters (Output) | `list_output_parameters` | Yes | Yes |
+| Parameters (Output) | `add_output_parameter` | No | Yes |
+| Parameters (Output) | `update_output_parameter` | No | Yes |
+| Parameters (Output) | `delete_output_parameter` | No | Yes |
 | VCS | `list_vcs_roots` | No | Yes |
 | VCS | `get_vcs_root` | No | Yes |
 | VCS | `get_versioned_settings_status` | No | Yes |
@@ -82,8 +92,10 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Users & Roles | `list_users` | No | Yes |
 | Users & Roles | `list_roles` | No | Yes |
 
-**Summary:** 77 tools total — 27 available in Dev mode, 50 Full-only.
+**Summary:** 87 tools total — 31 available in Dev mode, 56 Full-only.
 
 Notes:
-- Dev mode focuses on developer workflows (builds, tests, logs) and excludes infrastructure/admin tools to reduce context size (~4-5k tokens saved).
+- Dev mode focuses on developer workflows (builds, tests, logs) and excludes infrastructure/admin tools to reduce context size (~12k tokens saved).
 - Admin tools (agents, VCS roots, users, compatibility checks) require Full mode.
+- **New in v2.1.0:** Runtime mode switching via `get_mcp_mode` and `set_mcp_mode` tools.
+- **New in v2.1.1:** Full CRUD for project and output parameters.
