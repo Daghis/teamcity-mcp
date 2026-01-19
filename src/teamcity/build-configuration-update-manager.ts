@@ -1,17 +1,11 @@
 /**
  * BuildConfigurationUpdateManager - Manages updating of build configurations
  */
+import type { AxiosInstance } from 'axios';
+
 import { debug, info, error as logError } from '@/utils/logger';
 
 import type { TeamCityUnifiedClient } from './types/client';
-
-const ARTIFACT_RULES_SETTINGS_FIELD = 'settings/artifactRules';
-const ARTIFACT_RULES_LEGACY_FIELD = 'artifactRules';
-
-type BuildTypeFieldSetter = Pick<
-  TeamCityUnifiedClient['modules']['buildTypes'],
-  'setBuildTypeField'
->;
 
 const isArtifactRulesRetryableError = (error: unknown): boolean => {
   if (error == null || typeof error !== 'object') return false;
@@ -21,13 +15,27 @@ const isArtifactRulesRetryableError = (error: unknown): boolean => {
   return status === 400 || status === 404;
 };
 
+/**
+ * Updates artifact rules for a build configuration using direct HTTP.
+ *
+ * We bypass the auto-generated OpenAPI client because it encodes path parameters
+ * with encodeURIComponent(), which encodes `/` to `%2F`. TeamCity expects unencoded
+ * slashes in paths like `/app/rest/buildTypes/{id}/settings/artifactRules`.
+ *
+ * See: https://github.com/Daghis/teamcity-mcp/issues/334
+ */
 export const setArtifactRulesWithFallback = async (
-  api: BuildTypeFieldSetter,
+  http: AxiosInstance,
   buildTypeId: string,
   artifactRules: string
 ): Promise<void> => {
+  const encodedId = encodeURIComponent(buildTypeId);
+
   try {
-    await api.setBuildTypeField(buildTypeId, ARTIFACT_RULES_SETTINGS_FIELD, artifactRules);
+    // Primary path: settings/artifactRules (modern TeamCity)
+    await http.put(`/app/rest/buildTypes/${encodedId}/settings/artifactRules`, artifactRules, {
+      headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' },
+    });
   } catch (err) {
     if (!isArtifactRulesRetryableError(err)) {
       throw err;
@@ -40,7 +48,10 @@ export const setArtifactRulesWithFallback = async (
     });
 
     try {
-      await api.setBuildTypeField(buildTypeId, ARTIFACT_RULES_LEGACY_FIELD, artifactRules);
+      // Fallback path: artifactRules (older TeamCity servers)
+      await http.put(`/app/rest/buildTypes/${encodedId}/artifactRules`, artifactRules, {
+        headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' },
+      });
     } catch (fallbackError) {
       debug('Legacy artifact rules update failed', {
         buildTypeId,
@@ -391,14 +402,16 @@ export class BuildConfigurationUpdateManager {
           await this.client.modules.buildTypes.setBuildTypeField(
             currentConfig.id,
             'name',
-            updates.name
+            updates.name,
+            { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
           );
         }
         if (updates.description !== undefined) {
           await this.client.modules.buildTypes.setBuildTypeField(
             currentConfig.id,
             'description',
-            updates.description ?? ''
+            updates.description ?? '',
+            { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
           );
         }
       }
@@ -409,18 +422,15 @@ export class BuildConfigurationUpdateManager {
         /* eslint-disable no-await-in-loop */
         for (const setting of settings) {
           if (setting.name === 'artifactRules') {
-            await setArtifactRulesWithFallback(
-              this.client.modules.buildTypes,
-              currentConfig.id,
-              setting.value
-            );
+            await setArtifactRulesWithFallback(this.client.http, currentConfig.id, setting.value);
             continue;
           }
 
           await this.client.modules.buildTypes.setBuildTypeField(
             currentConfig.id,
             `settings/${setting.name}`,
-            setting.value
+            setting.value,
+            { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
           );
         }
         /* eslint-enable no-await-in-loop */
@@ -450,7 +460,8 @@ export class BuildConfigurationUpdateManager {
           await this.client.modules.buildTypes.setBuildTypeField(
             currentConfig.id,
             `parameters/${name}`,
-            value
+            value,
+            { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
           );
         }
         /* eslint-enable no-await-in-loop */

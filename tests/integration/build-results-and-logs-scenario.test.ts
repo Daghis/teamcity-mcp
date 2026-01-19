@@ -3,33 +3,19 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 
-import type {
-  ActionResult,
-  BuildLogChunk,
-  BuildRef,
-  TriggerBuildResult,
-} from '../types/tool-results';
-import { callTool, callToolsBatch } from './lib/mcp-runner';
+import type { BuildLogChunk, BuildRef, TriggerBuildResult } from '../types/tool-results';
+import { callTool } from './lib/mcp-runner';
+import {
+  type ProjectFixture,
+  hasTeamCityEnv,
+  isSerialWorker,
+  setupProjectFixture,
+  teardownProjectFixture,
+} from './lib/test-fixtures';
 
-const SERIAL_WORKER =
-  process.env['JEST_WORKER_ID'] === '1' || process.env['SERIAL_BUILD_TESTS'] === 'true';
-const serialDescribe = SERIAL_WORKER ? describe : describe.skip;
-
-const hasTeamCityEnv = Boolean(
-  (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
-    (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
-);
-
-const ts = Date.now();
-const PROJECT_ID = `E2E_RESULTS_${ts}`;
-const PROJECT_NAME = `E2E Results ${ts}`;
-const BT_ID = `E2E_RESULTS_BT_${ts}`;
-const BT_NAME = `E2E Results BuildType ${ts}`;
-
-let buildId: string | undefined;
-let buildNumber: string | undefined;
+const serialDescribe = isSerialWorker ? describe : describe.skip;
 
 interface BuildLogStreamResponse {
   encoding: 'stream';
@@ -46,83 +32,47 @@ interface BuildLogStreamResponse {
 }
 
 serialDescribe('Build results and logs: full writes + dev reads', () => {
-  afterAll(async () => {
-    try {
-      await callTool('full', 'delete_project', { projectId: PROJECT_ID });
-    } catch (_e) {
-      expect(true).toBe(true);
-    }
-  });
-  it('creates project, build config, and step (full)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const batch = await callToolsBatch('full', [
-      {
-        tool: 'create_project',
-        args: {
-          id: PROJECT_ID,
-          name: PROJECT_NAME,
-        },
-      },
-      {
-        tool: 'create_build_config',
-        args: {
-          projectId: PROJECT_ID,
-          id: BT_ID,
-          name: BT_NAME,
-          description: 'Build results/logs scenario',
-        },
-      },
-      {
-        tool: 'manage_build_steps',
-        args: {
-          buildTypeId: BT_ID,
-          action: 'add',
-          name: 'log-output',
-          type: 'simpleRunner',
-          properties: { 'script.content': 'echo "line1" && echo "line2" && echo "line3"' },
-        },
-      },
-    ]);
+  let fixture: ProjectFixture | null = null;
+  let buildId: string | undefined;
+  let buildNumber: string | undefined;
 
-    expect(batch.results).toHaveLength(3);
-    expect(batch.completed).toBe(true);
-    const [projectStep, configStep, stepStep] = batch.results;
-    const cproj = projectStep?.result as ActionResult | undefined;
-    const cbt = configStep?.result as ActionResult | undefined;
-    const step = stepStep?.result as ActionResult | undefined;
+  beforeAll(async () => {
+    if (!hasTeamCityEnv) return;
 
-    expect(projectStep?.ok).toBe(true);
-    expect(cproj).toMatchObject({ success: true, action: 'create_project' });
+    fixture = await setupProjectFixture({
+      prefix: 'E2E_RESULTS',
+      namePrefix: 'E2E Results',
+      buildConfigDescription: 'Build results/logs scenario',
+      stepScript: 'echo "line1" && echo "line2" && echo "line3"',
+      stepName: 'log-output',
+    });
 
-    expect(configStep?.ok).toBe(true);
-    expect(cbt).toMatchObject({ success: true, action: 'create_build_config' });
-
-    expect(stepStep?.ok).toBe(true);
-    expect(step).toMatchObject({ success: true, action: 'add_build_step' });
-  }, 60000);
-
-  it('triggers a build (dev)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    // Trigger a build and get its number
     const trig = await callTool<TriggerBuildResult>('dev', 'trigger_build', {
-      buildTypeId: BT_ID,
+      buildTypeId: fixture.buildTypeId,
       comment: 'e2e-results',
     });
-    expect(trig).toMatchObject({ success: true, action: 'trigger_build' });
-    buildId = trig.buildId;
-    expect(typeof buildId).toBe('string');
-  }, 90000);
 
-  it('reads build status and number (dev)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    if (!buildId) return expect(true).toBe(true);
-    const b = await callTool<BuildRef>('dev', 'get_build', { buildId });
-    buildNumber = String(b.number ?? '');
-    expect(typeof buildNumber).toBe('string');
-  }, 60000);
+    if (!trig.success || !trig.buildId) {
+      throw new Error(`Failed to trigger build: ${JSON.stringify(trig)}`);
+    }
+
+    buildId = trig.buildId;
+
+    // Get build number
+    const buildRef = await callTool<BuildRef>('dev', 'get_build', { buildId });
+    buildNumber = String(buildRef.number ?? '');
+  }, 120_000);
+
+  afterAll(async () => {
+    if (fixture) {
+      await teardownProjectFixture(fixture.projectId);
+    }
+  });
 
   it('get_build_results with flags (dev)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    if (!buildId) return expect(true).toBe(true);
+    if (!hasTeamCityEnv || !fixture || !buildId) return expect(true).toBe(true);
+
     const res = await callTool<Record<string, unknown>>('dev', 'get_build_results', {
       buildId,
       includeArtifacts: true,
@@ -133,11 +83,11 @@ serialDescribe('Build results and logs: full writes + dev reads', () => {
       maxArtifactSize: 1024,
     });
     expect(res).toBeDefined();
-  }, 60000);
+  }, 60_000);
 
   it('get_build_results streaming artifacts returns handles (dev)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    if (!buildId) return expect(true).toBe(true);
+    if (!hasTeamCityEnv || !fixture || !buildId) return expect(true).toBe(true);
+
     const res = await callTool<Record<string, unknown>>('dev', 'get_build_results', {
       buildId,
       includeArtifacts: true,
@@ -145,19 +95,20 @@ serialDescribe('Build results and logs: full writes + dev reads', () => {
       maxArtifactSize: 1024,
     });
     expect(res).toBeDefined();
+
     const artifacts = res?.['artifacts'] as Array<Record<string, unknown>> | undefined;
     if (Array.isArray(artifacts) && artifacts.length > 0) {
       const first = artifacts[0] ?? {};
       expect(first).not.toHaveProperty('content');
       expect(first).toHaveProperty('downloadHandle');
     }
-  }, 60000);
+  }, 60_000);
 
   it('get_build_results resolves using buildTypeId and buildNumber (dev)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    if (!buildNumber) return expect(true).toBe(true);
+    if (!hasTeamCityEnv || !fixture || !buildNumber) return expect(true).toBe(true);
+
     const res = await callTool<Record<string, unknown>>('dev', 'get_build_results', {
-      buildTypeId: BT_ID,
+      buildTypeId: fixture.buildTypeId,
       buildNumber,
       includeStatistics: true,
     });
@@ -167,18 +118,19 @@ serialDescribe('Build results and logs: full writes + dev reads', () => {
     if (build.number) {
       expect(String(build.number)).toBe(String(buildNumber));
     }
-  }, 60000);
+  }, 60_000);
 
   it('get_build_status resolves using buildTypeId and buildNumber (dev)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    if (!buildNumber) return expect(true).toBe(true);
+    if (!hasTeamCityEnv || !fixture || !buildNumber) return expect(true).toBe(true);
+
     let result: Record<string, unknown> | undefined;
     let lastFailure: Record<string, unknown> | undefined;
     let attempts = 0;
+
     while (attempts < 10) {
       // eslint-disable-next-line no-await-in-loop
       const candidate = await callTool<Record<string, unknown>>('dev', 'get_build_status', {
-        buildTypeId: BT_ID,
+        buildTypeId: fixture.buildTypeId,
         buildNumber,
         includeTests: true,
       });
@@ -213,25 +165,26 @@ serialDescribe('Build results and logs: full writes + dev reads', () => {
     if (typeof resolvedNumber === 'string' && resolvedNumber.length > 0) {
       expect(String(resolvedNumber)).toBe(String(buildNumber));
     }
-  }, 60000);
+  }, 60_000);
 
   it('get_build_results surfaces friendly not-found message for unknown build number (dev)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    if (!hasTeamCityEnv || !fixture) return expect(true).toBe(true);
+
     const bogusNumber = `MISSING-${Date.now()}`;
     const res = await callTool<Record<string, unknown>>('dev', 'get_build_results', {
-      buildTypeId: BT_ID,
+      buildTypeId: fixture.buildTypeId,
       buildNumber: bogusNumber,
     });
 
     expect(res).toBeDefined();
     expect(res?.['success']).toBe(false);
     const error = (res?.['error'] ?? {}) as { message?: string };
-    expect(error.message ?? '').toMatch(new RegExp(`${BT_ID}[^]*${bogusNumber}`));
-  }, 60000);
+    expect(error.message ?? '').toMatch(new RegExp(`${fixture.buildTypeId}[^]*${bogusNumber}`));
+  }, 60_000);
 
   it('fetch_build_log with paging and tail (dev)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    if (!buildId) return expect(true).toBe(true);
+    if (!hasTeamCityEnv || !fixture || !buildId) return expect(true).toBe(true);
+
     type BuildLogResponse = BuildLogChunk | { success: false; error?: { message?: string } };
 
     const page1 = await callTool<BuildLogResponse>('dev', 'fetch_build_log', {
@@ -278,11 +231,10 @@ serialDescribe('Build results and logs: full writes + dev reads', () => {
       throw new Error(`fetch_build_log tail request failed: ${message}`);
     }
     expect(tail).toHaveProperty('lines');
-  }, 60000);
+  }, 60_000);
 
   it('streams a build log segment to disk (dev)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    if (!buildId) return expect(true).toBe(true);
+    if (!hasTeamCityEnv || !fixture || !buildId) return expect(true).toBe(true);
 
     const targetPath = join(tmpdir(), `build-log-${buildId}-${randomUUID()}.log`);
 
@@ -318,28 +270,22 @@ serialDescribe('Build results and logs: full writes + dev reads', () => {
     } finally {
       await fs.rm(targetPath, { force: true });
     }
-  }, 60000);
+  }, 60_000);
 
   it('fetch_build_log by buildNumber + buildTypeId (dev)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    if (!buildNumber) return expect(true).toBe(true);
+    if (!hasTeamCityEnv || !fixture || !buildNumber) return expect(true).toBe(true);
+
     try {
       const byNumber = await callTool<BuildLogChunk>('dev', 'fetch_build_log', {
         buildNumber,
-        buildTypeId: BT_ID,
+        buildTypeId: fixture.buildTypeId,
         page: 1,
         pageSize: 50,
       });
       expect(byNumber).toHaveProperty('lines');
-    } catch (e) {
+    } catch {
       // Build number resolution may not be stable across branches; non-fatal
       expect(true).toBe(true);
     }
-  }, 60000);
-
-  it('deletes project (full)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const res = await callTool('full', 'delete_project', { projectId: PROJECT_ID });
-    expect(res).toMatchObject({ success: true, action: 'delete_project' });
-  }, 60000);
+  }, 60_000);
 });

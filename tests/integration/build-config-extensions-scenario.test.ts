@@ -5,7 +5,7 @@ import { callTool, callToolsBatchExpect } from './lib/mcp-runner';
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
-    (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
+  (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
 );
 
 const ts = Date.now();
@@ -195,9 +195,9 @@ describe('Build configuration dependency/feature management (full)', () => {
       const requirementAdd = await callTool<ActionResult>('full', 'manage_agent_requirements', {
         buildTypeId: TARGET_BT_ID,
         action: 'add',
+        type: 'exists',
         properties: {
           'property-name': 'env.ANSIBLE',
-          condition: 'exists',
         },
       });
       expect(requirementAdd).toMatchObject({

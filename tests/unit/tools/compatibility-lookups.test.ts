@@ -1,8 +1,8 @@
-// Force dev mode (read-only) for lookup tools
+// Force full mode for compatibility lookup tools (moved out of dev mode)
 jest.mock('@/config', () => ({
   getTeamCityUrl: () => 'https://example.test',
   getTeamCityToken: () => 'token',
-  getMCPMode: () => 'dev',
+  getMCPMode: () => 'full',
 }));
 
 describe('tools: compatibility lookups', () => {

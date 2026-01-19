@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "teamcity-mcp": {
+      "type": "stdio",
+      "command": "sh",
+      "args": [
+        "-c",
+        "cd /Users/marc/Developer/teamcity-mcp && node dist/index.js"
+      ],
+      "env": {}
+    }
+  }
+}

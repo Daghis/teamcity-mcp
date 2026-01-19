@@ -129,6 +129,16 @@ module.exports = [
       'prefer-promise-reject-errors': 'error',
       'no-await-in-loop': 'warn',
       'require-atomic-updates': 'error',
+      // Warn on double type assertions (as unknown as X) - prefer type guards or Zod schemas
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector:
+            'TSAsExpression > TSAsExpression[typeAnnotation.typeName.name="unknown"]',
+          message:
+            'Avoid `as unknown as` double assertions. Use type guards, Zod schemas, or add an eslint-disable comment explaining why this is necessary.',
+        },
+      ],
     },
     settings: {
       'import/resolver': {

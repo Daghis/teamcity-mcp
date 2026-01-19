@@ -1,19 +1,19 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json",
-  "name": "io.github.daghis/teamcity",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Daghis/teamcity",
   "description": "MCP server exposing JetBrains TeamCity CI/CD workflows to AI coding assistants",
   "repository": {
     "url": "https://github.com/Daghis/teamcity-mcp",
     "source": "github"
   },
   "websiteUrl": "https://github.com/Daghis/teamcity-mcp",
-  "version": "1.11.1",
+  "version": "2.1.2",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@daghis/teamcity-mcp",
-      "version": "1.11.1",
+      "version": "2.1.2",
       "runtimeHint": "npx",
       "runtimeArguments": [
         {

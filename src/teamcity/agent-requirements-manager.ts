@@ -9,13 +9,14 @@ type StringMap = Record<string, string>;
 interface ManageRequirementInput {
   buildTypeId: string;
   requirementId?: string;
+  type?: string;
   properties?: Record<string, unknown>;
   disabled?: boolean;
 }
 
-const JSON_HEADERS: RawAxiosRequestConfig = {
+const XML_HEADERS: RawAxiosRequestConfig = {
   headers: {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/xml',
     Accept: 'application/json',
   },
 };
@@ -78,18 +79,97 @@ const mergeRecords = (base: StringMap, override: StringMap): StringMap => ({
   ...override,
 });
 
+const escapeXml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+const attributesToString = (attributes: Record<string, string | undefined>): string => {
+  const parts = Object.entries(attributes)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => `${key}="${escapeXml(value as string)}"`);
+  return parts.length > 0 ? ` ${parts.join(' ')}` : '';
+};
+
+const propertiesToXml = (properties?: Properties | undefined): string | undefined => {
+  if (!properties) {
+    return undefined;
+  }
+  const entries = properties.property;
+  const list = Array.isArray(entries) ? entries : entries != null ? [entries] : [];
+
+  if (list.length === 0) {
+    return undefined;
+  }
+
+  const nodes = list
+    .filter((item) => item?.name)
+    .map((item) => {
+      const name = item?.name ?? '';
+      const value = item?.value != null ? String(item.value) : '';
+      return `<property name="${escapeXml(name)}" value="${escapeXml(value)}"/>`;
+    });
+
+  if (nodes.length === 0) {
+    return undefined;
+  }
+
+  return `<properties>${nodes.join('')}</properties>`;
+};
+
+const agentRequirementToXml = (requirement: AgentRequirement): string => {
+  const attributes: Record<string, string | undefined> = {
+    id:
+      typeof requirement.id === 'string' && requirement.id.trim() !== ''
+        ? requirement.id
+        : undefined,
+    name:
+      typeof requirement.name === 'string' && requirement.name.trim() !== ''
+        ? requirement.name
+        : undefined,
+    type:
+      typeof requirement.type === 'string' && requirement.type.trim() !== ''
+        ? requirement.type
+        : undefined,
+    disabled:
+      typeof requirement.disabled === 'boolean'
+        ? requirement.disabled
+          ? 'true'
+          : 'false'
+        : undefined,
+    inherited:
+      typeof requirement.inherited === 'boolean'
+        ? requirement.inherited
+          ? 'true'
+          : 'false'
+        : undefined,
+  };
+
+  const fragments: string[] = [];
+  const propertiesXml = propertiesToXml(requirement.properties);
+  if (propertiesXml) {
+    fragments.push(propertiesXml);
+  }
+
+  return `<agent-requirement${attributesToString(attributes)}>${fragments.join('')}</agent-requirement>`;
+};
+
 export class AgentRequirementsManager {
   constructor(private readonly client: TeamCityClientAdapter) {}
 
   async addRequirement(input: ManageRequirementInput): Promise<{ id: string }> {
     const { buildTypeId } = input;
     const payload = this.buildPayload(undefined, input);
+    const xmlBody = agentRequirementToXml(payload);
 
     const response = await this.client.modules.buildTypes.addAgentRequirementToBuildType(
       buildTypeId,
       undefined,
-      payload,
-      JSON_HEADERS
+      xmlBody as unknown as AgentRequirement,
+      XML_HEADERS
     );
 
     const id = response.data?.id;
@@ -112,12 +192,13 @@ export class AgentRequirementsManager {
     }
 
     const payload = this.buildPayload(existing, input);
+    const xmlBody = agentRequirementToXml(payload);
     await this.client.modules.buildTypes.replaceAgentRequirement(
       buildTypeId,
       requirementId,
       undefined,
-      payload,
-      JSON_HEADERS
+      xmlBody as unknown as AgentRequirement,
+      XML_HEADERS
     );
     return { id: requirementId };
   }
@@ -126,7 +207,7 @@ export class AgentRequirementsManager {
     await this.client.modules.buildTypes.deleteAgentRequirement(
       buildTypeId,
       requirementId,
-      JSON_HEADERS
+      JSON_GET_HEADERS
     );
   }
 
@@ -163,6 +244,7 @@ export class AgentRequirementsManager {
     const mergedProps = mergeRecords(baseProps, toStringRecord(input.properties));
     const payload: AgentRequirement = {
       ...(existing ?? {}),
+      type: input.type ?? existing?.type,
       disabled: input.disabled ?? existing?.disabled,
     };
 

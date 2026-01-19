@@ -1,0 +1,16 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 2%
+    patch:
+      default:
+        target: 80%
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: once
+  require_changes: true
+  hide_project_coverage: false
+  hide_unchanged_files: true

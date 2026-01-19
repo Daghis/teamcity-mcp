@@ -24,11 +24,26 @@ function extractTimestamp(str: string): number | null {
   return null;
 }
 
+/**
+ * Safely create a RegExp from user input with validation.
+ * Limits pattern length to prevent ReDoS attacks.
+ */
+function safeRegExp(pattern: string, maxLength = 200): RegExp {
+  if (pattern.length > maxLength) {
+    throw new Error(`Pattern too long (max ${maxLength} characters): ${pattern.slice(0, 50)}...`);
+  }
+  try {
+    return new RegExp(pattern);
+  } catch (e) {
+    throw new Error(`Invalid regex pattern: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 async function main(): Promise<void> {
   const { pattern, olderThanHours } = parseArgs(process.argv);
   const now = Date.now();
   const cutoff = now - olderThanHours * 3600 * 1000;
-  const re = new RegExp(pattern);
+  const re = safeRegExp(pattern);
 
   const client = new MCPTestClient({ mode: 'full' });
   await client.connect();

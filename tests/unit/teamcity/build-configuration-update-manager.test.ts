@@ -43,6 +43,8 @@ describe('BuildConfigurationUpdateManager', () => {
     mockClient.resetAllMocks();
     mockClient.buildTypes.setBuildTypeField.mockResolvedValue(undefined);
     mockClient.buildTypes.deleteBuildParameterOfBuildType_2.mockResolvedValue(undefined);
+    // Mock http.put for artifact rules (uses direct HTTP instead of OpenAPI client)
+    (mockClient.http.put as jest.Mock).mockResolvedValue({ data: 'OK' });
 
     manager = createManager();
   });
@@ -192,12 +194,14 @@ describe('BuildConfigurationUpdateManager', () => {
       expect(mockClient.buildTypes.setBuildTypeField).toHaveBeenCalledWith(
         'cfg1',
         'name',
-        'Renamed Config'
+        'Renamed Config',
+        { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
       );
       expect(mockClient.buildTypes.setBuildTypeField).toHaveBeenCalledWith(
         'cfg1',
         'settings/buildNumberPattern',
-        '%build.number%'
+        '%build.number%',
+        { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
       );
       expect(mockClient.buildTypes.deleteBuildParameterOfBuildType_2).toHaveBeenCalledWith(
         'token',
@@ -207,11 +211,12 @@ describe('BuildConfigurationUpdateManager', () => {
       retrieveSpy.mockRestore();
     });
 
-    it('falls back to legacy artifactRules field when settings path is rejected', async () => {
+    it('falls back to legacy artifactRules path when settings path is rejected', async () => {
       const error = Object.assign(new Error('bad request'), {
         response: { status: 400 },
       });
-      mockClient.buildTypes.setBuildTypeField.mockRejectedValueOnce(error);
+      // First http.put call for settings/artifactRules fails
+      (mockClient.http.put as jest.Mock).mockRejectedValueOnce(error);
       const retrieveSpy = jest
         .spyOn(manager, 'retrieveConfiguration')
         .mockResolvedValue({ ...updatedConfig, artifactRules: 'dist/** => archive.zip' });
@@ -222,17 +227,18 @@ describe('BuildConfigurationUpdateManager', () => {
         })
       ).resolves.toEqual({ ...updatedConfig, artifactRules: 'dist/** => archive.zip' });
 
-      expect(mockClient.buildTypes.setBuildTypeField).toHaveBeenNthCalledWith(
+      // Uses direct HTTP PUT (not OpenAPI client) with unencoded slashes in path
+      expect(mockClient.http.put).toHaveBeenNthCalledWith(
         1,
-        'cfg1',
-        'settings/artifactRules',
-        'dist/** => archive.zip'
+        '/app/rest/buildTypes/cfg1/settings/artifactRules',
+        'dist/** => archive.zip',
+        { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
       );
-      expect(mockClient.buildTypes.setBuildTypeField).toHaveBeenNthCalledWith(
+      expect(mockClient.http.put).toHaveBeenNthCalledWith(
         2,
-        'cfg1',
-        'artifactRules',
-        'dist/** => archive.zip'
+        '/app/rest/buildTypes/cfg1/artifactRules',
+        'dist/** => archive.zip',
+        { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
       );
 
       retrieveSpy.mockRestore();

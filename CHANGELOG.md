@@ -1,5 +1,247 @@
 # Changelog
 
+## [2.1.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.1...teamcity-mcp-v2.1.2) (2026-01-19)
+
+
+### Bug Fixes
+
+* **security:** override hono to 4.11.4 for JWT vulnerabilities ([#364](https://github.com/Daghis/teamcity-mcp/issues/364)) ([4f570a5](https://github.com/Daghis/teamcity-mcp/commit/4f570a546211b3d3b75e84aa3456dd1b924e5259))
+
+## [2.1.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.0...teamcity-mcp-v2.1.1) (2026-01-10)
+
+
+### Bug Fixes
+
+* correct parameter endpoints and add full CRUD for all parameter types ([#358](https://github.com/Daghis/teamcity-mcp/issues/358)) ([79e92ba](https://github.com/Daghis/teamcity-mcp/commit/79e92ba1c1a9642a0253bf9d040c15d0ec072803))
+
+## [2.1.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.7...teamcity-mcp-v2.1.0) (2026-01-08)
+
+
+### Features
+
+* add runtime MCP mode switching with list_changed notifications ([#355](https://github.com/Daghis/teamcity-mcp/issues/355)) ([873ba82](https://github.com/Daghis/teamcity-mcp/commit/873ba82e1329b0bc6271c15ec042093daa92499a))
+
+## [2.0.7](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.6...teamcity-mcp-v2.0.7) (2026-01-05)
+
+
+### Bug Fixes
+
+* revert to 2025-12-11 schema (compatible with mcp-publisher v1.4.0) ([#352](https://github.com/Daghis/teamcity-mcp/issues/352)) ([05e05c2](https://github.com/Daghis/teamcity-mcp/commit/05e05c2a8b7e70326a43a7b6554987378da17c9a))
+
+## [2.0.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.5...teamcity-mcp-v2.0.6) (2026-01-05)
+
+
+### Bug Fixes
+
+* update mcp-publisher to v1.4.0 ([#350](https://github.com/Daghis/teamcity-mcp/issues/350)) ([a4fb2b9](https://github.com/Daghis/teamcity-mcp/commit/a4fb2b960d04b8e9668232413119026fd79ba9d0))
+
+## [2.0.5](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.4...teamcity-mcp-v2.0.5) (2026-01-05)
+
+
+### Bug Fixes
+
+* use draft MCP registry schema instead of dated versions ([#348](https://github.com/Daghis/teamcity-mcp/issues/348)) ([51c8216](https://github.com/Daghis/teamcity-mcp/commit/51c8216960afe3774128b01508dd4a5c8fca8f67))
+
+## [2.0.4](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.3...teamcity-mcp-v2.0.4) (2026-01-05)
+
+
+### Bug Fixes
+
+* update MCP registry schema to 2025-12-11 ([#346](https://github.com/Daghis/teamcity-mcp/issues/346)) ([4eaec92](https://github.com/Daghis/teamcity-mcp/commit/4eaec92843b47005ad773b00837fd1a021c1cffa))
+
+## [2.0.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.2...teamcity-mcp-v2.0.3) (2026-01-05)
+
+
+### Bug Fixes
+
+* add type parameter to manage_agent_requirements ([#338](https://github.com/Daghis/teamcity-mcp/issues/338)) ([#343](https://github.com/Daghis/teamcity-mcp/issues/343)) ([5545257](https://github.com/Daghis/teamcity-mcp/commit/5545257823f442cf27e9313f11f1dd0b71115af3))
+
+## [2.0.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.1...teamcity-mcp-v2.0.2) (2026-01-05)
+
+
+### Bug Fixes
+
+* resolve HTTP 406 when updating build configuration fields ([#339](https://github.com/Daghis/teamcity-mcp/issues/339)) ([#341](https://github.com/Daghis/teamcity-mcp/issues/341)) ([16b1dd2](https://github.com/Daghis/teamcity-mcp/commit/16b1dd207978d63ad9824c9b7eecbbd4a9badc94))
+
+## [2.0.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.0.0...teamcity-mcp-v2.0.1) (2025-12-23)
+
+
+### Bug Fixes
+
+* resolve HTTP 400 when updating artifactRules via update_build_config ([#335](https://github.com/Daghis/teamcity-mcp/issues/335)) ([21614ad](https://github.com/Daghis/teamcity-mcp/commit/21614ad9af4e7a519a0ece0d7c41b90a10f74a73))
+
+## [2.0.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.13.1...teamcity-mcp-v2.0.0) (2025-12-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* 15 tools moved from Dev mode to Full-only mode.
+
+### Features
+
+* reduce dev mode tool surface ([#332](https://github.com/Daghis/teamcity-mcp/issues/332)) ([3a2bd6d](https://github.com/Daghis/teamcity-mcp/commit/3a2bd6dd72cc4b2d8c5cca1bb22867b1c7e19d12))
+
+## [1.13.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.13.0...teamcity-mcp-v1.13.1) (2025-12-22)
+
+
+### Bug Fixes
+
+* tune codecov PR comment behavior ([#329](https://github.com/Daghis/teamcity-mcp/issues/329)) ([a790ab1](https://github.com/Daghis/teamcity-mcp/commit/a790ab18cf08a755f930ed73639c958c7b096b55))
+
+## [1.13.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.12.1...teamcity-mcp-v1.13.0) (2025-12-22)
+
+
+### Features
+
+* add CLI argument support for Windows workaround ([#320](https://github.com/Daghis/teamcity-mcp/issues/320)) ([#326](https://github.com/Daghis/teamcity-mcp/issues/326)) ([cc05a4d](https://github.com/Daghis/teamcity-mcp/commit/cc05a4dd19c1d7e1f547cdd35bb910035141909d))
+
+## [1.12.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.12.0...teamcity-mcp-v1.12.1) (2025-12-22)
+
+
+### Bug Fixes
+
+* handle queued builds in get_build and get_build_status ([#324](https://github.com/Daghis/teamcity-mcp/issues/324)) ([4cb2dab](https://github.com/Daghis/teamcity-mcp/commit/4cb2dabfc9161e07708a899622d78b886742459d))
+
+## [1.12.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.20...teamcity-mcp-v1.12.0) (2025-12-06)
+
+
+### Features
+
+* add type safety standards and test utilities for [#158](https://github.com/Daghis/teamcity-mcp/issues/158) ([#314](https://github.com/Daghis/teamcity-mcp/issues/314)) ([1f89a25](https://github.com/Daghis/teamcity-mcp/commit/1f89a25a63fca111f04e96763b4d17888f91bc2a))
+
+## [1.11.20](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.19...teamcity-mcp-v1.11.20) (2025-12-06)
+
+
+### Bug Fixes
+
+* **security:** address remaining dependabot security alerts ([#312](https://github.com/Daghis/teamcity-mcp/issues/312)) ([f909460](https://github.com/Daghis/teamcity-mcp/commit/f9094607b3b980c63214185b57c74799e9315b66))
+
+## [1.11.19](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.18...teamcity-mcp-v1.11.19) (2025-12-06)
+
+
+### Bug Fixes
+
+* **security:** address CodeQL shell command injection alerts ([#310](https://github.com/Daghis/teamcity-mcp/issues/310)) ([de8ff77](https://github.com/Daghis/teamcity-mcp/commit/de8ff77d4846dc950900db9200ac3b62bd1137b6))
+
+## [1.11.18](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.17...teamcity-mcp-v1.11.18) (2025-12-06)
+
+
+### Bug Fixes
+
+* **security:** address CodeQL regex injection alert in cleanup.ts ([#307](https://github.com/Daghis/teamcity-mcp/issues/307)) ([6d1b63c](https://github.com/Daghis/teamcity-mcp/commit/6d1b63c400e67042e98aeaa1465a92b9bb2babf9))
+
+## [1.11.17](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.16...teamcity-mcp-v1.11.17) (2025-12-06)
+
+
+### Bug Fixes
+
+* **security:** address CodeQL incomplete string escaping alert ([#305](https://github.com/Daghis/teamcity-mcp/issues/305)) ([24071ed](https://github.com/Daghis/teamcity-mcp/commit/24071ed1e308d699f8f5e52075eb0d53b91f6a2e))
+
+## [1.11.16](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.15...teamcity-mcp-v1.11.16) (2025-12-06)
+
+
+### Bug Fixes
+
+* update @modelcontextprotocol/sdk to 1.24.0 to address CVE-2025-66414 ([#302](https://github.com/Daghis/teamcity-mcp/issues/302)) ([851ad8f](https://github.com/Daghis/teamcity-mcp/commit/851ad8fc4b037195243c60aec44711072d3d7ca7))
+
+## [1.11.15](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.14...teamcity-mcp-v1.11.15) (2025-12-06)
+
+
+### Bug Fixes
+
+* package hygiene - exclude unnecessary files from npm package ([#300](https://github.com/Daghis/teamcity-mcp/issues/300)) ([da79eb6](https://github.com/Daghis/teamcity-mcp/commit/da79eb6c8a3d661f771d7268b976276628038502))
+
+## [1.11.14](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.13...teamcity-mcp-v1.11.14) (2025-12-06)
+
+
+### Bug Fixes
+
+* Convert agent requirements and artifact dependencies to use XML format ([#294](https://github.com/Daghis/teamcity-mcp/issues/294)) ([a9bd9b7](https://github.com/Daghis/teamcity-mcp/commit/a9bd9b7a5710e03a0b8d2f2f35e703fc08aa5e85))
+
+## [1.11.13](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.12...teamcity-mcp-v1.11.13) (2025-12-06)
+
+
+### Bug Fixes
+
+* correct MCP name case to match GitHub username ([#292](https://github.com/Daghis/teamcity-mcp/issues/292)) ([7dd59c4](https://github.com/Daghis/teamcity-mcp/commit/7dd59c41df18b134a764d1ad3e90efa5e2a9ba30))
+
+## [1.11.12](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.11...teamcity-mcp-v1.11.12) (2025-12-06)
+
+
+### Bug Fixes
+
+* update MCP registry schema to 2025-10-17 ([#290](https://github.com/Daghis/teamcity-mcp/issues/290)) ([bc54888](https://github.com/Daghis/teamcity-mcp/commit/bc54888a6a483bf19b7c35518f88705dfe7e1ecd))
+
+## [1.11.11](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.10...teamcity-mcp-v1.11.11) (2025-12-06)
+
+
+### Bug Fixes
+
+* update MCP server schema to 2025-09-29 ([#288](https://github.com/Daghis/teamcity-mcp/issues/288)) ([5069bd2](https://github.com/Daghis/teamcity-mcp/commit/5069bd292ac40c0ba9224ba170414dcb0956810a))
+
+## [1.11.10](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.9...teamcity-mcp-v1.11.10) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** correct mcp-publisher download URL format ([#286](https://github.com/Daghis/teamcity-mcp/issues/286)) ([5c58c7d](https://github.com/Daghis/teamcity-mcp/commit/5c58c7daf1c94598b99a42aae3689164c55489e6))
+
+## [1.11.9](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.8...teamcity-mcp-v1.11.9) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** update mcp-publisher to v1.3.10 ([#284](https://github.com/Daghis/teamcity-mcp/issues/284)) ([2b07466](https://github.com/Daghis/teamcity-mcp/commit/2b07466da3821d838face7617a74079cdf576818))
+
+## [1.11.8](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.7...teamcity-mcp-v1.11.8) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** simplify OIDC workflow to match npm docs ([#282](https://github.com/Daghis/teamcity-mcp/issues/282)) ([b3e8493](https://github.com/Daghis/teamcity-mcp/commit/b3e84935cd61cceb41a6a773ca2b7aa3081306f6))
+
+## [1.11.7](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.6...teamcity-mcp-v1.11.7) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** clear NODE_AUTH_TOKEN via GITHUB_ENV for OIDC ([#279](https://github.com/Daghis/teamcity-mcp/issues/279)) ([ee5eaef](https://github.com/Daghis/teamcity-mcp/commit/ee5eaefbe593e3269ca1b1fa128ef5aa75c0651e))
+
+## [1.11.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.5...teamcity-mcp-v1.11.6) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** remove registry-url to enable npm OIDC trusted publishing ([#277](https://github.com/Daghis/teamcity-mcp/issues/277)) ([de2adbb](https://github.com/Daghis/teamcity-mcp/commit/de2adbbc422973eb3bbfe724163a627eb0d08780))
+
+## [1.11.5](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.4...teamcity-mcp-v1.11.5) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** clear NODE_AUTH_TOKEN for npm OIDC trusted publishing ([#275](https://github.com/Daghis/teamcity-mcp/issues/275)) ([689d499](https://github.com/Daghis/teamcity-mcp/commit/689d499b8198dfb4d647f1c22e039477c8913b2e))
+
+## [1.11.4](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.3...teamcity-mcp-v1.11.4) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** update npm for OIDC trusted publishing ([#273](https://github.com/Daghis/teamcity-mcp/issues/273)) ([6032c28](https://github.com/Daghis/teamcity-mcp/commit/6032c28b8cc6ccd47cf6cb167c360a47d98358a6))
+
+## [1.11.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.2...teamcity-mcp-v1.11.3) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** use Node.js 22 for npm trusted publishing ([#271](https://github.com/Daghis/teamcity-mcp/issues/271)) ([3573f1e](https://github.com/Daghis/teamcity-mcp/commit/3573f1e523f441a8607050708bf42ce17fb355b0))
+
+## [1.11.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.1...teamcity-mcp-v1.11.2) (2025-12-06)
+
+
+### Bug Fixes
+
+* **publish:** clarify id-token permission for trusted publishing ([#269](https://github.com/Daghis/teamcity-mcp/issues/269)) ([5e54da9](https://github.com/Daghis/teamcity-mcp/commit/5e54da9fa9cc46561aaf2673d632d7762776ad23))
+
 ## [1.11.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v1.11.0...teamcity-mcp-v1.11.1) (2025-11-04)
 
 

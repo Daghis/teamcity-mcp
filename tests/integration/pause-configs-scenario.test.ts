@@ -1,38 +1,29 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 
 import type { ActionResult } from '../types/tool-results';
-import { callTool, callToolsBatch, callToolsBatchExpect } from './lib/mcp-runner';
-
-const hasTeamCityEnv = Boolean(
-  (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
-    (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
-);
-
-const ts = Date.now();
-const PROJECT_ID = `E2E_PAUSE_${ts}`;
-const PROJECT_NAME = `E2E Pause ${ts}`;
-const BT1_ID = `E2E_PAUSE_BT1_${ts}`;
-const BT2_ID = `E2E_PAUSE_BT2_${ts}`;
+import { callToolsBatch, callToolsBatchExpect } from './lib/mcp-runner';
+import { hasTeamCityEnv, teardownProjectFixture } from './lib/test-fixtures';
 
 describe('Pause/unpause build configs (full) with dev verification', () => {
-  afterAll(async () => {
-    try {
-      await callTool('full', 'delete_project', { projectId: PROJECT_ID });
-    } catch (_e) {
-      expect(true).toBe(true);
-    }
-  });
-  it('creates project and two build configs (full)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
+  const ts = Date.now();
+  const projectId = `E2E_PAUSE_${ts}`;
+  const bt1Id = `E2E_PAUSE_BT1_${ts}`;
+  const bt2Id = `E2E_PAUSE_BT2_${ts}`;
+
+  let created = false;
+
+  beforeAll(async () => {
+    if (!hasTeamCityEnv) return;
+
     const results = await callToolsBatchExpect('full', [
-      { tool: 'create_project', args: { id: PROJECT_ID, name: PROJECT_NAME } },
+      { tool: 'create_project', args: { id: projectId, name: `E2E Pause ${ts}` } },
       {
         tool: 'create_build_config',
-        args: { projectId: PROJECT_ID, id: BT1_ID, name: 'E2E Pause BT1' },
+        args: { projectId, id: bt1Id, name: 'E2E Pause BT1' },
       },
       {
         tool: 'create_build_config',
-        args: { projectId: PROJECT_ID, id: BT2_ID, name: 'E2E Pause BT2' },
+        args: { projectId, id: bt2Id, name: 'E2E Pause BT2' },
       },
     ]);
 
@@ -40,16 +31,25 @@ describe('Pause/unpause build configs (full) with dev verification', () => {
     const bt1Result = results[1]?.result as ActionResult | undefined;
     const bt2Result = results[2]?.result as ActionResult | undefined;
 
-    expect(projectResult).toMatchObject({ success: true, action: 'create_project' });
-    expect(bt1Result).toMatchObject({ success: true, action: 'create_build_config' });
-    expect(bt2Result).toMatchObject({ success: true, action: 'create_build_config' });
-  }, 60000);
+    if (!projectResult?.success || !bt1Result?.success || !bt2Result?.success) {
+      throw new Error('Failed to create project and build configs for pause scenario');
+    }
+
+    created = true;
+  }, 120_000);
+
+  afterAll(async () => {
+    if (created) {
+      await teardownProjectFixture(projectId);
+    }
+  });
 
   it('pauses and unpauses both (full)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    if (!hasTeamCityEnv || !created) return expect(true).toBe(true);
+
     const batch = await callToolsBatch('full', [
-      { tool: 'set_build_configs_paused', args: { buildTypeIds: [BT1_ID, BT2_ID], paused: true } },
-      { tool: 'set_build_configs_paused', args: { buildTypeIds: [BT1_ID, BT2_ID], paused: false } },
+      { tool: 'set_build_configs_paused', args: { buildTypeIds: [bt1Id, bt2Id], paused: true } },
+      { tool: 'set_build_configs_paused', args: { buildTypeIds: [bt1Id, bt2Id], paused: false } },
     ]);
 
     const pauseStep = batch.results[0];
@@ -65,11 +65,5 @@ describe('Pause/unpause build configs (full) with dev verification', () => {
       return expect(true).toBe(true);
     }
     expect(unpauseStep.result).toHaveProperty('action');
-  }, 90000);
-
-  it('deletes project (full)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const res = await callTool('full', 'delete_project', { projectId: PROJECT_ID });
-    expect(res).toMatchObject({ success: true, action: 'delete_project' });
-  }, 60000);
+  }, 90_000);
 });

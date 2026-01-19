@@ -4,7 +4,7 @@ import { BranchSpecificationParser } from '@/teamcity/branch-specification-parse
 import { ConfigurationBranchMatcher } from '@/teamcity/configuration-branch-matcher';
 import type { TeamCityUnifiedClient } from '@/teamcity/types/client';
 
-import { createMockLogger } from '../../test-utils/mock-logger';
+import { createWinstonMockLogger } from '../../test-utils/mock-logger';
 import {
   MockTeamCityClient,
   createMockAxiosResponse,
@@ -19,7 +19,7 @@ describe('ConfigurationBranchMatcher', () => {
   let mockParser: jest.Mocked<BranchSpecificationParser>;
 
   beforeEach(() => {
-    mockLogger = createMockLogger();
+    mockLogger = createWinstonMockLogger();
     mockClient = createMockTeamCityClient();
     mockParser = {
       parseMultipleSpecifications: jest.fn(),

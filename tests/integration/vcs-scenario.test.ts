@@ -1,76 +1,72 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 
 import type { ActionResult, ListResult, VcsRootRef } from '../types/tool-results';
 import { callTool, callToolsBatch, callToolsBatchExpect } from './lib/mcp-runner';
-
-const hasTeamCityEnv = Boolean(
-  (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
-    (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
-);
-
-const ts = Date.now();
-const PROJECT_ID = `E2E_VCS_${ts}`;
-const PROJECT_NAME = `E2E VCS ${ts}`;
-const VCS_ID = `E2E_VCS_ROOT_${ts}`;
-const VCS_NAME = `E2E VCS Root ${ts}`;
-const BT_ID = `E2E_VCS_BT_${ts}`;
-const BT_NAME = `E2E VCS BuildType ${ts}`;
+import { hasTeamCityEnv, teardownProjectFixture } from './lib/test-fixtures';
 
 describe('VCS roots: full writes + dev reads', () => {
-  afterAll(async () => {
-    try {
-      await callTool('full', 'delete_project', { projectId: PROJECT_ID });
-    } catch (_e) {
-      expect(true).toBe(true);
-    }
-  });
-  it('creates project and build config (full)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
+  const ts = Date.now();
+  const projectId = `E2E_VCS_${ts}`;
+  const vcsId = `E2E_VCS_ROOT_${ts}`;
+  const btId = `E2E_VCS_BT_${ts}`;
+
+  let created = false;
+
+  beforeAll(async () => {
+    if (!hasTeamCityEnv) return;
+
     const results = await callToolsBatchExpect('full', [
       {
         tool: 'create_project',
-        args: { id: PROJECT_ID, name: PROJECT_NAME },
+        args: { id: projectId, name: `E2E VCS ${ts}` },
       },
       {
         tool: 'create_build_config',
-        args: { projectId: PROJECT_ID, id: BT_ID, name: BT_NAME },
+        args: { projectId, id: btId, name: `E2E VCS BuildType ${ts}` },
       },
-    ]);
-
-    const projectResult = results[0]?.result as ActionResult | undefined;
-    const buildConfigResult = results[1]?.result as ActionResult | undefined;
-
-    expect(projectResult).toMatchObject({ success: true, action: 'create_project' });
-    expect(buildConfigResult).toMatchObject({ success: true, action: 'create_build_config' });
-  }, 60000);
-
-  it('creates VCS root and verifies with get/list (dev)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const createBatch = await callToolsBatchExpect('full', [
       {
         tool: 'create_vcs_root',
         args: {
-          projectId: PROJECT_ID,
-          id: VCS_ID,
-          name: VCS_NAME,
+          projectId,
+          id: vcsId,
+          name: `E2E VCS Root ${ts}`,
           vcsName: 'jetbrains.git',
           url: 'https://example.com/repo.git',
           branch: 'refs/heads/main',
         },
       },
     ]);
-    const createVcs = createBatch[0]?.result as ActionResult | undefined;
-    expect(createVcs).toMatchObject({ success: true, action: 'create_vcs_root' });
 
-    const devBatch = await callToolsBatch('dev', [
-      { tool: 'get_vcs_root', args: { id: VCS_ID } },
-      { tool: 'list_vcs_roots', args: { projectId: PROJECT_ID } },
+    const projectResult = results[0]?.result as ActionResult | undefined;
+    const btResult = results[1]?.result as ActionResult | undefined;
+    const vcsResult = results[2]?.result as ActionResult | undefined;
+
+    if (!projectResult?.success || !btResult?.success || !vcsResult?.success) {
+      throw new Error('Failed to create project, build config, and VCS root for VCS scenario');
+    }
+
+    created = true;
+  }, 120_000);
+
+  afterAll(async () => {
+    if (created) {
+      await teardownProjectFixture(projectId);
+    }
+  });
+
+  it('verifies VCS root with get/list (full)', async () => {
+    if (!hasTeamCityEnv || !created) return expect(true).toBe(true);
+
+    // VCS tools are now full-only
+    const devBatch = await callToolsBatch('full', [
+      { tool: 'get_vcs_root', args: { id: vcsId } },
+      { tool: 'list_vcs_roots', args: { projectId } },
     ]);
 
     const getResult = devBatch.results[0];
     if (getResult?.ok) {
       const payload = getResult.result as VcsRootRef | undefined;
-      expect(payload?.id).toBe(VCS_ID);
+      expect(payload?.id).toBe(vcsId);
     } else {
       throw new Error(`get_vcs_root failed: ${getResult?.error}`);
     }
@@ -78,26 +74,21 @@ describe('VCS roots: full writes + dev reads', () => {
     const listResult = devBatch.results[1];
     if (listResult?.ok) {
       const payload = listResult.result as ListResult<VcsRootRef> | undefined;
-      const found = (payload?.items ?? []).some((r) => r.id === VCS_ID);
+      const found = (payload?.items ?? []).some((r) => r.id === vcsId);
       expect(found).toBe(true);
     } else {
       throw new Error(`list_vcs_roots failed: ${listResult?.error}`);
     }
-  }, 60000);
+  }, 60_000);
 
   it('attaches VCS root to build config (full)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    if (!hasTeamCityEnv || !created) return expect(true).toBe(true);
+
     const attach = await callTool<ActionResult>('full', 'add_vcs_root_to_build', {
-      buildTypeId: BT_ID,
-      vcsRootId: VCS_ID,
+      buildTypeId: btId,
+      vcsRootId: vcsId,
       checkoutRules: '+:refs/heads/*',
     });
     expect(attach).toMatchObject({ success: true, action: 'add_vcs_root_to_build' });
-  }, 60000);
-
-  it('deletes project (full)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const res = await callTool('full', 'delete_project', { projectId: PROJECT_ID });
-    expect(res).toMatchObject({ success: true, action: 'delete_project' });
-  }, 60000);
+  }, 60_000);
 });

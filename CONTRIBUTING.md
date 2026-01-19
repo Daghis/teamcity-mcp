@@ -30,6 +30,29 @@ Tools must return standardized JSON payloads. Tests should assert:
 - Documented optional flags (e.g., `includeQueueTotals`) affecting response shape.
 - Avoid verifying how API clients are invoked.
 
+## Running Tests
+
+### Unit tests
+
+```bash
+npm test                    # Run all unit tests
+npm run test:coverage       # Run with coverage report
+```
+
+### Integration tests
+
+Integration tests require a running TeamCity instance. Set `TEAMCITY_URL` and `TEAMCITY_TOKEN` in `.env` or environment.
+
+```bash
+npm run test:integration    # Run integration tests (some suites skipped)
+```
+
+Some integration test suites require exclusive access to TeamCity resources (queue operations, streaming artifacts). These are skipped by default and run with:
+
+```bash
+SERIAL_BUILD_TESTS=true npm run test:integration
+```
+
 ## Coverage expectations
 
 - `npm run test:coverage` now instruments the MCP tool registry (`src/tools.ts`) and the core TeamCity managers (build queue/results/status and configuration update). The suite must stay green with these files included.

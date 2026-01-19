@@ -1,10 +1,10 @@
-// Dev mode ok for getters/ping
+// Full mode for tests that include check_teamcity_connection (now full-only)
 // Use required tool helper to avoid undefined checks
 
 jest.mock('@/config', () => ({
   getTeamCityUrl: () => 'https://example.test',
   getTeamCityToken: () => 'token',
-  getMCPMode: () => 'dev',
+  getMCPMode: () => 'full',
 }));
 
 describe('tools: simple getters and utilities', () => {

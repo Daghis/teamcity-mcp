@@ -13,6 +13,11 @@ describe('BuildStatusManager', () => {
       getMultipleBuilds: jest.Mock;
       getBuildProblems: jest.Mock;
     };
+    modules: {
+      buildQueue: {
+        getQueuedBuild: jest.Mock;
+      };
+    };
     listBuildArtifacts: jest.Mock;
     downloadArtifactContent: jest.Mock;
     getBuildStatistics: jest.Mock;
@@ -29,6 +34,11 @@ describe('BuildStatusManager', () => {
         getBuild: jest.fn(),
         getMultipleBuilds: jest.fn(),
         getBuildProblems: jest.fn(),
+      },
+      modules: {
+        buildQueue: {
+          getQueuedBuild: jest.fn(),
+        },
       },
       listBuildArtifacts: jest.fn(),
       downloadArtifactContent: jest.fn(),
@@ -397,8 +407,13 @@ describe('BuildStatusManager', () => {
 
     describe('Error Handling', () => {
       it('should throw BuildNotFoundError for non-existent builds', async () => {
+        // Build not in /builds endpoint
         mockClient.builds.getBuild.mockRejectedValue({
           response: { status: 404, data: { message: 'Build not found' } },
+        });
+        // Build also not in /buildQueue endpoint
+        mockClient.modules.buildQueue.getQueuedBuild.mockRejectedValue({
+          response: { status: 404, data: { message: 'Queued build not found' } },
         });
 
         await expect(manager.getBuildStatus({ buildId: '99999' })).rejects.toThrow(

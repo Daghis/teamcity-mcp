@@ -2,7 +2,7 @@ import type { Logger } from 'winston';
 
 import { BranchFilteringService, type BranchInfo } from '@/teamcity/branch-filtering-service';
 
-import { createMockLogger } from '../../test-utils/mock-logger';
+import { createWinstonMockLogger } from '../../test-utils/mock-logger';
 
 describe('BranchFilteringService', () => {
   let service: BranchFilteringService;
@@ -10,7 +10,7 @@ describe('BranchFilteringService', () => {
   let testBranches: BranchInfo[];
 
   beforeEach(() => {
-    mockLogger = createMockLogger();
+    mockLogger = createWinstonMockLogger();
     service = new BranchFilteringService(mockLogger);
 
     // Create test branches with various properties

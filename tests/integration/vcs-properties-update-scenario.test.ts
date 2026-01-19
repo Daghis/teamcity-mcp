@@ -1,42 +1,30 @@
-import { afterAll, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 
 import type { ActionResult, ListResult } from '../types/tool-results';
 import { callTool, callToolsBatch, callToolsBatchExpect } from './lib/mcp-runner';
+import { hasTeamCityEnv, teardownProjectFixture } from './lib/test-fixtures';
 
-const hasTeamCityEnv = Boolean(
-  (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
-    (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
-);
+describe('VCS root property updates: full mode', () => {
+  const ts = Date.now();
+  const projectId = `E2E_VCS_PROPS_${ts}`;
+  const vcsId = `E2E_VCS_ROOT_PROPS_${ts}`;
 
-const ts = Date.now();
-const PROJECT_ID = `E2E_VCS_PROPS_${ts}`;
-const PROJECT_NAME = `E2E VCS Props ${ts}`;
-const VCS_ID = `E2E_VCS_ROOT_PROPS_${ts}`;
-const VCS_NAME = `E2E VCS Root Props ${ts}`;
+  let created = false;
 
-describe('VCS root property updates: full writes + dev reads', () => {
-  afterAll(async () => {
+  beforeAll(async () => {
     if (!hasTeamCityEnv) return;
-    try {
-      await callTool('full', 'delete_project', { projectId: PROJECT_ID });
-    } catch (_e) {
-      // ignore cleanup errors
-    }
-  });
 
-  it('creates project and VCS root (full)', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
     const results = await callToolsBatchExpect('full', [
       {
         tool: 'create_project',
-        args: { id: PROJECT_ID, name: PROJECT_NAME },
+        args: { id: projectId, name: `E2E VCS Props ${ts}` },
       },
       {
         tool: 'create_vcs_root',
         args: {
-          projectId: PROJECT_ID,
-          id: VCS_ID,
-          name: VCS_NAME,
+          projectId,
+          id: vcsId,
+          name: `E2E VCS Root Props ${ts}`,
           vcsName: 'jetbrains.git',
           url: 'https://example.com/repo.git',
           branch: 'refs/heads/main',
@@ -45,25 +33,35 @@ describe('VCS root property updates: full writes + dev reads', () => {
     ]);
 
     const projectResult = results[0]?.result as ActionResult | undefined;
-    const createVcs = results[1]?.result as ActionResult | undefined;
+    const vcsResult = results[1]?.result as ActionResult | undefined;
 
-    expect(projectResult).toMatchObject({ success: true, action: 'create_project' });
-    expect(createVcs).toMatchObject({ success: true, action: 'create_vcs_root' });
-  }, 60000);
+    if (!projectResult?.success || !vcsResult?.success) {
+      throw new Error('Failed to create project and VCS root for VCS props scenario');
+    }
 
-  it('updates branch and branchSpec via MCP and verifies with dev', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    created = true;
+  }, 120_000);
+
+  afterAll(async () => {
+    if (created) {
+      await teardownProjectFixture(projectId);
+    }
+  });
+
+  it('updates branch and branchSpec via MCP and verifies', async () => {
+    if (!hasTeamCityEnv || !created) return expect(true).toBe(true);
 
     const update = await callTool<ActionResult>('full', 'update_vcs_root_properties', {
-      id: VCS_ID,
+      id: vcsId,
       branch: 'refs/heads/main',
       branchSpec: ['+:refs/heads/*', '+:refs/pull/*/head'],
     });
     expect(update).toMatchObject({ success: true, action: 'update_vcs_root_properties' });
 
-    const devBatch = await callToolsBatch('dev', [
-      { tool: 'get_vcs_root', args: { id: VCS_ID } },
-      { tool: 'list_vcs_roots', args: { projectId: PROJECT_ID } },
+    // VCS tools are now full-only
+    const devBatch = await callToolsBatch('full', [
+      { tool: 'get_vcs_root', args: { id: vcsId } },
+      { tool: 'list_vcs_roots', args: { projectId } },
     ]);
 
     const getStep = devBatch.results[0];
@@ -74,7 +72,7 @@ describe('VCS root property updates: full writes + dev reads', () => {
       id: string;
       properties?: { property?: Array<{ name?: string; value?: string }> };
     };
-    expect(get.id).toBe(VCS_ID);
+    expect(get.id).toBe(vcsId);
     const props = get.properties?.property ?? [];
     const branch = props.find((p) => p.name === 'branch');
     const branchSpec = props.find((p) => p.name === 'branchSpec');
@@ -87,25 +85,26 @@ describe('VCS root property updates: full writes + dev reads', () => {
       throw new Error(`list_vcs_roots failed: ${listStep?.error}`);
     }
     const list = listStep.result as ListResult<{ id: string }>;
-    const found = (list.items ?? []).some((r) => r.id === VCS_ID);
+    const found = (list.items ?? []).some((r) => r.id === vcsId);
     expect(found).toBe(true);
-  }, 60000);
+  }, 60_000);
 
   it('sets multiple refs via JSON update and verifies persistence', async () => {
-    if (!hasTeamCityEnv) return expect(true).toBe(true);
+    if (!hasTeamCityEnv || !created) return expect(true).toBe(true);
 
     // Update via JSON batch with array input; tool joins with newlines
     const update2 = await callTool<ActionResult>('full', 'update_vcs_root_properties', {
-      id: VCS_ID,
+      id: vcsId,
       branchSpec: ['+:refs/heads/*', '+:refs/tags/*'],
     });
     expect(update2).toMatchObject({ success: true, action: 'update_vcs_root_properties' });
 
-    const get2 = (await callTool('dev', 'get_vcs_root', { id: VCS_ID })) as unknown as {
+    // VCS tools are now full-only
+    const get2 = (await callTool('full', 'get_vcs_root', { id: vcsId })) as unknown as {
       id: string;
       properties?: { property?: Array<{ name?: string; value?: string }> };
     };
-    expect(get2.id).toBe(VCS_ID);
+    expect(get2.id).toBe(vcsId);
     const props2 = get2.properties?.property ?? [];
     const branchSpec2 = props2.find((p) => p.name === 'branchSpec');
     expect(branchSpec2?.value?.includes('+:refs/heads/*')).toBe(true);
@@ -113,5 +112,5 @@ describe('VCS root property updates: full writes + dev reads', () => {
     // Optionally assert it contains exactly two lines
     const lines = (branchSpec2?.value ?? '').split('\n').filter(Boolean);
     expect(lines.length).toBe(2);
-  }, 60000);
+  }, 60_000);
 });

@@ -12,7 +12,7 @@ import { pipeline } from 'node:stream/promises';
 import { isAxiosError } from 'axios';
 import { z } from 'zod';
 
-import { getMCPMode as getMCPModeFromConfig } from '@/config';
+import { getMCPMode as getMCPModeFromConfig, getServerInstance, setMCPMode } from '@/config';
 import { type Build, type Mutes, ResolutionTypeEnum } from '@/teamcity-client/models';
 import type { Step } from '@/teamcity-client/models/step';
 import { AgentRequirementsManager } from '@/teamcity/agent-requirements-manager';
@@ -43,6 +43,12 @@ import { TeamCityAPI } from './api-client';
 
 const isReadableStream = (value: unknown): value is Readable =>
   typeof value === 'object' && value !== null && typeof (value as Readable).pipe === 'function';
+
+/**
+ * Check if an error is an Axios 404 response
+ */
+const isAxios404 = (error: unknown): boolean =>
+  isAxiosError(error) && error.response?.status === 404;
 
 interface ArtifactPayloadBase {
   name: string;
@@ -417,13 +423,53 @@ interface AddParameterArgs {
   buildTypeId: string;
   name: string;
   value: string;
+  type?: string;
 }
 interface UpdateParameterArgs {
   buildTypeId: string;
   name: string;
   value: string;
+  type?: string;
 }
 interface DeleteParameterArgs {
+  buildTypeId: string;
+  name: string;
+}
+// Project parameter interfaces
+interface ListProjectParametersArgs {
+  projectId: string;
+}
+interface AddProjectParameterArgs {
+  projectId: string;
+  name: string;
+  value: string;
+  type?: string;
+}
+interface UpdateProjectParameterArgs {
+  projectId: string;
+  name: string;
+  value: string;
+  type?: string;
+}
+interface DeleteProjectParameterArgs {
+  projectId: string;
+  name: string;
+}
+// Output parameter interfaces
+interface ListOutputParametersArgs {
+  buildTypeId: string;
+}
+interface AddOutputParameterArgs {
+  buildTypeId: string;
+  name: string;
+  value: string;
+}
+interface UpdateOutputParameterArgs {
+  buildTypeId: string;
+  name: string;
+  value: string;
+}
+interface DeleteOutputParameterArgs {
   buildTypeId: string;
   name: string;
 }
@@ -479,6 +525,75 @@ const DEV_TOOLS: ToolDefinition[] = [
           {
             type: 'text',
             text: `pong${typedArgs.message ? `: ${typedArgs.message}` : ''}`,
+          },
+        ],
+      };
+    },
+  },
+
+  // === Mode Management Tools ===
+  {
+    name: 'get_mcp_mode',
+    description:
+      'Get current MCP mode. Dev mode: read-only tools for safe exploration. Full mode: all tools including admin operations.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+    handler: async () => {
+      const mode = getMCPMode();
+      const toolCount = getAvailableTools().length;
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ mode, toolCount }, null, 2),
+          },
+        ],
+      };
+    },
+  },
+  {
+    name: 'set_mcp_mode',
+    description:
+      'Switch MCP mode at runtime. Dev mode: safe read-only operations. Full mode: all operations including writes. Clients are notified of tool list changes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mode: {
+          type: 'string',
+          enum: ['dev', 'full'],
+          description: 'Target mode: dev (read-only) or full (all operations)',
+        },
+      },
+      required: ['mode'],
+    },
+    handler: async (args: unknown) => {
+      const typed = args as { mode: 'dev' | 'full' };
+      const previousMode = getMCPMode();
+
+      setMCPMode(typed.mode);
+
+      const server = getServerInstance();
+      if (server) {
+        await server.sendToolListChanged();
+      }
+
+      const toolCount = getAvailableTools().length;
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                previousMode,
+                currentMode: typed.mode,
+                toolCount,
+                message: `Mode switched. ${toolCount} tools now available.`,
+              },
+              null,
+              2
+            ),
           },
         ],
       };
@@ -687,7 +802,8 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'get_build',
-    description: 'Get details of a specific build',
+    description:
+      'Get details of a specific build (works for both queued and running/finished builds)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -702,6 +818,29 @@ const DEV_TOOLS: ToolDefinition[] = [
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+
+          // Step 1: Try builds endpoint
+          try {
+            const build = (await adapter.getBuild(typed.buildId)) as {
+              status?: string;
+              statusText?: string;
+            };
+            return json(build);
+          } catch (error) {
+            if (!isAxios404(error)) throw error;
+            // Build not in builds endpoint - might be queued
+          }
+
+          // Step 2: Try build queue
+          try {
+            const qb = await adapter.modules.buildQueue.getQueuedBuild(`id:${typed.buildId}`);
+            return json({ ...qb.data, state: 'queued' });
+          } catch (queueError) {
+            if (!isAxios404(queueError)) throw queueError;
+            // Build not in queue either - race condition
+          }
+
+          // Step 3: Retry builds endpoint (build may have left queue between checks)
           const build = (await adapter.getBuild(typed.buildId)) as {
             status?: string;
             statusText?: string;
@@ -986,22 +1125,23 @@ const DEV_TOOLS: ToolDefinition[] = [
               enrich.canMoveToTop = result.queuePosition > 1;
             }
 
-            if (typed.includeQueueTotals) {
-              try {
-                const countResp = await adapter.modules.buildQueue.getAllQueuedBuilds(
-                  undefined,
-                  'count'
-                );
-                enrich.totalQueued = (countResp.data as { count?: number }).count;
-              } catch {
-                /* ignore */
-              }
+            // Always include queue totals for queued builds
+            try {
+              const countResp = await adapter.modules.buildQueue.getAllQueuedBuilds(
+                undefined,
+                'count'
+              );
+              enrich.totalQueued = (countResp.data as { count?: number }).count;
+            } catch {
+              /* ignore */
             }
-            if (typed.includeQueueReason) {
+
+            // Always include wait reason for queued builds (if not already set by BuildStatusManager)
+            if (!result.waitReason) {
               try {
                 const targetBuildId = typed.buildId ?? result.buildId;
                 if (targetBuildId) {
-                  const qb = await adapter.modules.buildQueue.getQueuedBuild(targetBuildId);
+                  const qb = await adapter.modules.buildQueue.getQueuedBuild(`id:${targetBuildId}`);
                   enrich.waitReason = (qb.data as { waitReason?: string }).waitReason;
                 }
               } catch {
@@ -1554,6 +1694,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   {
@@ -1588,6 +1729,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   {
@@ -1988,6 +2130,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   // === Agent Compatibility (read-only lookups) ===
@@ -2012,6 +2155,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
   {
     name: 'get_incompatible_build_types_for_agent',
@@ -2034,6 +2178,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
   {
     name: 'get_agent_enabled_info',
@@ -2056,6 +2201,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
   {
     name: 'get_compatible_agents_for_build_type',
@@ -2090,6 +2236,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
   {
     name: 'count_compatible_agents_for_build_type',
@@ -2125,6 +2272,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
   {
     name: 'get_compatible_agents_for_queued_build',
@@ -2163,6 +2311,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
   {
     name: 'check_teamcity_connection',
@@ -2173,6 +2322,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       const ok = await adapter.testConnection();
       return json({ ok });
     },
+    mode: 'full',
   },
 
   // === Agent Tools ===
@@ -2238,6 +2388,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   {
@@ -2302,6 +2453,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   // === Additional Tools from Complex Implementation ===
@@ -3201,6 +3353,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   {
@@ -3270,6 +3423,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   {
@@ -3298,6 +3452,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         args
       );
     },
+    mode: 'full',
   },
 
   {
@@ -3362,7 +3517,14 @@ const DEV_TOOLS: ToolDefinition[] = [
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
           const buildType = (await adapter.getBuildType(typed.buildTypeId)) as {
-            parameters?: { property?: Array<{ name?: string; value?: string }> };
+            parameters?: {
+              property?: Array<{
+                name?: string;
+                value?: string;
+                inherited?: boolean;
+                type?: { rawValue?: string };
+              }>;
+            };
           };
           return json({
             parameters: buildType.parameters?.property ?? [],
@@ -3784,19 +3946,21 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             await adapter.modules.buildTypes.setBuildTypeField(
               typedArgs.buildTypeId,
               'name',
-              typedArgs.name
+              typedArgs.name,
+              { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
             );
           }
           if (typedArgs.description !== undefined) {
             await adapter.modules.buildTypes.setBuildTypeField(
               typedArgs.buildTypeId,
               'description',
-              typedArgs.description
+              typedArgs.description,
+              { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
             );
           }
           if (typedArgs.artifactRules !== undefined) {
             await setArtifactRulesWithFallback(
-              adapter.modules.buildTypes,
+              adapter.http,
               typedArgs.buildTypeId,
               typedArgs.artifactRules
             );
@@ -3808,19 +3972,21 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           await adapter.modules.buildTypes.setBuildTypeField(
             typedArgs.buildTypeId,
             'name',
-            typedArgs.name
+            typedArgs.name,
+            { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
           );
         }
         if (typedArgs.description !== undefined) {
           await adapter.modules.buildTypes.setBuildTypeField(
             typedArgs.buildTypeId,
             'description',
-            typedArgs.description
+            typedArgs.description,
+            { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
           );
         }
         if (typedArgs.artifactRules !== undefined) {
           await setArtifactRulesWithFallback(
-            adapter.modules.buildTypes,
+            adapter.http,
             typedArgs.buildTypeId,
             typedArgs.artifactRules
           );
@@ -3832,7 +3998,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         await adapter.modules.buildTypes.setBuildTypeField(
           typedArgs.buildTypeId,
           'paused',
-          String(typedArgs.paused)
+          String(typedArgs.paused),
+          { headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' } }
         );
       }
 
@@ -4121,9 +4288,33 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           type: 'string',
           description: 'Requirement ID (required for update/delete)',
         },
+        type: {
+          type: 'string',
+          enum: [
+            'exists',
+            'not-exists',
+            'equals',
+            'does-not-equal',
+            'more-than',
+            'less-than',
+            'no-more-than',
+            'no-less-than',
+            'ver-more-than',
+            'ver-less-than',
+            'ver-no-more-than',
+            'ver-no-less-than',
+            'contains',
+            'does-not-contain',
+            'starts-with',
+            'ends-with',
+            'matches',
+            'does-not-match',
+          ],
+          description: 'Requirement type (e.g., exists, equals, contains, starts-with, matches)',
+        },
         properties: {
           type: 'object',
-          description: 'Requirement properties (e.g. property-name, condition, value)',
+          description: 'Requirement properties (e.g. property-name, property-value)',
         },
         disabled: { type: 'boolean', description: 'Disable or enable the requirement' },
       },
@@ -4131,11 +4322,32 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     },
     handler: async (args: unknown) => {
       const propertyValue = z.union([z.string(), z.number(), z.boolean()]);
+      const requirementTypes = [
+        'exists',
+        'not-exists',
+        'equals',
+        'does-not-equal',
+        'more-than',
+        'less-than',
+        'no-more-than',
+        'no-less-than',
+        'ver-more-than',
+        'ver-less-than',
+        'ver-no-more-than',
+        'ver-no-less-than',
+        'contains',
+        'does-not-contain',
+        'starts-with',
+        'ends-with',
+        'matches',
+        'does-not-match',
+      ] as const;
       const schema = z
         .object({
           buildTypeId: z.string().min(1),
           action: z.enum(['add', 'update', 'delete']),
           requirementId: z.string().min(1).optional(),
+          type: z.enum(requirementTypes).optional(),
           properties: z.record(z.string(), propertyValue).optional(),
           disabled: z.boolean().optional(),
         })
@@ -4161,6 +4373,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             case 'add': {
               const result = await manager.addRequirement({
                 buildTypeId: typed.buildTypeId,
+                type: typed.type,
                 properties: typed.properties,
                 disabled: typed.disabled,
               });
@@ -4175,6 +4388,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             case 'update': {
               const result = await manager.updateRequirement(typed.requirementId as string, {
                 buildTypeId: typed.buildTypeId,
+                type: typed.type,
                 properties: typed.properties,
                 disabled: typed.disabled,
               });
@@ -4239,7 +4453,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
             {
               headers: {
                 'Content-Type': 'text/plain',
-                Accept: 'application/json',
+                Accept: 'text/plain',
               },
             }
           );
@@ -4315,6 +4529,11 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         buildTypeId: { type: 'string', description: 'Build type ID' },
         name: { type: 'string', description: 'Parameter name' },
         value: { type: 'string', description: 'Parameter value' },
+        type: {
+          type: 'string',
+          description:
+            'Parameter type spec (optional): "password", "text", "checkbox checkedValue=\'true\' uncheckedValue=\'false\'", "select data_1=\'opt1\' data_2=\'opt2\'"',
+        },
       },
       required: ['buildTypeId', 'name', 'value'],
     },
@@ -4322,11 +4541,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       const typedArgs = args as AddParameterArgs;
 
       const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-      const parameter = {
+      const parameter: { name: string; value: string; type?: { rawValue: string } } = {
         name: typedArgs.name,
         value: typedArgs.value,
       };
-      await adapter.modules.buildTypes.createBuildParameterOfBuildType(
+      if (typedArgs.type) {
+        parameter.type = { rawValue: typedArgs.type };
+      }
+      await adapter.modules.buildTypes.createBuildParameterOfBuildType_1(
         typedArgs.buildTypeId,
         undefined,
         parameter,
@@ -4351,6 +4573,11 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         buildTypeId: { type: 'string', description: 'Build type ID' },
         name: { type: 'string', description: 'Parameter name' },
         value: { type: 'string', description: 'New parameter value' },
+        type: {
+          type: 'string',
+          description:
+            'Parameter type spec (optional): "password", "text", "checkbox checkedValue=\'true\' uncheckedValue=\'false\'", "select data_1=\'opt1\' data_2=\'opt2\'"',
+        },
       },
       required: ['buildTypeId', 'name', 'value'],
     },
@@ -4358,14 +4585,18 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       const typedArgs = args as UpdateParameterArgs;
 
       const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-      await adapter.modules.buildTypes.updateBuildParameterOfBuildType(
+      const parameter: { name: string; value: string; type?: { rawValue: string } } = {
+        name: typedArgs.name,
+        value: typedArgs.value,
+      };
+      if (typedArgs.type) {
+        parameter.type = { rawValue: typedArgs.type };
+      }
+      await adapter.modules.buildTypes.updateBuildParameterOfBuildType_7(
         typedArgs.name,
         typedArgs.buildTypeId,
         undefined,
-        {
-          name: typedArgs.name,
-          value: typedArgs.value,
-        },
+        parameter,
         { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
       );
       return json({
@@ -4400,6 +4631,291 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       return json({
         success: true,
         action: 'delete_parameter',
+        buildTypeId: typedArgs.buildTypeId,
+        name: typedArgs.name,
+      });
+    },
+    mode: 'full',
+  },
+
+  // === Project Parameter Management ===
+  {
+    name: 'list_project_parameters',
+    description: 'List parameters for a project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+      },
+      required: ['projectId'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as ListProjectParametersArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      const response = (await adapter.modules.projects.getBuildParameters(typedArgs.projectId)) as {
+        data?: {
+          property?: Array<{
+            name?: string;
+            value?: string;
+            inherited?: boolean;
+            type?: { rawValue?: string };
+          }>;
+        };
+      };
+      const parameters = response.data?.property ?? [];
+      return json({
+        parameters,
+        count: parameters.length,
+      });
+    },
+  },
+
+  {
+    name: 'add_project_parameter',
+    description: 'Add a parameter to a project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+        name: { type: 'string', description: 'Parameter name' },
+        value: { type: 'string', description: 'Parameter value' },
+        type: {
+          type: 'string',
+          description:
+            'Parameter type spec (optional): "password", "text", "checkbox checkedValue=\'true\' uncheckedValue=\'false\'", "select data_1=\'opt1\' data_2=\'opt2\'"',
+        },
+      },
+      required: ['projectId', 'name', 'value'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as AddProjectParameterArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      const parameter: { name: string; value: string; type?: { rawValue: string } } = {
+        name: typedArgs.name,
+        value: typedArgs.value,
+      };
+      if (typedArgs.type) {
+        parameter.type = { rawValue: typedArgs.type };
+      }
+      await adapter.modules.projects.createBuildParameter(
+        typedArgs.projectId,
+        undefined,
+        parameter,
+        {
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        }
+      );
+      return json({
+        success: true,
+        action: 'add_project_parameter',
+        projectId: typedArgs.projectId,
+        name: typedArgs.name,
+      });
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'update_project_parameter',
+    description: 'Update a project parameter',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+        name: { type: 'string', description: 'Parameter name' },
+        value: { type: 'string', description: 'New parameter value' },
+        type: {
+          type: 'string',
+          description:
+            'Parameter type spec (optional): "password", "text", "checkbox checkedValue=\'true\' uncheckedValue=\'false\'", "select data_1=\'opt1\' data_2=\'opt2\'"',
+        },
+      },
+      required: ['projectId', 'name', 'value'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as UpdateProjectParameterArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      const parameter: { name: string; value: string; type?: { rawValue: string } } = {
+        name: typedArgs.name,
+        value: typedArgs.value,
+      };
+      if (typedArgs.type) {
+        parameter.type = { rawValue: typedArgs.type };
+      }
+      await adapter.modules.projects.updateBuildParameter(
+        typedArgs.name,
+        typedArgs.projectId,
+        undefined,
+        parameter,
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+      );
+      return json({
+        success: true,
+        action: 'update_project_parameter',
+        projectId: typedArgs.projectId,
+        name: typedArgs.name,
+      });
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'delete_project_parameter',
+    description: 'Delete a parameter from a project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+        name: { type: 'string', description: 'Parameter name' },
+      },
+      required: ['projectId', 'name'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as DeleteProjectParameterArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      await adapter.modules.projects.deleteBuildParameter(typedArgs.name, typedArgs.projectId);
+      return json({
+        success: true,
+        action: 'delete_project_parameter',
+        projectId: typedArgs.projectId,
+        name: typedArgs.name,
+      });
+    },
+    mode: 'full',
+  },
+
+  // === Output Parameter Management ===
+  {
+    name: 'list_output_parameters',
+    description: 'List output parameters for a build configuration',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildTypeId: { type: 'string', description: 'Build type ID' },
+      },
+      required: ['buildTypeId'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as ListOutputParametersArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      const buildType = (await adapter.getBuildType(typedArgs.buildTypeId)) as {
+        'output-parameters'?: {
+          property?: Array<{
+            name?: string;
+            value?: string;
+          }>;
+        };
+      };
+      const parameters = buildType['output-parameters']?.property ?? [];
+      return json({
+        parameters,
+        count: parameters.length,
+      });
+    },
+  },
+
+  {
+    name: 'add_output_parameter',
+    description: 'Add an output parameter to a build configuration (for build chains)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildTypeId: { type: 'string', description: 'Build type ID' },
+        name: { type: 'string', description: 'Parameter name' },
+        value: { type: 'string', description: 'Parameter value' },
+      },
+      required: ['buildTypeId', 'name', 'value'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as AddOutputParameterArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      const parameter = {
+        name: typedArgs.name,
+        value: typedArgs.value,
+      };
+      // Note: output parameters do not support types
+      await adapter.modules.buildTypes.createBuildParameterOfBuildType(
+        typedArgs.buildTypeId,
+        undefined,
+        parameter,
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+      );
+      return json({
+        success: true,
+        action: 'add_output_parameter',
+        buildTypeId: typedArgs.buildTypeId,
+        name: typedArgs.name,
+      });
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'update_output_parameter',
+    description: 'Update an output parameter in a build configuration',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildTypeId: { type: 'string', description: 'Build type ID' },
+        name: { type: 'string', description: 'Parameter name' },
+        value: { type: 'string', description: 'New parameter value' },
+      },
+      required: ['buildTypeId', 'name', 'value'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as UpdateOutputParameterArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      // Note: output parameters do not support types
+      await adapter.modules.buildTypes.updateBuildParameterOfBuildType(
+        typedArgs.name,
+        typedArgs.buildTypeId,
+        undefined,
+        {
+          name: typedArgs.name,
+          value: typedArgs.value,
+        },
+        { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+      );
+      return json({
+        success: true,
+        action: 'update_output_parameter',
+        buildTypeId: typedArgs.buildTypeId,
+        name: typedArgs.name,
+      });
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'delete_output_parameter',
+    description: 'Delete an output parameter from a build configuration',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildTypeId: { type: 'string', description: 'Build type ID' },
+        name: { type: 'string', description: 'Parameter name' },
+      },
+      required: ['buildTypeId', 'name'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as DeleteOutputParameterArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      // Uses the original deleteBuildParameterOfBuildType which targets /output-parameters
+      await adapter.modules.buildTypes.deleteBuildParameterOfBuildType(
+        typedArgs.name,
+        typedArgs.buildTypeId
+      );
+      return json({
+        success: true,
+        action: 'delete_output_parameter',
         buildTypeId: typedArgs.buildTypeId,
         name: typedArgs.name,
       });

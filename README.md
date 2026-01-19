@@ -15,24 +15,29 @@ A Model Control Protocol (MCP) server that bridges AI coding assistants with Jet
 
 The TeamCity MCP Server allows developers using AI-powered coding assistants (Claude Code, Cursor, Windsurf) to interact with TeamCity directly from their development environment via MCP tools.
 
+> **Upgrading from 1.x?** Version 2.0.0 moved 15 tools from Dev to Full mode, including queue management, agent compatibility checks, and server health monitoring. If you relied on these tools in Dev mode, switch to `MCP_MODE=full` or use runtime mode switching (v2.1.0+). See [CHANGELOG.md](CHANGELOG.md) for details.
+
 ## Features
 
 ### 🚀 Two Operational Modes
 
-- **Dev Mode**: Safe CI/CD operations
-  - Trigger builds
-  - Monitor build status and progress
-  - Fetch build logs
-  - Investigate test failures
-  - List projects and configurations
+- **Dev Mode** (default): Safe CI/CD operations (31 tools, ~14k context tokens)
+  - Trigger builds and monitor status
+  - Fetch build logs and inspect test failures
+  - List projects, configurations, and queue
+  - Read parameters and investigate problems
 
-- **Full Mode**: Complete infrastructure management
+- **Full Mode**: Complete infrastructure management (87 tools, ~26k context tokens)
   - All Dev mode features, plus:
   - Create and clone build configurations
-  - Manage build steps and triggers
+  - Manage build steps, triggers, and dependencies
   - Configure VCS roots and agents
-  - Set up new projects
-  - Modify infrastructure settings
+  - Full CRUD for parameters (build config, project, and output parameters)
+  - Queue management and server administration
+
+**Runtime Mode Switching (v2.1.0+):** Switch between modes at runtime using the `get_mcp_mode` and `set_mcp_mode` tools—no restart required. MCP clients that support notifications will see the tool list update automatically.
+
+See the [Tools Mode Matrix](docs/mcp-tools-mode-matrix.md) for the complete list of 87 tools and their availability by mode.
 
 ### 🎯 Key Capabilities
 
@@ -46,7 +51,7 @@ The TeamCity MCP Server allows developers using AI-powered coding assistants (Cl
 
 ### Prerequisites
 
-- Node.js >= 20.10.0
+- Node.js >= 20.10.0 and < 21
 - TeamCity Server 2020.1+ with REST API access
 - TeamCity authentication token
 
@@ -89,9 +94,39 @@ npx -y @daghis/teamcity-mcp
   - `claude mcp add [-s user] teamcity -- npx -y @daghis/teamcity-mcp`
 - With env vars (if not using .env):
   - `claude mcp add [-s user] teamcity -- env TEAMCITY_URL="https://teamcity.example.com" TEAMCITY_TOKEN="tc_<your_token>" MCP_MODE=dev npx -y @daghis/teamcity-mcp`
+- With CLI arguments (recommended for Windows):
+  - `claude mcp add [-s user] teamcity -- npx -y @daghis/teamcity-mcp --url "https://teamcity.example.com" --token "tc_<your_token>" --mode dev`
 - Context usage (Opus 4.1, estimates):
   - Dev (default): ~14k tokens for MCP tools
   - Full (`MCP_MODE=full`): ~26k tokens for MCP tools
+
+### Windows Users
+
+On Windows, Claude Code's MCP configuration [may not properly merge environment variables](https://github.com/anthropics/claude-code/issues/1254). Use CLI arguments as a workaround:
+
+```json
+{
+  "mcpServers": {
+    "teamcity": {
+      "command": "npx",
+      "args": ["-y", "@daghis/teamcity-mcp", "--url", "https://teamcity.example.com", "--token", "YOUR_TOKEN"]
+    }
+  }
+}
+```
+
+Or use a config file for better security (token not visible in process list):
+
+```json
+{
+  "mcpServers": {
+    "teamcity": {
+      "command": "npx",
+      "args": ["-y", "@daghis/teamcity-mcp", "--config", "C:\\path\\to\\teamcity.env"]
+    }
+  }
+}
+```
 
 ## Configuration
 
@@ -220,14 +255,18 @@ The CI workflow runs `npm run build:bundle` and uploads the generated `coverage/
 
 ```
 teamcity-mcp/
-├── src/               # Source code
-│   ├── tools/        # MCP tool implementations
-│   ├── utils/        # Utility functions
-│   ├── types/        # TypeScript type definitions
-│   └── config/       # Configuration management
-├── tests/            # Test files
-├── docs/             # Documentation
-└── .agent-os/        # Agent OS specifications
+├── src/                    # Source code
+│   ├── tools.ts           # All 87 MCP tool definitions
+│   ├── server.ts          # MCP server setup
+│   ├── api-client.ts      # TeamCity API singleton
+│   ├── config/            # Configuration with Zod validation
+│   ├── teamcity/          # Domain logic (build, agent, config managers)
+│   ├── teamcity-client/   # Auto-generated OpenAPI client
+│   ├── types/             # TypeScript type definitions
+│   └── utils/             # Logger, MCP helpers, pagination
+├── tests/                  # Unit and integration tests
+├── docs/                   # Documentation
+└── scripts/                # Build and maintenance scripts
 ```
 
 ## API Documentation
@@ -269,9 +308,33 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 
 ## Security
 
-- Configure `TEAMCITY_TOKEN` via environment (see `.env.example`); never commit real tokens
-- Token-based authentication only
-- Logs redact sensitive values
+### Token Management
+
+- Configure `TEAMCITY_TOKEN` via environment variable or config file (see `.env.example`); never commit real tokens
+- Use a token with minimal required permissions; read-only tokens work for most Dev mode operations
+- Token-based authentication only; the MCP server does not support username/password
+- Logs redact sensitive values including tokens
+
+### Mode Selection
+
+- Prefer **Dev mode** unless Full mode is explicitly needed—this limits the blast radius of any misconfiguration or prompt injection
+- Full mode enables destructive operations (project deletion, agent management) that cannot be easily undone
+
+### Network Security
+
+- Always use HTTPS for TeamCity connections; the server does not enforce this but strongly recommends it
+- The MCP server connects only to the configured TeamCity URL; no other network calls are made
+
+### AI Assistant Considerations
+
+- AI assistants could be manipulated via prompt injection in build logs, test output, or other TeamCity data
+- Dev mode's limited tool set reduces the impact of such attacks
+- All actions appear in TeamCity's audit log under the token's associated user
+- Build logs and test failure details may contain sensitive information (secrets, paths, internal URLs) that become visible to the AI assistant
+
+### Repository Security
+
+This repository has GitHub secret scanning and push protection enabled. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Support
 
@@ -283,6 +346,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for deta
 - JetBrains TeamCity for the excellent CI/CD platform
 - Anthropic for the Model Control Protocol specification
 - The open-source community for continuous support
+- See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party licenses
 
 ---
 

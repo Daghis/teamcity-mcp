@@ -52,8 +52,12 @@ describe('AgentRequirementsManager', () => {
     expect(client.modules.buildTypes.addAgentRequirementToBuildType).toHaveBeenCalledWith(
       'BuildCfg',
       undefined,
-      expect.objectContaining({ disabled: undefined }),
-      expect.any(Object)
+      '<agent-requirement></agent-requirement>',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/xml',
+        }),
+      })
     );
   });
 
@@ -63,6 +67,22 @@ describe('AgentRequirementsManager', () => {
     await expect(manager.addRequirement({ buildTypeId: 'BuildCfg' })).rejects.toThrow(
       'TeamCity did not return an agent requirement identifier'
     );
+  });
+
+  test('addRequirement includes type attribute in XML', async () => {
+    client.modules.buildTypes.addAgentRequirementToBuildType.mockResolvedValue({
+      data: { id: 'req1' },
+    });
+
+    await manager.addRequirement({
+      buildTypeId: 'BuildCfg',
+      type: 'exists',
+      properties: { 'property-name': 'env.ANSIBLE' },
+    });
+
+    const [, , xmlBody] = client.modules.buildTypes.addAgentRequirementToBuildType.mock.calls[0];
+    expect(xmlBody).toContain('type="exists"');
+    expect(xmlBody).toContain('name="property-name" value="env.ANSIBLE"');
   });
 
   test('updateRequirement merges existing properties and flags', async () => {
@@ -84,22 +104,29 @@ describe('AgentRequirementsManager', () => {
     });
 
     expect(result).toEqual({ id: 'req1' });
-    expect(client.modules.buildTypes.replaceAgentRequirement).toHaveBeenCalledWith(
-      'BuildCfg',
-      'req1',
-      undefined,
-      expect.objectContaining({
-        disabled: true,
-        properties: {
-          property: expect.arrayContaining([
-            { name: 'env.EXISTING', value: 'old' },
-            { name: 'env.NEW', value: 'value' },
-            { name: 'flag', value: 'true' },
-          ]),
-        },
+    // Arguments: buildTypeId, requirementId, fields, body, headers
+    const [buildTypeId, requirementId, fields, xmlBody, headers] =
+      client.modules.buildTypes.replaceAgentRequirement.mock.calls[0];
+
+    expect(buildTypeId).toBe('BuildCfg');
+    expect(requirementId).toBe('req1');
+    expect(fields).toBeUndefined();
+
+    // Verify XML structure
+    expect(xmlBody).toContain('<agent-requirement');
+    expect(xmlBody).toContain('id="req1"');
+    expect(xmlBody).toContain('disabled="true"');
+    expect(xmlBody).toContain('<properties>');
+    expect(xmlBody).toContain('name="env.EXISTING" value="old"');
+    expect(xmlBody).toContain('name="env.NEW" value="value"');
+    expect(xmlBody).toContain('name="flag" value="true"');
+
+    // Verify headers
+    expect(headers).toMatchObject({
+      headers: expect.objectContaining({
+        'Content-Type': 'application/xml',
       }),
-      expect.any(Object)
-    );
+    });
   });
 
   test('updateRequirement throws when requirement is missing', async () => {
@@ -110,6 +137,50 @@ describe('AgentRequirementsManager', () => {
     await expect(manager.updateRequirement('missing', { buildTypeId: 'BuildCfg' })).rejects.toThrow(
       /was not found/
     );
+  });
+
+  test('updateRequirement preserves existing type when not provided', async () => {
+    client.modules.buildTypes.getAgentRequirement.mockResolvedValue({
+      data: {
+        id: 'req1',
+        type: 'exists',
+        properties: {
+          property: [{ name: 'property-name', value: 'env.ANSIBLE' }],
+        },
+      },
+    });
+    client.modules.buildTypes.replaceAgentRequirement.mockResolvedValue({ data: {} });
+
+    await manager.updateRequirement('req1', {
+      buildTypeId: 'BuildCfg',
+      disabled: true,
+    });
+
+    const [, , , xmlBody] = client.modules.buildTypes.replaceAgentRequirement.mock.calls[0];
+    expect(xmlBody).toContain('type="exists"');
+  });
+
+  test('updateRequirement allows changing type', async () => {
+    client.modules.buildTypes.getAgentRequirement.mockResolvedValue({
+      data: {
+        id: 'req1',
+        type: 'exists',
+        properties: {
+          property: [{ name: 'property-name', value: 'env.ANSIBLE' }],
+        },
+      },
+    });
+    client.modules.buildTypes.replaceAgentRequirement.mockResolvedValue({ data: {} });
+
+    await manager.updateRequirement('req1', {
+      buildTypeId: 'BuildCfg',
+      type: 'equals',
+      properties: { 'property-value': 'true' },
+    });
+
+    const [, , , xmlBody] = client.modules.buildTypes.replaceAgentRequirement.mock.calls[0];
+    expect(xmlBody).toContain('type="equals"');
+    expect(xmlBody).toContain('name="property-value" value="true"');
   });
 
   test('deleteRequirement delegates to API', async () => {

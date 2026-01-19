@@ -1,8 +1,8 @@
-// Dev mode is fine for list tools
+// Full mode needed for list_agents, list_agent_pools, list_vcs_roots
 jest.mock('@/config', () => ({
   getTeamCityUrl: () => 'https://example.test',
   getTeamCityToken: () => 'token',
-  getMCPMode: () => 'dev',
+  getMCPMode: () => 'full',
 }));
 
 function parseCount(locator?: string): { count: number; start: number } {

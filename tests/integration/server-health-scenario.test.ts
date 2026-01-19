@@ -4,13 +4,14 @@ import { callTool, callToolsBatchExpect } from './lib/mcp-runner';
 
 const hasTeamCityEnv = Boolean(
   (process.env['TEAMCITY_URL'] ?? process.env['TEAMCITY_SERVER_URL']) &&
-    (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
+  (process.env['TEAMCITY_TOKEN'] ?? process.env['TEAMCITY_API_TOKEN'])
 );
 
 describe('Server env and health checks', () => {
-  it('get_server_info and check_teamcity_connection (dev)', async () => {
+  it('get_server_info (dev) and check_teamcity_connection (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const results = await callToolsBatchExpect('dev', [
+    // get_server_info is dev-mode, check_teamcity_connection is full-only
+    const results = await callToolsBatchExpect('full', [
       { tool: 'get_server_info', args: {} },
       { tool: 'check_teamcity_connection', args: {} },
     ]);
@@ -22,9 +23,10 @@ describe('Server env and health checks', () => {
     expect(conn).toHaveProperty('ok');
   }, 30000);
 
-  it('check_availability_guard (dev)', async () => {
+  it('check_availability_guard (full)', async () => {
     if (!hasTeamCityEnv) return expect(true).toBe(true);
-    const results = await callToolsBatchExpect('dev', [
+    // check_availability_guard is full-only
+    const results = await callToolsBatchExpect('full', [
       { tool: 'check_availability_guard', args: {} },
       { tool: 'check_availability_guard', args: { failOnWarning: true } },
     ]);

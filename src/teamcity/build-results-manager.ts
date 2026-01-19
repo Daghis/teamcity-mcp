@@ -4,6 +4,7 @@
 import type { AxiosError, AxiosResponse } from 'axios';
 
 import { warn } from '@/utils/logger';
+import { globToRegex } from '@/utils/pattern';
 
 import { TeamCityAPIError, TeamCityNotFoundError } from './errors';
 import type { TeamCityUnifiedClient } from './types/client';
@@ -578,11 +579,7 @@ export class BuildResultsManager {
    * Filter artifacts by pattern
    */
   private filterArtifacts(artifacts: TeamCityArtifact[], pattern: string): TeamCityArtifact[] {
-    // Convert glob pattern to regex
-    const regex = new RegExp(
-      `^${pattern.replace(/\./g, '\\.').replace(/\*/g, '.*').replace(/\?/g, '.')}$`
-    );
-
+    const regex = globToRegex(pattern);
     return artifacts.filter((a) => regex.test(a.name));
   }
 
