@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.1...teamcity-mcp-v2.1.2) (2026-01-19)
+
+
+### Bug Fixes
+
+* **security:** override hono to 4.11.4 for JWT vulnerabilities ([#364](https://github.com/Daghis/teamcity-mcp/issues/364)) ([4f570a5](https://github.com/Daghis/teamcity-mcp/commit/4f570a546211b3d3b75e84aa3456dd1b924e5259))
+
 ## [2.1.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.0...teamcity-mcp-v2.1.1) (2026-01-10)
 
 
