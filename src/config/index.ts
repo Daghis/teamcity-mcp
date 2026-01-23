@@ -15,11 +15,9 @@ const envSchema = z.object({
   PORT: z.string().default('3000').transform(Number),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   MCP_MODE: z.enum(['dev', 'full']).default('dev'),
-  // Accept primary and alias names for TeamCity credentials
+  // TeamCity credentials (primary names only; aliases handled separately for cleaner public schema)
   TEAMCITY_URL: z.string().url().optional(),
-  TEAMCITY_SERVER_URL: z.string().url().optional(),
   TEAMCITY_TOKEN: z.string().optional(),
-  TEAMCITY_API_TOKEN: z.string().optional(),
   // TeamCity connection and behavior knobs
   TEAMCITY_TIMEOUT: z.string().optional(),
   TEAMCITY_MAX_CONCURRENT: z.string().optional(),
@@ -91,9 +89,11 @@ export function loadConfig(): ApplicationConfig {
     },
   };
 
-  // Resolve TeamCity credentials from primary or alias vars
-  const tcUrl = env.TEAMCITY_URL ?? env.TEAMCITY_SERVER_URL;
-  const tcToken = env.TEAMCITY_TOKEN ?? env.TEAMCITY_API_TOKEN;
+  // Resolve TeamCity credentials from primary or legacy alias vars
+  // Aliases (TEAMCITY_SERVER_URL, TEAMCITY_API_TOKEN) are kept out of envSchema
+  // to avoid exposing them in auto-generated documentation while maintaining backwards compatibility
+  const tcUrl = env.TEAMCITY_URL ?? process.env['TEAMCITY_SERVER_URL'];
+  const tcToken = env.TEAMCITY_TOKEN ?? process.env['TEAMCITY_API_TOKEN'];
   // Add TeamCity configuration if credentials are provided
   if (tcUrl !== undefined && tcToken !== undefined) {
     config.teamcity = {
