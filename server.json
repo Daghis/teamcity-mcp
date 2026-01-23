@@ -28,11 +28,13 @@
         {
           "name": "TEAMCITY_URL",
           "description": "Base URL of your TeamCity server",
+          "placeholder": "https://teamcity.example.com/",
           "isRequired": true
         },
         {
           "name": "TEAMCITY_TOKEN",
           "description": "TeamCity personal access token with required permissions",
+          "placeholder": "YOUR_TOKEN_HERE",
           "isRequired": true,
           "isSecret": true
         },
