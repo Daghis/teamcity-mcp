@@ -51,7 +51,7 @@ See the [Tools Mode Matrix](docs/mcp-tools-mode-matrix.md) for the complete list
 
 ### Prerequisites
 
-- Node.js >= 20.10.0 and < 21
+- Node.js >= 20.10.0 (LTS versions 20, 22, 24 tested in CI)
 - TeamCity Server 2020.1+ with REST API access
 - TeamCity authentication token
 
@@ -90,12 +90,13 @@ npx -y @daghis/teamcity-mcp
 
 ## Claude Code
 
-- Add the MCP:
-  - `claude mcp add [-s user] teamcity -- npx -y @daghis/teamcity-mcp`
+- Add the MCP (relying on `.env` for configuration):
+  - `claude mcp add teamcity -- npx -y @daghis/teamcity-mcp`
 - With env vars (if not using .env):
-  - `claude mcp add [-s user] teamcity -- env TEAMCITY_URL="https://teamcity.example.com" TEAMCITY_TOKEN="tc_<your_token>" MCP_MODE=dev npx -y @daghis/teamcity-mcp`
+  - `claude mcp add teamcity -e TEAMCITY_URL="https://teamcity.example.com" -e TEAMCITY_TOKEN="tc_<your_token>" -- npx -y @daghis/teamcity-mcp`
 - With CLI arguments (recommended for Windows):
-  - `claude mcp add [-s user] teamcity -- npx -y @daghis/teamcity-mcp --url "https://teamcity.example.com" --token "tc_<your_token>" --mode dev`
+  - `claude mcp add teamcity -- npx -y @daghis/teamcity-mcp --url "https://teamcity.example.com" --token "tc_<your_token>" --mode dev`
+- Add `-s user` to install user-wide instead of project-scoped (default)
 - Context usage (Opus 4.1, estimates):
   - Dev (default): ~14k tokens for MCP tools
   - Full (`MCP_MODE=full`): ~26k tokens for MCP tools
