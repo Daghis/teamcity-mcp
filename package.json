@@ -9,7 +9,7 @@
     "teamcity-mcp": "dist/index.js"
   },
   "engines": {
-    "node": ">=20.10.0 <21"
+    "node": ">=20.10.0"
   },
   "scripts": {
     "dev": "node ./node_modules/tsx/dist/cli.mjs watch src/index.ts",
