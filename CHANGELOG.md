@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.5](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.4...teamcity-mcp-v2.1.5) (2026-01-26)
+
+
+### Bug Fixes
+
+* **ci:** migrate from deprecated codecov/test-results-action to codecov-action ([#377](https://github.com/Daghis/teamcity-mcp/issues/377)) ([012bcc6](https://github.com/Daghis/teamcity-mcp/commit/012bcc6b7c20a3734a49edba0d44139e5dd3a2bb))
+
 ## [2.1.4](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.3...teamcity-mcp-v2.1.4) (2026-01-26)
 
 
