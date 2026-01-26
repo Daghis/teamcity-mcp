@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.2...teamcity-mcp-v2.1.3) (2026-01-26)
+
+
+### Bug Fixes
+
+* **tests:** eliminate race condition in boundary threshold test ([#373](https://github.com/Daghis/teamcity-mcp/issues/373)) ([d4efddf](https://github.com/Daghis/teamcity-mcp/commit/d4efddfd5b4b31f6e8a8901571f01143912e0a55))
+
 ## [2.1.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.1...teamcity-mcp-v2.1.2) (2026-01-19)
 
 
