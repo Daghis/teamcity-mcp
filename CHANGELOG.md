@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.4](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.3...teamcity-mcp-v2.1.4) (2026-01-26)
+
+
+### Bug Fixes
+
+* **ci:** remove duplicate workflow_run trigger from publish workflow ([#375](https://github.com/Daghis/teamcity-mcp/issues/375)) ([f9dcca8](https://github.com/Daghis/teamcity-mcp/commit/f9dcca87c480de854b22998e0c3903d2b2cbd6e5))
+
 ## [2.1.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.2...teamcity-mcp-v2.1.3) (2026-01-26)
 
 
