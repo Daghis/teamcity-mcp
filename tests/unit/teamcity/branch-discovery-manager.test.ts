@@ -1288,21 +1288,29 @@ describe('BranchDiscoveryManager', () => {
 
   describe('detectBranchActivity - extended coverage', () => {
     it('should handle boundary threshold exactly at threshold days', () => {
-      const now = new Date();
-      const exactlyAtThreshold = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // Exactly 30 days
+      // Freeze time to eliminate race condition between test setup and detectBranchActivity
+      jest.useFakeTimers();
+      const frozenNow = new Date('2025-06-15T12:00:00.000Z');
+      jest.setSystemTime(frozenNow);
 
-      const branch: BranchInfo = {
-        name: 'boundary',
-        displayName: 'boundary',
-        isDefault: false,
-        isActive: false,
-        buildCount: 1,
-        lastActivityDate: exactlyAtThreshold.toISOString(),
-      };
+      try {
+        const exactlyAtThreshold = new Date(frozenNow.getTime() - 30 * 24 * 60 * 60 * 1000); // Exactly 30 days
 
-      const result = manager.detectBranchActivity(branch, 30);
+        const branch: BranchInfo = {
+          name: 'boundary',
+          displayName: 'boundary',
+          isDefault: false,
+          isActive: false,
+          buildCount: 1,
+          lastActivityDate: exactlyAtThreshold.toISOString(),
+        };
 
-      expect(result.isActive).toBe(true); // <= 30 days means active
+        const result = manager.detectBranchActivity(branch, 30);
+
+        expect(result.isActive).toBe(true); // <= 30 days means active
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('should handle TeamCity date format correctly', () => {
