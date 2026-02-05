@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.7](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.6...teamcity-mcp-v2.1.7) (2026-02-05)
+
+
+### Bug Fixes
+
+* **deps:** upgrade @modelcontextprotocol/sdk to 1.26.0 for CVE-2026-25536 ([#383](https://github.com/Daghis/teamcity-mcp/issues/383)) ([fae1bc0](https://github.com/Daghis/teamcity-mcp/commit/fae1bc03764048d6877c42fccdd11a9e8d061778))
+
 ## [2.1.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.5...teamcity-mcp-v2.1.6) (2026-01-28)
 
 
