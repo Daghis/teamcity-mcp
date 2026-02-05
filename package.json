@@ -64,7 +64,7 @@
     "url": "https://github.com/Daghis/teamcity-mcp/issues"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.24.0",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "axios": "^1.13.2",
     "axios-retry": "^4.5.0",
     "dotenv": "17.2.3",
