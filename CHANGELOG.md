@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.5...teamcity-mcp-v2.1.6) (2026-01-28)
+
+
+### Bug Fixes
+
+* **deps:** bump hono override to 4.11.7 for security fixes ([#379](https://github.com/Daghis/teamcity-mcp/issues/379)) ([12efbb1](https://github.com/Daghis/teamcity-mcp/commit/12efbb1fbbb13283d05005c49592bf7a6df54752))
+
 ## [2.1.5](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.4...teamcity-mcp-v2.1.5) (2026-01-26)
 
 
