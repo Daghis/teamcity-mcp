@@ -86,7 +86,7 @@ describe('Temporary Test', () => {
   });
 });
 `;
-      const tempTestFile = path.join(process.cwd(), 'tests', 'temp.test.ts');
+      const tempTestFile = path.join(process.cwd(), 'tests', 'temp-infra-exec.spec.ts');
       fs.writeFileSync(tempTestFile, tempTestContent);
 
       try {
@@ -124,7 +124,7 @@ describe('TypeScript Test', () => {
   });
 });
 `;
-      const tempTestFile = path.join(process.cwd(), 'tests', 'temp-ts.test.ts');
+      const tempTestFile = path.join(process.cwd(), 'tests', 'temp-infra-ts.spec.ts');
       fs.writeFileSync(tempTestFile, tempTestContent);
 
       try {

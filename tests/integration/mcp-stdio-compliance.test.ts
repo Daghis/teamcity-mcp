@@ -22,13 +22,14 @@ interface InitializeResponse {
 }
 
 describe('MCP stdio transport compliance', () => {
-  const serverPath = join(__dirname, '../../dist/index.js');
+  const tsxPath = join(__dirname, '../../node_modules/tsx/dist/cli.mjs');
+  const serverPath = join(__dirname, '../../src/index.ts');
   const timeout = 10000;
 
   it(
     'should only output valid JSON-RPC to stdout during handshake',
     async () => {
-      const server = spawn('node', [serverPath], {
+      const server = spawn('node', [tsxPath, serverPath], {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {
           ...process.env,
@@ -129,7 +130,7 @@ describe('MCP stdio transport compliance', () => {
   it(
     'should route all winston logging to stderr, not stdout',
     async () => {
-      const server = spawn('node', [serverPath], {
+      const server = spawn('node', [tsxPath, serverPath], {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {
           ...process.env,
@@ -217,7 +218,7 @@ describe('MCP stdio transport compliance', () => {
   it(
     'should report correct server version from package.json',
     async () => {
-      const server = spawn('node', [serverPath], {
+      const server = spawn('node', [tsxPath, serverPath], {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {
           ...process.env,
