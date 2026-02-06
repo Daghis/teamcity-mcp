@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.9](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.8...teamcity-mcp-v2.1.9) (2026-02-06)
+
+
+### Bug Fixes
+
+* eliminate intermittent test failures from cross-test file pollution ([#387](https://github.com/Daghis/teamcity-mcp/issues/387)) ([cabd563](https://github.com/Daghis/teamcity-mcp/commit/cabd56351247eaefe1411ebd91efc90618b5404c))
+
 ## [2.1.8](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.7...teamcity-mcp-v2.1.8) (2026-02-06)
 
 
