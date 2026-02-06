@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.8](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.7...teamcity-mcp-v2.1.8) (2026-02-06)
+
+
+### Bug Fixes
+
+* return auto-generated stepId from manage_build_steps add action ([#385](https://github.com/Daghis/teamcity-mcp/issues/385)) ([549335c](https://github.com/Daghis/teamcity-mcp/commit/549335cbb16f24d5462fe3a630a171ba801ab799)), closes [#381](https://github.com/Daghis/teamcity-mcp/issues/381)
+
 ## [2.1.7](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.6...teamcity-mcp-v2.1.7) (2026-02-05)
 
 
