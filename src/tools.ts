@@ -5036,7 +5036,11 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           enum: ['add', 'update', 'delete'],
           description: 'Action to perform',
         },
-        stepId: { type: 'string', description: 'Step ID (for update/delete)' },
+        stepId: {
+          type: 'string',
+          description:
+            'Step ID (required for update/delete; ignored by TeamCity for add — IDs are auto-generated)',
+        },
         name: { type: 'string', description: 'Step name' },
         type: { type: 'string', description: 'Step type (e.g., simpleRunner)' },
         properties: { type: 'object', description: 'Step properties' },
@@ -5106,7 +5110,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
                   property: Object.entries(stepProps).map(([k, v]) => ({ name: k, value: v })),
                 },
               };
-              await adapter.modules.buildTypes.addBuildStepToBuildType(
+              const response = await adapter.modules.buildTypes.addBuildStepToBuildType(
                 typedArgs.buildTypeId,
                 undefined,
                 step,
@@ -5114,10 +5118,12 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
                   headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
                 }
               );
+              const created = response.data as Step;
               return json({
                 success: true,
                 action: 'add_build_step',
                 buildTypeId: typedArgs.buildTypeId,
+                stepId: created?.id,
               });
             }
 
