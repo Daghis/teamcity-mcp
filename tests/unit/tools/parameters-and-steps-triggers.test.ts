@@ -369,7 +369,9 @@ describe('tools: parameters, steps, triggers', () => {
     await new Promise<void>((resolve, reject) => {
       jest.isolateModules(() => {
         (async () => {
-          const addBuildStepToBuildType = jest.fn(async () => ({}));
+          const addBuildStepToBuildType = jest.fn(async () => ({
+            data: { id: 'RUNNER_42', name: 'Run', type: 'simpleRunner' },
+          }));
           const replaceBuildStep = jest.fn(async () => ({}));
           const deleteBuildStep = jest.fn(async () => ({}));
           const getBuildStep = jest.fn(async () => ({
@@ -409,6 +411,7 @@ describe('tools: parameters, steps, triggers', () => {
             success: true,
             action: 'add_build_step',
             buildTypeId: 'bt',
+            stepId: 'RUNNER_42',
           });
 
           res = await getRequiredTool('manage_build_steps').handler({
