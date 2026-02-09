@@ -67,7 +67,7 @@
     "@modelcontextprotocol/sdk": "^1.26.0",
     "axios": "^1.13.2",
     "axios-retry": "^4.5.0",
-    "dotenv": "17.2.3",
+    "dotenv": "17.2.4",
     "tslib": "^2.8.1",
     "winston": "^3.11.0",
     "zod": "^4.3.5"
