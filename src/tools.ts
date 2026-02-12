@@ -1048,7 +1048,8 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'cancel_build',
-    description: 'Cancel or stop a running (or queued) build by ID. Supports an optional comment and requeue flag.',
+    description:
+      'Cancel or stop a running (or queued) build by ID. Supports an optional comment and requeue flag.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1056,7 +1057,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         comment: { type: 'string', description: 'Optional cancellation comment' },
         readdIntoQueue: {
           type: 'boolean',
-          description: 'If true, a new identical build will be queued after cancel (running builds only). Defaults to false.',
+          description:
+            'If true, a new identical build will be queued after cancel (running builds only). Defaults to false.',
         },
       },
       required: ['buildId'],
