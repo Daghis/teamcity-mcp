@@ -206,6 +206,114 @@ describe('tools: build actions and status/basic info', () => {
     });
   });
 
+  it('cancel_build calls cancelBuild with JSON content-type and returns structured JSON', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const cancelBuild = jest.fn(async () => ({}));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: {
+                  builds: { cancelBuild },
+                },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('cancel_build').handler({
+            buildId: 'b42',
+            comment: 'No longer needed',
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'cancel_build',
+            buildId: 'b42',
+            comment: 'No longer needed',
+          });
+          expect(cancelBuild).toHaveBeenCalledTimes(1);
+          expect(cancelBuild).toHaveBeenCalledWith(
+            'id:b42',
+            undefined,
+            { comment: 'No longer needed', readdIntoQueue: false },
+            expect.objectContaining({
+              headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+            })
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('cancel_build uses default comment when none provided', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const cancelBuild = jest.fn(async () => ({}));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: {
+                  builds: { cancelBuild },
+                },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('cancel_build').handler({ buildId: 'b99' });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({ success: true, action: 'cancel_build', buildId: 'b99' });
+          expect(cancelBuild).toHaveBeenCalledWith(
+            'id:b99',
+            undefined,
+            { comment: 'Cancelled via MCP', readdIntoQueue: false },
+            expect.anything()
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('cancel_build passes readdIntoQueue flag', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const cancelBuild = jest.fn(async () => ({}));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: {
+                  builds: { cancelBuild },
+                },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          await getRequiredTool('cancel_build').handler({
+            buildId: 'b50',
+            readdIntoQueue: true,
+          });
+          expect(cancelBuild).toHaveBeenCalledWith(
+            'id:b50',
+            undefined,
+            { comment: 'Cancelled via MCP', readdIntoQueue: true },
+            expect.anything()
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
   it('get_build_status returns structured status JSON', async () => {
     jest.resetModules();
     await new Promise<void>((resolve, reject) => {
