@@ -1047,6 +1047,52 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
 
   {
+    name: 'cancel_build',
+    description: 'Cancel or stop a running (or queued) build by ID. Supports an optional comment and requeue flag.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildId: { type: 'string', description: 'Build ID' },
+        comment: { type: 'string', description: 'Optional cancellation comment' },
+        readdIntoQueue: {
+          type: 'boolean',
+          description: 'If true, a new identical build will be queued after cancel (running builds only). Defaults to false.',
+        },
+      },
+      required: ['buildId'],
+    },
+    handler: async (args: unknown) => {
+      const schema = z.object({
+        buildId: z.string().min(1),
+        comment: z.string().optional(),
+        readdIntoQueue: z.boolean().optional(),
+      });
+      return runTool(
+        'cancel_build',
+        schema,
+        async (typed) => {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          await adapter.modules.builds.cancelBuild(
+            `id:${typed.buildId}`,
+            undefined,
+            {
+              comment: typed.comment ?? 'Cancelled via MCP',
+              readdIntoQueue: typed.readdIntoQueue ?? false,
+            }
+          );
+          return json({
+            success: true,
+            action: 'cancel_build',
+            buildId: typed.buildId,
+            comment: typed.comment,
+          });
+        },
+        args
+      );
+    },
+  },
+
+  {
     name: 'get_build_status',
     description: 'Get build status with optional test/problem and queue context details',
     inputSchema: {
