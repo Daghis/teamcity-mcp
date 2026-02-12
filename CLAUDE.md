@@ -57,3 +57,13 @@ Three parameter sets exist:
 - **Build config output parameters**: `/buildTypes/{id}/output-parameters` (no type support)
 
 Type support includes: `password`, `text`, `checkbox`, `select` with spec format in `type.rawValue`.
+
+## Git Workflow
+
+Before starting any work that will result in a commit/PR, always pull the latest `main` first:
+
+```bash
+git checkout main && git pull origin main
+```
+
+Then create the feature branch from that up-to-date main. This avoids "branch is out-of-date" warnings on PRs.
