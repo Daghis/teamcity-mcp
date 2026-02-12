@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.10](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.9...teamcity-mcp-v2.1.10) (2026-02-12)
+
+
+### Bug Fixes
+
+* bump axios to ^1.13.5 for CVE-2026-25639 ([3d2a87c](https://github.com/Daghis/teamcity-mcp/commit/3d2a87c39daad7392e5276091bfc9bc3415b48bf))
+* bump axios to ^1.13.5 to address CVE-2026-25639 DoS vulnerability ([ca60f67](https://github.com/Daghis/teamcity-mcp/commit/ca60f67f05d7591d14944fc90ec1a1f474dac7cf))
+
 ## [2.1.9](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.8...teamcity-mcp-v2.1.9) (2026-02-06)
 
 
