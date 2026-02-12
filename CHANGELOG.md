@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.10...teamcity-mcp-v2.2.0) (2026-02-12)
+
+
+### Features
+
+* add cancel_build tool to dev tools ([091e23d](https://github.com/Daghis/teamcity-mcp/commit/091e23d7d74b12723825dbebca716df536df6cac))
+
 ## [2.1.10](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.9...teamcity-mcp-v2.1.10) (2026-02-12)
 
 
