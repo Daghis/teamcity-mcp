@@ -240,7 +240,10 @@ describe('tools: build actions and status/basic info', () => {
             undefined,
             { comment: 'No longer needed', readdIntoQueue: false },
             expect.objectContaining({
-              headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+              headers: expect.objectContaining({
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              }),
             })
           );
           resolve();

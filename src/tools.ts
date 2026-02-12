@@ -1081,7 +1081,7 @@ const DEV_TOOLS: ToolDefinition[] = [
               comment: typed.comment ?? 'Cancelled via MCP',
               readdIntoQueue: typed.readdIntoQueue ?? false,
             },
-            { headers: { 'Content-Type': 'application/json' } }
+            { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
           );
           return json({
             success: true,
