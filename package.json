@@ -1,6 +1,6 @@
 {
   "name": "@daghis/teamcity-mcp",
-  "version": "2.1.9",
+  "version": "2.1.10",
   "description": "Model Control Protocol server for TeamCity CI/CD integration with AI coding assistants",
   "mcpName": "io.github.Daghis/teamcity",
   "main": "dist/index.js",
@@ -65,7 +65,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "axios": "^1.13.2",
+    "axios": "^1.13.5",
     "axios-retry": "^4.5.0",
     "dotenv": "17.2.4",
     "tslib": "^2.8.1",
@@ -98,7 +98,7 @@
     "typescript": "^5.3.2"
   },
   "overrides": {
-    "axios": "^1.13.2",
+    "axios": "^1.13.5",
     "body-parser": "^2.2.1",
     "glob@>=10.2.0 <10.5.0": "^10.5.0",
     "hono": "^4.11.7",
