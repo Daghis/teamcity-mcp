@@ -21,6 +21,7 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Builds | `analyze_build_problems` | Yes | Yes |
 | Builds | `trigger_build` | Yes | Yes |
 | Builds | `cancel_queued_build` | Yes | Yes |
+| Builds | `cancel_build` | Yes | Yes |
 | Builds | `download_build_artifact` | Yes | Yes |
 | Builds | `download_build_artifacts` | Yes | Yes |
 | Build Configs | `list_build_configs` | Yes | Yes |
@@ -92,7 +93,7 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Users & Roles | `list_users` | No | Yes |
 | Users & Roles | `list_roles` | No | Yes |
 
-**Summary:** 87 tools total — 31 available in Dev mode, 56 Full-only.
+**Summary:** 88 tools total — 32 available in Dev mode, 56 Full-only.
 
 Notes:
 - Dev mode focuses on developer workflows (builds, tests, logs) and excludes infrastructure/admin tools to reduce context size (~12k tokens saved).
