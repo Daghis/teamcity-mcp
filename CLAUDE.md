@@ -68,3 +68,13 @@ When Marc says he wants to "check-in with GitHub", run these steps:
 2. Check new issues
 3. Check new PRs
 4. Check security alerts
+
+## Git Workflow
+
+Before starting any work that will result in a commit/PR, always pull the latest `main` first:
+
+```bash
+git checkout main && git pull origin main
+```
+
+Then create the feature branch from that up-to-date main. This avoids "branch is out-of-date" warnings on PRs.
