@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.2.0...teamcity-mcp-v2.2.1) (2026-02-14)
+
+
+### Bug Fixes
+
+* **deps:** update qs to 6.14.2 to fix DoS vulnerability ([#397](https://github.com/Daghis/teamcity-mcp/issues/397)) ([39f6b28](https://github.com/Daghis/teamcity-mcp/commit/39f6b28489f8e167f62adbf84ac6126ddfbb17f7))
+
 ## [2.2.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.1.10...teamcity-mcp-v2.2.0) (2026-02-12)
 
 
