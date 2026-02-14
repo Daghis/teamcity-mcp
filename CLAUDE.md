@@ -58,6 +58,17 @@ Three parameter sets exist:
 
 Type support includes: `password`, `text`, `checkbox`, `select` with spec format in `type.rawValue`.
 
+## Workflows
+
+### "Check-in with GitHub"
+
+When Marc says he wants to "check-in with GitHub", run these steps:
+
+1. Pull latest pulse stats (via project-pulse MCP, repo: `Daghis/teamcity-mcp`, npm: `@daghis/teamcity-mcp`)
+2. Check new issues
+3. Check new PRs
+4. Check security alerts
+
 ## Git Workflow
 
 Before starting any work that will result in a commit/PR, always pull the latest `main` first:

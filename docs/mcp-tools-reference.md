@@ -52,6 +52,8 @@ This document lists all Model Context Protocol (MCP) tools exposed by the TeamCi
 - `cancel_queued_build` — Cancel a queued build
   - Args: `buildId: string`
   - Mode: full
+- `cancel_build` — Cancel or stop a running (or queued) build
+  - Args: `buildId: string`, `comment?: string`, `readdIntoQueue?: boolean`
 - `get_build_status` — Build status with optional queue context
   - Args: `buildId: string`, `includeTests?: boolean`, `includeProblems?: boolean`, `includeQueueTotals?: boolean` (adds totalQueued; extra call when queued), `includeQueueReason?: boolean` (adds waitReason; extra call when queued)
 - `fetch_build_log` — Build log by lines (pagination/tail or stream-to-file)
