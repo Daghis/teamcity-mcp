@@ -1,13 +1,9 @@
 /**
  * Configuration management for TeamCity MCP Server
  */
-import dotenv from 'dotenv';
 import { z } from 'zod';
 
 import type { ApplicationConfig } from '@/types/config';
-
-// Load environment variables
-dotenv.config();
 
 // Environment variable schema
 const envSchema = z.object({
