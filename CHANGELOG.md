@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.2.1...teamcity-mcp-v2.2.2) (2026-02-28)
+
+
+### Bug Fixes
+
+* remove stray dotenv.config() from config module ([#404](https://github.com/Daghis/teamcity-mcp/issues/404)) ([4e5bc2c](https://github.com/Daghis/teamcity-mcp/commit/4e5bc2cb1f9f3617e796f35a7a504e41dca00f3b)), closes [#400](https://github.com/Daghis/teamcity-mcp/issues/400)
+
 ## [2.2.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.2.0...teamcity-mcp-v2.2.1) (2026-02-14)
 
 
