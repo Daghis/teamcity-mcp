@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.2.2...teamcity-mcp-v2.2.3) (2026-03-09)
+
+
+### Bug Fixes
+
+* add .env.example to repo ([#411](https://github.com/Daghis/teamcity-mcp/issues/411)) ([67d8f25](https://github.com/Daghis/teamcity-mcp/commit/67d8f2526c8286547dffac0611ad7d57a313d112)), closes [#409](https://github.com/Daghis/teamcity-mcp/issues/409)
+
 ## [2.2.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.2.1...teamcity-mcp-v2.2.2) (2026-02-28)
 
 
