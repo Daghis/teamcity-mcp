@@ -128,7 +128,7 @@ function resolveBuildLocator(input: {
 }): { locator: string; friendlyId: string } {
   const trimmedBuildId = typeof input.buildId === 'string' ? input.buildId.trim() : undefined;
   if (trimmedBuildId && trimmedBuildId.length > 0) {
-    return { locator: trimmedBuildId, friendlyId: `ID '${trimmedBuildId}'` };
+    return { locator: `id:${trimmedBuildId}`, friendlyId: `ID '${trimmedBuildId}'` };
   }
 
   const buildNumber =
