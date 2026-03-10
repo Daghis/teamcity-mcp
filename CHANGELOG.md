@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.3.2...teamcity-mcp-v2.4.0) (2026-03-10)
+
+
+### Features
+
+* add SSH key management tools for projects ([#407](https://github.com/Daghis/teamcity-mcp/issues/407)) ([#421](https://github.com/Daghis/teamcity-mcp/issues/421)) ([e00955c](https://github.com/Daghis/teamcity-mcp/commit/e00955c1d4c43955a734c806e42bd8ac4296d21d))
+
 ## [2.3.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.3.1...teamcity-mcp-v2.3.2) (2026-03-10)
 
 
