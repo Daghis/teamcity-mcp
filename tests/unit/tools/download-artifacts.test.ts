@@ -98,11 +98,11 @@ describe('tools: download_build_artifacts', () => {
       encoding: 'base64',
     });
 
-    expect(downloadArtifact).toHaveBeenNthCalledWith(1, '123', 'first.bin', {
+    expect(downloadArtifact).toHaveBeenNthCalledWith(1, 'id:123', 'first.bin', {
       encoding: 'base64',
       maxSize: undefined,
     });
-    expect(downloadArtifact).toHaveBeenNthCalledWith(2, '123', 'second.txt', {
+    expect(downloadArtifact).toHaveBeenNthCalledWith(2, 'id:123', 'second.txt', {
       encoding: 'base64',
       maxSize: undefined,
     });
@@ -178,11 +178,11 @@ describe('tools: download_build_artifacts', () => {
       outputDir: tempRoot,
     });
 
-    expect(downloadArtifact).toHaveBeenNthCalledWith(1, '456', 'logs/app.log', {
+    expect(downloadArtifact).toHaveBeenNthCalledWith(1, 'id:456', 'logs/app.log', {
       encoding: 'stream',
       maxSize: undefined,
     });
-    expect(downloadArtifact).toHaveBeenNthCalledWith(2, '456', 'metrics.json', {
+    expect(downloadArtifact).toHaveBeenNthCalledWith(2, 'id:456', 'metrics.json', {
       encoding: 'stream',
       maxSize: undefined,
     });

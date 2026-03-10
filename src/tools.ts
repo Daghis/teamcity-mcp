@@ -89,6 +89,78 @@ interface NormalizedArtifactRequest {
   downloadUrl?: string;
 }
 
+/**
+ * Shared Zod schema for build identification.
+ * Accepts either `buildId` or `buildNumber` + `buildTypeId`.
+ */
+const buildIdentifierSchema = z
+  .object({
+    buildId: z.string().min(1).optional(),
+    buildNumber: z.union([z.string().min(1), z.number().int()]).optional(),
+    buildTypeId: z.string().min(1).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.buildId && value.buildNumber === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['buildId'],
+        message: 'Either buildId or (buildNumber + buildTypeId) must be provided',
+      });
+    }
+    if (value.buildNumber !== undefined && !value.buildTypeId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['buildTypeId'],
+        message: 'buildTypeId is required when querying by buildNumber',
+      });
+    }
+  });
+
+/**
+ * Resolve a build identifier to a TeamCity build locator string.
+ * Returns the buildId as-is if provided, otherwise composes a
+ * `buildType:(id:X),number:Y` locator from buildNumber + buildTypeId.
+ */
+function resolveBuildLocator(input: {
+  buildId?: string;
+  buildNumber?: string | number;
+  buildTypeId?: string;
+}): { locator: string; friendlyId: string } {
+  const trimmedBuildId = typeof input.buildId === 'string' ? input.buildId.trim() : undefined;
+  if (trimmedBuildId && trimmedBuildId.length > 0) {
+    return { locator: `id:${trimmedBuildId}`, friendlyId: `ID '${trimmedBuildId}'` };
+  }
+
+  const buildNumber =
+    input.buildNumber !== undefined ? String(input.buildNumber).trim() : undefined;
+  const buildTypeId = input.buildTypeId?.trim();
+
+  if (buildTypeId && buildNumber) {
+    return {
+      locator: `buildType:(id:${buildTypeId}),number:${buildNumber}`,
+      friendlyId: `build type '${buildTypeId}' #${buildNumber}`,
+    };
+  }
+
+  throw new TeamCityAPIError('Unable to resolve build identifier', 'INVALID_BUILD_IDENTIFIER');
+}
+
+/** Standard inputSchema properties for build identification (buildId OR buildNumber + buildTypeId). */
+const buildIdentifierInputProperties = {
+  buildId: { type: 'string' as const, description: 'Build ID (internal TeamCity ID)' },
+  buildNumber: {
+    oneOf: [
+      { type: 'string' as const, description: 'Build number as TeamCity displays it (e.g. "886")' },
+      { type: 'number' as const, description: 'Numeric build number' },
+    ],
+    description: 'Human-readable build number (requires buildTypeId)',
+  },
+  buildTypeId: {
+    type: 'string' as const,
+    description: 'Build configuration ID (required when using buildNumber)',
+  },
+};
+
 const sanitizeFileName = (
   artifactName: string
 ): {
@@ -807,21 +879,21 @@ const DEV_TOOLS: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        buildId: { type: 'string', description: 'Build ID' },
+        ...buildIdentifierInputProperties,
       },
-      required: ['buildId'],
     },
     handler: async (args: unknown) => {
-      const schema = z.object({ buildId: z.string().min(1) });
+      const schema = buildIdentifierSchema;
       return runTool(
         'get_build',
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const { locator, friendlyId } = resolveBuildLocator(typed);
 
           // Step 1: Try builds endpoint
           try {
-            const build = (await adapter.getBuild(typed.buildId)) as {
+            const build = (await adapter.getBuild(locator)) as {
               status?: string;
               statusText?: string;
             };
@@ -831,21 +903,25 @@ const DEV_TOOLS: ToolDefinition[] = [
             // Build not in builds endpoint - might be queued
           }
 
-          // Step 2: Try build queue
-          try {
-            const qb = await adapter.modules.buildQueue.getQueuedBuild(`id:${typed.buildId}`);
-            return json({ ...qb.data, state: 'queued' });
-          } catch (queueError) {
-            if (!isAxios404(queueError)) throw queueError;
-            // Build not in queue either - race condition
+          // Step 2: Try build queue (only when using buildId - queue requires numeric ID)
+          if (typed.buildId) {
+            try {
+              const qb = await adapter.modules.buildQueue.getQueuedBuild(`id:${typed.buildId}`);
+              return json({ ...qb.data, state: 'queued' });
+            } catch (queueError) {
+              if (!isAxios404(queueError)) throw queueError;
+              // Build not in queue either - race condition
+            }
+
+            // Step 3: Retry builds endpoint (build may have left queue between checks)
+            const build = (await adapter.getBuild(locator)) as {
+              status?: string;
+              statusText?: string;
+            };
+            return json(build);
           }
 
-          // Step 3: Retry builds endpoint (build may have left queue between checks)
-          const build = (await adapter.getBuild(typed.buildId)) as {
-            status?: string;
-            statusText?: string;
-          };
-          return json(build);
+          throw new TeamCityNotFoundError(`Build not found for ${friendlyId}`);
         },
         args
       );
@@ -1617,7 +1693,7 @@ const DEV_TOOLS: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        buildId: { type: 'string', description: 'Build ID' },
+        ...buildIdentifierInputProperties,
         pageSize: { type: 'number', description: 'Items per page (default 100)' },
         maxPages: { type: 'number', description: 'Max pages to fetch (when all=true)' },
         all: { type: 'boolean', description: 'Fetch all pages up to maxPages' },
@@ -1626,24 +1702,25 @@ const DEV_TOOLS: ToolDefinition[] = [
           description: 'Optional fields selector for server-side projection',
         },
       },
-      required: ['buildId'],
     },
     handler: async (args: unknown) => {
-      const schema = z.object({
-        buildId: z.string().min(1),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
-        all: z.boolean().optional(),
-        fields: z.string().min(1).optional(),
-      });
+      const schema = buildIdentifierSchema.and(
+        z.object({
+          pageSize: z.number().int().min(1).max(1000).optional(),
+          maxPages: z.number().int().min(1).max(1000).optional(),
+          all: z.boolean().optional(),
+          fields: z.string().min(1).optional(),
+        })
+      );
       return runTool(
         'list_test_failures',
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const { locator: buildLocator } = resolveBuildLocator(typed);
           const pageSize = typed.pageSize ?? 100;
           const baseFetch = async ({ count, start }: { count?: number; start?: number }) => {
-            const parts: string[] = [`build:(id:${typed.buildId})`, 'status:FAILURE'];
+            const parts: string[] = [`build:(${buildLocator})`, 'status:FAILURE'];
             if (typeof count === 'number') parts.push(`count:${count}`);
             if (typeof start === 'number') parts.push(`start:${start}`);
             const locator = parts.join(',');
@@ -2648,7 +2725,7 @@ const DEV_TOOLS: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        buildId: { type: 'string', description: 'Build ID' },
+        ...buildIdentifierInputProperties,
         artifactPath: { type: 'string', description: 'Artifact path or name' },
         encoding: {
           type: 'string',
@@ -2666,16 +2743,17 @@ const DEV_TOOLS: ToolDefinition[] = [
             'Optional absolute path to write streamed content; defaults to a temp file when streaming',
         },
       },
-      required: ['buildId', 'artifactPath'],
+      required: ['artifactPath'],
     },
     handler: async (args: unknown) => {
-      const schema = z.object({
-        buildId: z.string().min(1),
-        artifactPath: z.string().min(1),
-        encoding: z.enum(['base64', 'text', 'stream']).default('base64'),
-        maxSize: z.number().int().positive().optional(),
-        outputPath: z.string().min(1).optional(),
-      });
+      const schema = buildIdentifierSchema.and(
+        z.object({
+          artifactPath: z.string().min(1),
+          encoding: z.enum(['base64', 'text', 'stream']).default('base64'),
+          maxSize: z.number().int().positive().optional(),
+          outputPath: z.string().min(1).optional(),
+        })
+      );
 
       return runTool(
         'download_build_artifact',
@@ -2683,8 +2761,9 @@ const DEV_TOOLS: ToolDefinition[] = [
         async (typed) => {
           const encoding = typed.encoding ?? 'base64';
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const { locator: buildLocator } = resolveBuildLocator(typed);
           debug('tools.download_build_artifact.start', {
-            buildId: typed.buildId,
+            buildLocator,
             encoding,
             artifactPath: typed.artifactPath,
             maxSize: typed.maxSize,
@@ -2692,7 +2771,7 @@ const DEV_TOOLS: ToolDefinition[] = [
           });
 
           const manager = new ArtifactManager(adapter);
-          const artifact = await manager.downloadArtifact(typed.buildId, typed.artifactPath, {
+          const artifact = await manager.downloadArtifact(buildLocator, typed.artifactPath, {
             encoding,
             maxSize: typed.maxSize,
           });
@@ -2713,7 +2792,7 @@ const DEV_TOOLS: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        buildId: { type: 'string', description: 'Build ID' },
+        ...buildIdentifierInputProperties,
         artifactPaths: {
           type: 'array',
           description: 'Artifact paths or names to download',
@@ -2748,7 +2827,7 @@ const DEV_TOOLS: ToolDefinition[] = [
             'Optional absolute directory to write streamed artifacts; defaults to temp files when streaming',
         },
       },
-      required: ['buildId', 'artifactPaths'],
+      required: ['artifactPaths'],
     },
     handler: async (args: unknown) => {
       const artifactInputSchema = z.union([
@@ -2760,29 +2839,30 @@ const DEV_TOOLS: ToolDefinition[] = [
         }),
       ]);
 
-      const schema = z
-        .object({
-          buildId: z.string().min(1),
-          artifactPaths: z.array(artifactInputSchema).min(1),
-          encoding: z.enum(['base64', 'text', 'stream']).default('base64'),
-          maxSize: z.number().int().positive().optional(),
-          outputDir: z
-            .string()
-            .min(1)
-            .optional()
-            .refine((value) => value == null || isAbsolute(value), {
-              message: 'outputDir must be an absolute path',
-            }),
-        })
-        .superRefine((value, ctx) => {
-          if (value.encoding !== 'stream' && value.outputDir) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: 'outputDir can only be provided when encoding is set to "stream"',
-              path: ['outputDir'],
-            });
-          }
-        });
+      const schema = buildIdentifierSchema.and(
+        z
+          .object({
+            artifactPaths: z.array(artifactInputSchema).min(1),
+            encoding: z.enum(['base64', 'text', 'stream']).default('base64'),
+            maxSize: z.number().int().positive().optional(),
+            outputDir: z
+              .string()
+              .min(1)
+              .optional()
+              .refine((value) => value == null || isAbsolute(value), {
+                message: 'outputDir must be an absolute path',
+              }),
+          })
+          .superRefine((value, ctx) => {
+            if (value.encoding !== 'stream' && value.outputDir) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'outputDir can only be provided when encoding is set to "stream"',
+                path: ['outputDir'],
+              });
+            }
+          })
+      );
 
       return runTool(
         'download_build_artifacts',
@@ -2790,6 +2870,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         async (typed) => {
           const encoding = typed.encoding ?? 'base64';
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const { locator: buildLocator } = resolveBuildLocator(typed);
           const manager = new ArtifactManager(adapter);
 
           type ArtifactBatchResult =
@@ -2800,7 +2881,7 @@ const DEV_TOOLS: ToolDefinition[] = [
                 error: string;
               });
 
-          const requests = toNormalizedArtifactRequests(typed.artifactPaths, typed.buildId);
+          const requests = toNormalizedArtifactRequests(typed.artifactPaths, buildLocator);
           const results: ArtifactBatchResult[] = [];
 
           for (const request of requests) {
@@ -2903,22 +2984,23 @@ const DEV_TOOLS: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        buildId: { type: 'string', description: 'Build ID' },
+        ...buildIdentifierInputProperties,
         testNameId: { type: 'string', description: 'Test name ID (optional)' },
       },
-      required: ['buildId'],
     },
     handler: async (args: unknown) => {
-      const schema = z.object({
-        buildId: z.string().min(1),
-        testNameId: z.string().min(1).optional(),
-      });
+      const schema = buildIdentifierSchema.and(
+        z.object({
+          testNameId: z.string().min(1).optional(),
+        })
+      );
       return runTool(
         'get_test_details',
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-          let locator = `build:(id:${typed.buildId})`;
+          const { locator: buildLocator } = resolveBuildLocator(typed);
+          let locator = `build:(${buildLocator})`;
           if (typed.testNameId) locator += `,test:(id:${typed.testNameId})`;
           const response = await adapter.modules.tests.getAllTestOccurrences(locator);
           return json(response.data);
@@ -2934,23 +3016,23 @@ const DEV_TOOLS: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        buildId: { type: 'string', description: 'Build ID to analyze' },
+        ...buildIdentifierInputProperties,
       },
-      required: ['buildId'],
     },
     handler: async (args: unknown) => {
-      const schema = z.object({ buildId: z.string().min(1) });
+      const schema = buildIdentifierSchema;
       return runTool(
         'analyze_build_problems',
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-          const build = (await adapter.getBuild(typed.buildId)) as {
+          const { locator: buildLocator } = resolveBuildLocator(typed);
+          const build = (await adapter.getBuild(buildLocator)) as {
             status?: string;
             statusText?: string;
           };
-          const problems = await adapter.modules.builds.getBuildProblems(`id:${typed.buildId}`);
-          const failures = await adapter.listTestFailures(typed.buildId);
+          const problems = await adapter.modules.builds.getBuildProblems(buildLocator);
+          const failures = await adapter.listTestFailures(buildLocator);
           return json({
             buildStatus: build.status,
             statusText: build.statusText,

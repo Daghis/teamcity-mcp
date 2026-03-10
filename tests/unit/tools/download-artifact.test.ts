@@ -94,7 +94,7 @@ describe('tools: download_build_artifact', () => {
     const payload = JSON.parse(response.content?.[0]?.text ?? '{}');
     expect(payload.encoding).toBe('base64');
     expect(payload.content).toBe(Buffer.from('hello world!').toString('base64'));
-    expect(downloadArtifact).toHaveBeenCalledWith('123', 'artifact.bin', {
+    expect(downloadArtifact).toHaveBeenCalledWith('id:123', 'artifact.bin', {
       encoding: 'base64',
       maxSize: undefined,
     });
@@ -144,7 +144,7 @@ describe('tools: download_build_artifact', () => {
     const payload = JSON.parse(response.content?.[0]?.text ?? '{}');
     expect(payload.encoding).toBe('stream');
     expect(payload.outputPath).toBe(targetPath);
-    expect(downloadArtifact).toHaveBeenCalledWith('456', 'logs/build.log', {
+    expect(downloadArtifact).toHaveBeenCalledWith('id:456', 'logs/build.log', {
       encoding: 'stream',
       maxSize: undefined,
     });
