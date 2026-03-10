@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.3.0...teamcity-mcp-v2.3.1) (2026-03-10)
+
+
+### Bug Fixes
+
+* use toBuildLocator() for all build URL templates in api-client ([#416](https://github.com/Daghis/teamcity-mcp/issues/416)) ([2a10312](https://github.com/Daghis/teamcity-mcp/commit/2a10312e1469ed9d7c9b9e47caaddaac693df400))
+
 ## [2.3.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.2.3...teamcity-mcp-v2.3.0) (2026-03-10)
 
 
