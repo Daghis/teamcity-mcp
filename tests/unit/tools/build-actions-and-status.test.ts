@@ -16,8 +16,8 @@ describe('tools: build actions and status/basic info', () => {
           jest.doMock('@/api-client', () => ({
             TeamCityAPI: {
               getInstance: () => ({
-                getBuild: async (id: string) => ({
-                  id,
+                getBuild: async (_id: string) => ({
+                  id: 'b1',
                   number: '42',
                   status: 'SUCCESS',
                   state: 'finished',
