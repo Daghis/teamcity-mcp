@@ -333,12 +333,15 @@ export class TeamCityAPI {
       return response.data as string;
     } catch (primaryError) {
       // Fallback to REST endpoint (plain text)
-      const response = await this.axiosInstance.get(`/app/rest/builds/id:${buildId}/log`, {
-        params: { plain: true },
-        headers: { Accept: 'text/plain' },
-        responseType: 'text',
-        transformResponse: [(data) => data],
-      });
+      const response = await this.axiosInstance.get(
+        `/app/rest/builds/${toBuildLocator(buildId)}/log`,
+        {
+          params: { plain: true },
+          headers: { Accept: 'text/plain' },
+          responseType: 'text',
+          transformResponse: [(data) => data],
+        }
+      );
       return response.data as string;
     }
   }
@@ -361,16 +364,19 @@ export class TeamCityAPI {
 
     // Try REST endpoint with start/count support (if available)
     try {
-      const response = await this.axiosInstance.get(`/app/rest/builds/id:${buildId}/log`, {
-        params: {
-          plain: true,
-          start: startLine,
-          count: lineCount,
-        },
-        headers: { Accept: 'text/plain' },
-        responseType: 'text',
-        transformResponse: [(data) => data],
-      });
+      const response = await this.axiosInstance.get(
+        `/app/rest/builds/${toBuildLocator(buildId)}/log`,
+        {
+          params: {
+            plain: true,
+            start: startLine,
+            count: lineCount,
+          },
+          headers: { Accept: 'text/plain' },
+          responseType: 'text',
+          transformResponse: [(data) => data],
+        }
+      );
       const text = (response.data as string) ?? '';
       // Normalize newlines and split into lines consistently
       const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
@@ -411,7 +417,9 @@ export class TeamCityAPI {
   }
 
   async listTestFailures(buildId: string) {
-    const response = await this.tests.getAllTestOccurrences(`build:(id:${buildId}),status:FAILURE`);
+    const response = await this.tests.getAllTestOccurrences(
+      `build:(${toBuildLocator(buildId)}),status:FAILURE`
+    );
     return response.data;
   }
 
@@ -451,7 +459,7 @@ export class TeamCityAPI {
     } as RawAxiosRequestConfig<T>;
 
     return this.axiosInstance.get<T>(
-      `/app/rest/builds/id:${buildId}/artifacts/content/${normalizedPath}`,
+      `/app/rest/builds/${toBuildLocator(buildId)}/artifacts/content/${normalizedPath}`,
       requestOptions
     );
   }
@@ -480,7 +488,10 @@ export class TeamCityAPI {
       transformResponse: options?.transformResponse ?? [(data) => data],
     };
 
-    return this.axiosInstance.get<T>(`/app/rest/builds/id:${buildId}/log`, requestOptions);
+    return this.axiosInstance.get<T>(
+      `/app/rest/builds/${toBuildLocator(buildId)}/log`,
+      requestOptions
+    );
   }
 
   async getBuildStatistics(buildId: string, fields?: string): Promise<AxiosResponse<unknown>> {
@@ -488,7 +499,7 @@ export class TeamCityAPI {
   }
 
   async listChangesForBuild(buildId: string, fields?: string): Promise<AxiosResponse<unknown>> {
-    return this.changes.getAllChanges(`build:(id:${buildId})`, fields);
+    return this.changes.getAllChanges(`build:(${toBuildLocator(buildId)})`, fields);
   }
 
   async listSnapshotDependencies(buildId: string): Promise<AxiosResponse<unknown>> {
