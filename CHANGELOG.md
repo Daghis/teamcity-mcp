@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.3.1...teamcity-mcp-v2.3.2) (2026-03-10)
+
+
+### Bug Fixes
+
+* write snapshot dependency options as properties, not XML options ([#406](https://github.com/Daghis/teamcity-mcp/issues/406)) ([#419](https://github.com/Daghis/teamcity-mcp/issues/419)) ([e13fa2d](https://github.com/Daghis/teamcity-mcp/commit/e13fa2dd1be5c387efd9b4fc0e38cb5e15634be4))
+
 ## [2.3.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.3.0...teamcity-mcp-v2.3.1) (2026-03-10)
 
 
