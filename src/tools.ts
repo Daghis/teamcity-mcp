@@ -545,6 +545,20 @@ interface DeleteOutputParameterArgs {
   buildTypeId: string;
   name: string;
 }
+// SSH key interfaces
+interface ListProjectSshKeysArgs {
+  projectId: string;
+}
+interface UploadProjectSshKeyArgs {
+  projectId: string;
+  keyName: string;
+  privateKeyContent?: string;
+  privateKeyPath?: string;
+}
+interface DeleteProjectSshKeyArgs {
+  projectId: string;
+  keyName: string;
+}
 interface CreateVCSRootArgs {
   projectId: string;
   name: string;
@@ -6031,6 +6045,114 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         },
         args
       );
+    },
+    mode: 'full',
+  },
+
+  // === SSH Key Management ===
+  {
+    name: 'list_project_ssh_keys',
+    description: 'List SSH keys configured for a project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+      },
+      required: ['projectId'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as ListProjectSshKeysArgs;
+      const api = TeamCityAPI.getInstance();
+      const response = await api.http.get(
+        `/app/rest/projects/${encodeURIComponent(typedArgs.projectId)}/sshKeys`,
+        { headers: { Accept: 'application/json' } }
+      );
+      return json({
+        success: true,
+        action: 'list_project_ssh_keys',
+        projectId: typedArgs.projectId,
+        sshKeys: response.data,
+      });
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'upload_project_ssh_key',
+    description:
+      'Upload an SSH key to a project. Provide either privateKeyContent (raw PEM string) or privateKeyPath (path to key file), but not both.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+        keyName: { type: 'string', description: 'Name for the SSH key' },
+        privateKeyContent: {
+          type: 'string',
+          description: 'Raw private key content (PEM format)',
+        },
+        privateKeyPath: {
+          type: 'string',
+          description: 'Path to the private key file',
+        },
+      },
+      required: ['projectId', 'keyName'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as UploadProjectSshKeyArgs;
+
+      if (!typedArgs.privateKeyContent && !typedArgs.privateKeyPath) {
+        throw new Error('Either privateKeyContent or privateKeyPath must be provided');
+      }
+      if (typedArgs.privateKeyContent && typedArgs.privateKeyPath) {
+        throw new Error('Provide only one of privateKeyContent or privateKeyPath, not both');
+      }
+
+      const keyContent = typedArgs.privateKeyPath
+        ? await fs.readFile(typedArgs.privateKeyPath, 'utf-8')
+        : (typedArgs.privateKeyContent as string);
+
+      const formData = new FormData();
+      formData.append('privateKey', new Blob([keyContent]), 'key');
+
+      const api = TeamCityAPI.getInstance();
+      await api.http.post(
+        `/app/rest/projects/${encodeURIComponent(typedArgs.projectId)}/sshKeys?${new URLSearchParams({ name: typedArgs.keyName })}`,
+        formData
+      );
+
+      return json({
+        success: true,
+        action: 'upload_project_ssh_key',
+        projectId: typedArgs.projectId,
+        keyName: typedArgs.keyName,
+      });
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'delete_project_ssh_key',
+    description: 'Delete an SSH key from a project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+        keyName: { type: 'string', description: 'Name of the SSH key to delete' },
+      },
+      required: ['projectId', 'keyName'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as DeleteProjectSshKeyArgs;
+      const api = TeamCityAPI.getInstance();
+      await api.http.delete(
+        `/app/rest/projects/${encodeURIComponent(typedArgs.projectId)}/sshKeys?${new URLSearchParams({ name: typedArgs.keyName })}`
+      );
+      return json({
+        success: true,
+        action: 'delete_project_ssh_key',
+        projectId: typedArgs.projectId,
+        keyName: typedArgs.keyName,
+      });
     },
     mode: 'full',
   },
