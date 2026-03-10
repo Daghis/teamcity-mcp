@@ -167,7 +167,7 @@ describe('BuildDependencyManager', () => {
         );
       });
 
-      it('should separate options from properties for snapshot dependencies', async () => {
+      it('should write all snapshot settings as properties (not options)', async () => {
         buildTypesApi.addSnapshotDependencyToBuildType.mockResolvedValue(
           createMockAxiosResponse({ id: 'snapshot-dep-2' })
         );
@@ -183,13 +183,13 @@ describe('BuildDependencyManager', () => {
         });
 
         const xmlBody = buildTypesApi.addSnapshotDependencyToBuildType.mock.calls[0]?.[2] as string;
-        expect(xmlBody).toContain('<options>');
-        expect(xmlBody).toContain('name="run-build-on-the-same-agent" value="true"');
+        expect(xmlBody).not.toContain('<options>');
         expect(xmlBody).toContain('<properties>');
+        expect(xmlBody).toContain('name="run-build-on-the-same-agent" value="true"');
         expect(xmlBody).toContain('name="custom-property" value="value"');
       });
 
-      it('should handle all known snapshot dependency option keys', async () => {
+      it('should write all snapshot option keys as properties', async () => {
         buildTypesApi.addSnapshotDependencyToBuildType.mockResolvedValue(
           createMockAxiosResponse({ id: 'snapshot-dep-3' })
         );
@@ -208,12 +208,35 @@ describe('BuildDependencyManager', () => {
         });
 
         const xmlBody = buildTypesApi.addSnapshotDependencyToBuildType.mock.calls[0]?.[2] as string;
-        expect(xmlBody).toContain('<options>');
+        expect(xmlBody).not.toContain('<options>');
+        expect(xmlBody).toContain('<properties>');
         expect(xmlBody).toContain('run-build-on-the-same-agent');
         expect(xmlBody).toContain('sync-revisions');
         expect(xmlBody).toContain('take-successful-builds-only');
         expect(xmlBody).toContain('take-started-build-with-same-revisions');
         expect(xmlBody).toContain('do-not-run-new-build-if-there-is-a-suitable-one');
+      });
+
+      it('should write options input as properties', async () => {
+        buildTypesApi.addSnapshotDependencyToBuildType.mockResolvedValue(
+          createMockAxiosResponse({ id: 'snapshot-dep-4' })
+        );
+
+        await manager.addDependency({
+          buildTypeId: 'Config_B',
+          dependencyType: 'snapshot',
+          dependsOn: 'Base_Config',
+          options: {
+            'take-successful-builds-only': 'true',
+            'sync-revisions': 'true',
+          },
+        });
+
+        const xmlBody = buildTypesApi.addSnapshotDependencyToBuildType.mock.calls[0]?.[2] as string;
+        expect(xmlBody).not.toContain('<options>');
+        expect(xmlBody).toContain('<properties>');
+        expect(xmlBody).toContain('name="take-successful-builds-only" value="true"');
+        expect(xmlBody).toContain('name="sync-revisions" value="true"');
       });
     });
 
@@ -348,7 +371,7 @@ describe('BuildDependencyManager', () => {
     });
 
     describe('snapshot dependencies', () => {
-      it('should update an existing snapshot dependency', async () => {
+      it('should update an existing snapshot dependency with options merged into properties', async () => {
         buildTypesApi.getSnapshotDependency.mockResolvedValue(
           createMockAxiosResponse({
             id: 'snapshot-dep-1',
@@ -376,16 +399,17 @@ describe('BuildDependencyManager', () => {
         });
 
         expect(result.id).toBe('snapshot-dep-1');
-        expect(buildTypesApi.replaceSnapshotDependency).toHaveBeenCalledWith(
-          'Config_B',
-          'snapshot-dep-1',
-          undefined,
-          expect.stringContaining('<snapshot-dependency'),
-          expect.any(Object)
-        );
+        const xmlBody = buildTypesApi.replaceSnapshotDependency.mock.calls[0]?.[3] as string;
+        expect(xmlBody).toContain('<snapshot-dependency');
+        expect(xmlBody).not.toContain('<options>');
+        expect(xmlBody).toContain('<properties>');
+        // Existing property preserved
+        expect(xmlBody).toContain('name="run-build-if-dependency-failed" value="false"');
+        // Existing option from GET merged into properties and overridden
+        expect(xmlBody).toContain('name="run-build-on-the-same-agent" value="true"');
       });
 
-      it('should merge options with existing values', async () => {
+      it('should merge existing GET options into properties on update', async () => {
         buildTypesApi.getSnapshotDependency.mockResolvedValue(
           createMockAxiosResponse({
             id: 'snapshot-dep-1',
@@ -413,8 +437,10 @@ describe('BuildDependencyManager', () => {
         });
 
         const xmlBody = buildTypesApi.replaceSnapshotDependency.mock.calls[0]?.[3] as string;
-        expect(xmlBody).toContain('run-build-on-the-same-agent');
-        expect(xmlBody).toContain('sync-revisions');
+        expect(xmlBody).not.toContain('<options>');
+        expect(xmlBody).toContain('<properties>');
+        expect(xmlBody).toContain('name="run-build-on-the-same-agent" value="true"');
+        expect(xmlBody).toContain('name="sync-revisions" value="true"');
       });
     });
 
@@ -696,7 +722,7 @@ describe('BuildDependencyManager', () => {
     });
   });
 
-  describe('edge cases for option parsing', () => {
+  describe('edge cases for option parsing (GET options merged into properties)', () => {
     it('should handle single option object instead of array', async () => {
       buildTypesApi.getSnapshotDependency.mockResolvedValue(
         createMockAxiosResponse({
@@ -719,6 +745,8 @@ describe('BuildDependencyManager', () => {
       });
 
       const xmlBody = buildTypesApi.replaceSnapshotDependency.mock.calls[0]?.[3] as string;
+      expect(xmlBody).toContain('<properties>');
+      expect(xmlBody).not.toContain('<options>');
       expect(xmlBody).toContain('name="singleOption" value="singleValue"');
     });
 
@@ -743,7 +771,9 @@ describe('BuildDependencyManager', () => {
       });
 
       const xmlBody = buildTypesApi.replaceSnapshotDependency.mock.calls[0]?.[3] as string;
-      expect(xmlBody).toContain('run-build-on-the-same-agent');
+      expect(xmlBody).toContain('<properties>');
+      expect(xmlBody).not.toContain('<options>');
+      expect(xmlBody).toContain('name="run-build-on-the-same-agent" value="true"');
     });
 
     it('should handle options with missing name', async () => {
@@ -768,6 +798,7 @@ describe('BuildDependencyManager', () => {
       });
 
       const xmlBody = buildTypesApi.replaceSnapshotDependency.mock.calls[0]?.[3] as string;
+      expect(xmlBody).toContain('<properties>');
       expect(xmlBody).toContain('validOption');
       expect(xmlBody).not.toContain('orphanValue');
     });
@@ -794,6 +825,7 @@ describe('BuildDependencyManager', () => {
       });
 
       const xmlBody = buildTypesApi.replaceSnapshotDependency.mock.calls[0]?.[3] as string;
+      expect(xmlBody).toContain('<properties>');
       expect(xmlBody).toContain('name="optionWithNoValue" value=""');
     });
   });
@@ -1075,7 +1107,7 @@ describe('BuildDependencyManager', () => {
   });
 
   describe('artifact dependency options handling', () => {
-    it('should include explicit options for artifact dependencies when provided', async () => {
+    it('should write explicit options as properties for artifact dependencies', async () => {
       buildTypesApi.addArtifactDependencyToBuildType.mockResolvedValue(
         createMockAxiosResponse({ id: 'dep-1' })
       );
@@ -1089,12 +1121,10 @@ describe('BuildDependencyManager', () => {
         },
       });
 
-      // For artifact dependencies, options should NOT be included in XML
-      // They should be treated as properties instead
       const xmlBody = buildTypesApi.addArtifactDependencyToBuildType.mock.calls[0]?.[2] as string;
-      // Artifact dependencies don't support options in the same way as snapshot dependencies
-      // The options get converted to properties for artifact dependencies
       expect(xmlBody).not.toContain('<options>');
+      expect(xmlBody).toContain('<properties>');
+      expect(xmlBody).toContain('name="custom-option" value="value"');
     });
   });
 

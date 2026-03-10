@@ -60,14 +60,6 @@ const defaultTypeFor = (dependencyType: DependencyType): string | undefined => {
   }
 };
 
-const SNAPSHOT_DEPENDENCY_OPTION_KEYS = new Set([
-  'run-build-on-the-same-agent',
-  'sync-revisions',
-  'take-successful-builds-only',
-  'take-started-build-with-same-revisions',
-  'do-not-run-new-build-if-there-is-a-suitable-one',
-]);
-
 const toStringRecord = (input?: Record<string, unknown>): StringMap => {
   if (!input) {
     return {};
@@ -134,16 +126,6 @@ const optionsToRecord = (options?: SnapshotDependencyOptions): StringMap => {
   return map;
 };
 
-const recordToOptions = (record: StringMap): SnapshotDependencyOptions | undefined => {
-  const entries = Object.entries(record);
-  if (entries.length === 0) {
-    return undefined;
-  }
-  return {
-    option: entries.map(([name, value]) => ({ name, value })),
-  };
-};
-
 const mergeRecords = (base: StringMap, override: StringMap): StringMap => {
   const merged: StringMap = { ...base };
   for (const [key, value] of Object.entries(override)) {
@@ -191,32 +173,6 @@ const propertiesToXml = (properties?: Properties | undefined): string | undefine
   }
 
   return `<properties>${nodes.join('')}</properties>`;
-};
-
-const optionsToXml = (options?: SnapshotDependencyOptions | undefined): string | undefined => {
-  if (!options) {
-    return undefined;
-  }
-  const entries = options.option;
-  const list = Array.isArray(entries) ? entries : entries != null ? [entries] : [];
-
-  if (list.length === 0) {
-    return undefined;
-  }
-
-  const nodes = list
-    .filter((item) => item?.name)
-    .map((item) => {
-      const name = item?.name ?? '';
-      const value = item?.value != null ? String(item.value) : '';
-      return `<option name="${escapeXml(name)}" value="${escapeXml(value)}"/>`;
-    });
-
-  if (nodes.length === 0) {
-    return undefined;
-  }
-
-  return `<options>${nodes.join('')}</options>`;
 };
 
 const sourceBuildTypeToXml = (
@@ -280,11 +236,6 @@ const dependencyToXml = (
   const propertiesXml = propertiesToXml(payload.properties);
   if (propertiesXml) {
     fragments.push(propertiesXml);
-  }
-
-  const optionsXml = optionsToXml((payload as SnapshotDependencyWithOptions).options);
-  if (optionsXml) {
-    fragments.push(optionsXml);
   }
 
   return `<${root}${attributesToString(attributes)}>${fragments.join('')}</${root}>`;
@@ -463,53 +414,27 @@ export class BuildDependencyManager {
     existing: DependencyResource | undefined,
     input: ManageDependencyInput
   ): ArtifactDependency | SnapshotDependency {
-    const existingSnapshot = existing as SnapshotDependencyWithOptions | undefined;
+    // TeamCity's REST API expects all snapshot dependency settings in <properties>,
+    // even though GET responses return some of them in an undocumented <options> block.
+    // We merge existing options into properties so they survive the round-trip.
     const baseProperties = propertiesToRecord(existing?.properties as Properties | undefined);
-    const inputPropertyRecord = toStringRecord(input.properties);
-    const inputExplicitOptions = toStringRecord(input.options);
-
-    let optionOverrides: StringMap = {};
-    let propertyOverrides: StringMap = inputPropertyRecord;
-
-    let baseOptions: StringMap = {};
     if (dependencyType === 'snapshot') {
-      baseOptions = optionsToRecord(existingSnapshot?.options);
-      const knownOptionKeys = new Set<string>([
-        ...Object.keys(baseOptions),
-        ...Object.keys(inputExplicitOptions),
-      ]);
-      for (const key of SNAPSHOT_DEPENDENCY_OPTION_KEYS) {
-        knownOptionKeys.add(key);
-      }
-
-      const derivedOptionOverrides: StringMap = { ...inputExplicitOptions };
-      const derivedPropertyOverrides: StringMap = {};
-
-      for (const [key, value] of Object.entries(inputPropertyRecord)) {
-        if (knownOptionKeys.has(key)) {
-          derivedOptionOverrides[key] = value;
-        } else {
-          derivedPropertyOverrides[key] = value;
-        }
-      }
-
-      optionOverrides = derivedOptionOverrides;
-      propertyOverrides = derivedPropertyOverrides;
-    } else if (Object.keys(inputExplicitOptions).length > 0) {
-      optionOverrides = inputExplicitOptions;
+      const existingOptions = optionsToRecord(
+        (existing as SnapshotDependencyWithOptions | undefined)?.options
+      );
+      Object.assign(baseProperties, existingOptions);
     }
 
-    const mergedProps = mergeRecords(baseProperties, propertyOverrides);
+    const inputOverrides = mergeRecords(
+      toStringRecord(input.properties),
+      toStringRecord(input.options)
+    );
+    const mergedProps = mergeRecords(baseProperties, inputOverrides);
     const properties = recordToProperties(mergedProps);
-
-    let mergedOptions: StringMap = {};
-    if (dependencyType === 'snapshot') {
-      mergedOptions = mergeRecords(baseOptions, optionOverrides);
-    }
 
     const resolvedType = input.type ?? existing?.type ?? defaultTypeFor(dependencyType);
 
-    const payload: ArtifactDependency | SnapshotDependencyWithOptions = {
+    const payload: ArtifactDependency | SnapshotDependency = {
       ...(existing ?? {}),
       disabled: input.disabled ?? existing?.disabled,
     };
@@ -521,15 +446,6 @@ export class BuildDependencyManager {
       payload.properties = properties;
     } else {
       delete payload.properties;
-    }
-
-    if (dependencyType === 'snapshot') {
-      const options = recordToOptions(mergedOptions);
-      if (options) {
-        (payload as SnapshotDependencyWithOptions).options = options;
-      } else {
-        delete (payload as SnapshotDependencyWithOptions).options;
-      }
     }
 
     const dependsOn = input.dependsOn ?? existing?.['source-buildType']?.id;

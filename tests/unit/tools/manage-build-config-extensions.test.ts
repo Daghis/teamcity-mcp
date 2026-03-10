@@ -241,12 +241,11 @@ describe('build configuration extended management tools', () => {
             '<source-buildType id="New_Base_Config"/>'
           );
           const updateSnapshotXml = replaceSnapshotDependency.mock.calls[0]?.[3] as string;
-          expect(updateSnapshotXml).toContain(
-            '<properties><property name="run-build-if-dependency-failed" value="true"/></properties>'
-          );
-          expect(updateSnapshotXml).toContain(
-            '<options><option name="run-build-on-the-same-agent" value="true"/></options>'
-          );
+          // Both existing properties and GET options are merged into <properties>
+          expect(updateSnapshotXml).toContain('name="run-build-if-dependency-failed" value="true"');
+          expect(updateSnapshotXml).toContain('name="run-build-on-the-same-agent" value="true"');
+          expect(updateSnapshotXml).toContain('<properties>');
+          expect(updateSnapshotXml).not.toContain('<options>');
 
           res = await getRequiredTool('manage_build_dependencies').handler({
             buildTypeId: 'Config_A',
