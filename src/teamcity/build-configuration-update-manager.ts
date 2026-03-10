@@ -214,7 +214,7 @@ export class BuildConfigurationUpdateManager {
         'response' in err &&
         (err as { response?: { status?: number } }).response?.status === 403
       ) {
-        throw new Error('Permission denied: No access to build configuration');
+        throw new Error('Permission denied: No access to build configuration', { cause: err });
       }
       throw err;
     }
@@ -483,18 +483,18 @@ export class BuildConfigurationUpdateManager {
       const error = err as { response?: { status?: number; data?: { message?: string } } };
 
       if (error.response?.status === 409) {
-        throw new Error('Configuration was modified by another user');
+        throw new Error('Configuration was modified by another user', { cause: err });
       }
       if (error.response?.status === 403) {
-        throw new Error('Permission denied: You need project edit permissions');
+        throw new Error('Permission denied: You need project edit permissions', { cause: err });
       }
       if (error.response?.status === 400) {
         const message = error.response?.data?.message ?? 'Invalid configuration';
-        throw new Error(`Invalid update: ${message}`);
+        throw new Error(`Invalid update: ${message}`, { cause: err });
       }
 
       logError('Failed to apply updates', error as Error);
-      throw new Error('Partial update failure');
+      throw new Error('Partial update failure', { cause: err });
     }
   }
 
@@ -645,7 +645,7 @@ export class BuildConfigurationUpdateManager {
       info('Rollback completed successfully', { configId });
     } catch (err) {
       logError('Failed to rollback changes', err as Error);
-      throw new Error('Rollback failed: Manual intervention may be required');
+      throw new Error('Rollback failed: Manual intervention may be required', { cause: err });
     }
   }
 

@@ -188,7 +188,7 @@ export class BranchDiscoveryManager {
     } catch (err) {
       const error = err as Error;
       logError('Failed to discover branches from history', error);
-      throw new Error(`Failed to discover branches from history: ${error.message}`);
+      throw new Error(`Failed to discover branches from history: ${error.message}`, { cause: err });
     }
   }
 

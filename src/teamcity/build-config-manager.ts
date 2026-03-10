@@ -398,8 +398,6 @@ export class BuildConfigManager {
         case 'id':
           comparison = a.id.localeCompare(b.id);
           break;
-        default:
-          comparison = 0;
       }
 
       return order === 'asc' ? comparison : -comparison;

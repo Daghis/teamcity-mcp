@@ -102,7 +102,7 @@ export function asyncHandler<TArgs extends unknown[], TReturn>(
       if (error instanceof Error) {
         throw error;
       }
-      throw new Error(`Async operation failed: ${String(error)}`);
+      throw new Error(`Async operation failed: ${String(error)}`, { cause: error });
     }
   };
 }

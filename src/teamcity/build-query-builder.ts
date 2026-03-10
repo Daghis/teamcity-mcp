@@ -312,7 +312,7 @@ export class BuildQueryBuilder {
 
       return `${year}${month}${day}T${hours}${minutes}${seconds}+0000`;
     } catch (error) {
-      throw new Error(`Invalid date format: ${dateStr}`);
+      throw new Error(`Invalid date format: ${dateStr}`, { cause: error });
     }
   }
 
