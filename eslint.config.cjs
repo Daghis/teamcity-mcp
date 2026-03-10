@@ -1,5 +1,4 @@
 const js = require('@eslint/js');
-const importPlugin = require('eslint-plugin-import');
 const tsPlugin = require('@typescript-eslint/eslint-plugin');
 const tsParser = require('@typescript-eslint/parser');
 const prettierConfig = require('eslint-config-prettier');
@@ -51,7 +50,6 @@ module.exports = [
     files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
     plugins: {
       '@typescript-eslint': tsPlugin,
-      import: importPlugin,
     },
     rules: {
       'no-console': 'error',
@@ -110,12 +108,6 @@ module.exports = [
           leadingUnderscore: 'allow',
         },
       ],
-      'import/order': 'off',
-      'import/no-duplicates': 'error',
-      'import/no-unused-modules': 'error',
-      'import/first': 'error',
-      'import/newline-after-import': 'error',
-      'import/no-default-export': 'off',
       'object-shorthand': 'error',
       'prefer-template': 'error',
       'no-useless-concat': 'error',
@@ -139,14 +131,6 @@ module.exports = [
             'Avoid `as unknown as` double assertions. Use type guards, Zod schemas, or add an eslint-disable comment explaining why this is necessary.',
         },
       ],
-    },
-    settings: {
-      'import/resolver': {
-        typescript: {
-          alwaysTryTypes: true,
-          project: ['./tsconfig.json', './tsconfig.build.json'],
-        },
-      },
     },
   },
   {
@@ -185,7 +169,6 @@ module.exports = [
     },
     rules: {
       '@typescript-eslint/no-require-imports': 'off',
-      'import/no-default-export': 'off',
     },
   },
   prettierConfig,
