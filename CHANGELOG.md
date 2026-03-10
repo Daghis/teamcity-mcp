@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.2.3...teamcity-mcp-v2.3.0) (2026-03-10)
+
+
+### Features
+
+* **tools:** accept buildNumber + buildTypeId across all build tools ([#410](https://github.com/Daghis/teamcity-mcp/issues/410)) ([9aa005d](https://github.com/Daghis/teamcity-mcp/commit/9aa005d01bf6db9e7ac53155680876dc36202da7))
+
 ## [2.2.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.2.2...teamcity-mcp-v2.2.3) (2026-03-09)
 
 
