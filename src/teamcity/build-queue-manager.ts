@@ -268,7 +268,7 @@ export class BuildQueueManager extends EventEmitter {
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to get queue position: ${message}`);
+      throw new Error(`Failed to get queue position: ${message}`, { cause: error });
     }
   }
 
@@ -295,7 +295,7 @@ export class BuildQueueManager extends EventEmitter {
       return await this.getQueuePosition(buildId);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to move build to top: ${message}`);
+      throw new Error(`Failed to move build to top: ${message}`, { cause: error });
     }
   }
 
@@ -322,7 +322,7 @@ export class BuildQueueManager extends EventEmitter {
       return await Promise.all(buildIds.map((id) => this.getQueuePosition(id)));
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to reorder queue: ${message}`);
+      throw new Error(`Failed to reorder queue: ${message}`, { cause: error });
     }
   }
 
@@ -385,7 +385,7 @@ export class BuildQueueManager extends EventEmitter {
       return status;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to get build status: ${message}`);
+      throw new Error(`Failed to get build status: ${message}`, { cause: error });
     }
   }
 
@@ -464,7 +464,7 @@ export class BuildQueueManager extends EventEmitter {
       this.emit('build:canceled', { buildId, comment });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to cancel build: ${message}`);
+      throw new Error(`Failed to cancel build: ${message}`, { cause: error });
     }
   }
 

@@ -98,7 +98,8 @@ export class SwaggerCache {
     } catch (err) {
       logError('Failed to cache spec', err instanceof Error ? err : new Error(String(err)));
       throw new Error(
-        `Failed to cache spec: ${err instanceof Error ? err.message : 'Unknown error'}`
+        `Failed to cache spec: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        { cause: err }
       );
     }
   }

@@ -132,13 +132,13 @@ export class ArtifactManager {
     } catch (error) {
       const err = error as { response?: { status?: number }; message?: string };
       if (err.response?.status === 401) {
-        throw new Error('Authentication failed: Invalid TeamCity token');
+        throw new Error('Authentication failed: Invalid TeamCity token', { cause: error });
       }
       if (err.response?.status === 404) {
-        throw new Error(`Build not found: ${buildId}`);
+        throw new Error(`Build not found: ${buildId}`, { cause: error });
       }
       const errMsg = err.message ?? String(error);
-      throw new Error(`Failed to fetch artifacts: ${errMsg}`);
+      throw new Error(`Failed to fetch artifacts: ${errMsg}`, { cause: error });
     }
   }
 
@@ -314,7 +314,7 @@ export class ArtifactManager {
       } else {
         errMsg = error instanceof Error ? error.message : 'Unknown error';
       }
-      throw new Error(`Failed to download artifact: ${errMsg}`);
+      throw new Error(`Failed to download artifact: ${errMsg}`, { cause: error });
     }
   }
 
