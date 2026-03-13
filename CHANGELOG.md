@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.4.0...teamcity-mcp-v2.4.1) (2026-03-13)
+
+
+### Bug Fixes
+
+* bump hono override to ^4.12.7 to resolve GHSA-v8w9-8mx6-g223 ([#423](https://github.com/Daghis/teamcity-mcp/issues/423)) ([d37b790](https://github.com/Daghis/teamcity-mcp/commit/d37b79098bb5fe8362f435d6ebd54638a82bc774))
+
 ## [2.4.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.3.2...teamcity-mcp-v2.4.0) (2026-03-10)
 
 
