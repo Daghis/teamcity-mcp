@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.4.1...teamcity-mcp-v2.4.2) (2026-03-17)
+
+
+### Bug Fixes
+
+* apply npm audit fix for transitive dependency vulnerabilities ([#426](https://github.com/Daghis/teamcity-mcp/issues/426)) ([74fc355](https://github.com/Daghis/teamcity-mcp/commit/74fc355b0501a3a23a9a667b0d75f72bdc656cdb))
+
 ## [2.4.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.4.0...teamcity-mcp-v2.4.1) (2026-03-13)
 
 
