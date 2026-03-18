@@ -25,6 +25,7 @@ const EXPECTED_DEV_TOOLS = new Set([
   'cancel_queued_build',
   'cancel_build',
   'get_build_status',
+  'wait_for_build',
   'fetch_build_log',
   'get_build_results',
   'download_build_artifact',

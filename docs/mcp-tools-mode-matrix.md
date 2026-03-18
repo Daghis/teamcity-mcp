@@ -16,6 +16,7 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Builds | `list_builds` | Yes | Yes |
 | Builds | `get_build` | Yes | Yes |
 | Builds | `get_build_status` | Yes | Yes |
+| Builds | `wait_for_build` | Yes | Yes |
 | Builds | `get_build_results` | Yes | Yes |
 | Builds | `fetch_build_log` | Yes | Yes |
 | Builds | `analyze_build_problems` | Yes | Yes |
