@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.4.2...teamcity-mcp-v2.4.3) (2026-03-18)
+
+
+### Bug Fixes
+
+* use individual property PUTs in update_vcs_root_properties to prevent wiping existing properties ([#431](https://github.com/Daghis/teamcity-mcp/issues/431)) ([85bac24](https://github.com/Daghis/teamcity-mcp/commit/85bac244cb55f458bc2d22844c993d7f0446ea57)), closes [#428](https://github.com/Daghis/teamcity-mcp/issues/428)
+* use z.coerce.number() to accept string-encoded numeric params ([#432](https://github.com/Daghis/teamcity-mcp/issues/432)) ([6de9aa4](https://github.com/Daghis/teamcity-mcp/commit/6de9aa4c9b11e9c78a261c57381fc44e5f3ffd7b)), closes [#429](https://github.com/Daghis/teamcity-mcp/issues/429)
+
 ## [2.4.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.4.1...teamcity-mcp-v2.4.2) (2026-03-17)
 
 
