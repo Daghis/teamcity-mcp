@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.4.3...teamcity-mcp-v2.5.0) (2026-03-18)
+
+
+### Features
+
+* add wait_for_build tool to poll until build completes ([#430](https://github.com/Daghis/teamcity-mcp/issues/430)) ([#433](https://github.com/Daghis/teamcity-mcp/issues/433)) ([a83e6cf](https://github.com/Daghis/teamcity-mcp/commit/a83e6cf99e4c523103bf894ee3d58c91734853f6))
+
 ## [2.4.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.4.2...teamcity-mcp-v2.4.3) (2026-03-18)
 
 
