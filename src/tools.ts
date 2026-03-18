@@ -31,6 +31,7 @@ import {
 } from '@/teamcity/client-adapter';
 import { TeamCityAPIError, TeamCityNotFoundError, isRetryableError } from '@/teamcity/errors';
 import { createPaginatedFetcher, fetchAllPages } from '@/teamcity/pagination';
+import { sleep } from '@/utils/async';
 import {
   buildBranchSegmentInput,
   hasBranchSegment,
@@ -1291,6 +1292,109 @@ const DEV_TOOLS: ToolDefinition[] = [
           }
 
           return json(result);
+        },
+        args
+      );
+    },
+  },
+
+  {
+    name: 'wait_for_build',
+    description:
+      'Wait for a build to complete by polling until it reaches a terminal state (finished, canceled, failed) or timeout',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildId: { type: 'string', description: 'Build ID to wait for' },
+        buildNumber: {
+          type: 'string',
+          description: 'Human build number (requires buildTypeId)',
+        },
+        buildTypeId: {
+          type: 'string',
+          description: 'Build configuration ID (required with buildNumber)',
+        },
+        timeout: {
+          type: 'number',
+          description: 'Max seconds to wait (default 600, max 3600)',
+        },
+        pollInterval: {
+          type: 'number',
+          description: 'Seconds between polls (default 15, min 5)',
+        },
+        includeTests: { type: 'boolean', description: 'Include test summary in result' },
+        includeProblems: { type: 'boolean', description: 'Include build problems in result' },
+      },
+    },
+    handler: async (args: unknown) => {
+      const schema = z
+        .object({
+          buildId: z.string().min(1).optional(),
+          buildNumber: z.string().min(1).optional(),
+          buildTypeId: z.string().min(1).optional(),
+          timeout: z.coerce.number().int().min(1).max(3600).default(600),
+          pollInterval: z.coerce.number().int().min(5).max(300).default(15),
+          includeTests: z.boolean().optional(),
+          includeProblems: z.boolean().optional(),
+        })
+        .superRefine((value, ctx) => {
+          if (!value.buildId && !value.buildNumber) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['buildId'],
+              message: 'Either buildId or buildNumber must be provided',
+            });
+          }
+
+          if (value.buildNumber && !value.buildTypeId) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['buildTypeId'],
+              message: 'buildTypeId is required when querying by buildNumber',
+            });
+          }
+        });
+
+      return runTool(
+        'wait_for_build',
+        schema,
+        async (typed) => {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const statusManager = new (
+            await import('@/teamcity/build-status-manager')
+          ).BuildStatusManager(adapter);
+
+          const deadline = Date.now() + typed.timeout * 1000;
+          const terminalStates = new Set(['finished', 'canceled', 'failed']);
+          let pollCount = 0;
+          const startTime = Date.now();
+
+          while (true) {
+            pollCount++;
+            const result = await statusManager.getBuildStatus({
+              buildId: typed.buildId,
+              buildNumber: typed.buildNumber,
+              buildTypeId: typed.buildTypeId,
+              includeTests: typed.includeTests,
+              includeProblems: typed.includeProblems,
+              forceRefresh: true,
+            });
+
+            const waitSeconds = Math.round((Date.now() - startTime) / 1000);
+            debug(
+              `wait_for_build poll #${pollCount}: state=${result.state} (${waitSeconds}s elapsed)`
+            );
+
+            if (terminalStates.has(result.state)) {
+              return json({ ...result, pollCount, waitSeconds });
+            }
+
+            if (Date.now() >= deadline) {
+              return json({ ...result, timedOut: true, pollCount, waitSeconds });
+            }
+
+            await sleep(typed.pollInterval * 1000);
+          }
         },
         args
       );
