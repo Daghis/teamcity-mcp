@@ -70,4 +70,28 @@ describe('fetch_build_log pagination', () => {
     expect(payload.meta.hasMore).toBe(false);
     expect(payload.meta.totalLines).toBe(10);
   });
+
+  it('accepts page and pageSize as strings (coercion)', async () => {
+    const res = await getRequiredTool('fetch_build_log').handler({
+      buildId: '123',
+      page: '2' as unknown as number,
+      pageSize: '3' as unknown as number,
+    });
+    const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+    expect(payload.lines).toEqual(['line 4', 'line 5', 'line 6']);
+    expect(payload.meta.page).toBe(2);
+    expect(payload.meta.pageSize).toBe(3);
+  });
+
+  it('accepts startLine and lineCount as strings (coercion)', async () => {
+    const res = await getRequiredTool('fetch_build_log').handler({
+      buildId: 'abc',
+      startLine: '5' as unknown as number,
+      lineCount: '3' as unknown as number,
+    });
+    const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+    expect(payload.lines).toEqual(['line 6', 'line 7', 'line 8']);
+    expect(payload.meta.startLine).toBe(5);
+    expect(payload.meta.pageSize).toBe(3);
+  });
 });
