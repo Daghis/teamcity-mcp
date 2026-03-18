@@ -96,7 +96,7 @@ interface NormalizedArtifactRequest {
 const buildIdentifierSchema = z
   .object({
     buildId: z.string().min(1).optional(),
-    buildNumber: z.union([z.string().min(1), z.number().int()]).optional(),
+    buildNumber: z.union([z.string().min(1), z.coerce.number().int()]).optional(),
     buildTypeId: z.string().min(1).optional(),
   })
   .superRefine((value, ctx) => {
@@ -708,8 +708,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       const schema = z.object({
         locator: z.string().min(1).optional(),
         parentProjectId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -818,9 +818,9 @@ const DEV_TOOLS: ToolDefinition[] = [
         buildTypeId: z.string().min(1).optional(),
         branch: z.string().min(1).optional(),
         status: z.enum(['SUCCESS', 'FAILURE', 'ERROR']).optional(),
-        count: z.number().int().min(1).max(1000).default(10).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        count: z.coerce.number().int().min(1).max(1000).default(10).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -1336,12 +1336,12 @@ const DEV_TOOLS: ToolDefinition[] = [
       const schema = z
         .object({
           buildId: z.string().min(1).optional(),
-          buildNumber: z.union([z.string().min(1), z.number().int().min(0)]).optional(),
+          buildNumber: z.union([z.string().min(1), z.coerce.number().int().min(0)]).optional(),
           buildTypeId: z.string().min(1).optional(),
-          page: z.number().int().min(1).optional(),
-          pageSize: z.number().int().min(1).max(5000).optional(),
-          startLine: z.number().int().min(0).optional(),
-          lineCount: z.number().int().min(1).max(5000).optional(),
+          page: z.coerce.number().int().min(1).optional(),
+          pageSize: z.coerce.number().int().min(1).max(5000).optional(),
+          startLine: z.coerce.number().int().min(0).optional(),
+          lineCount: z.coerce.number().int().min(1).max(5000).optional(),
           tail: z.boolean().optional(),
           encoding: z.enum(['text', 'stream']).default('text'),
           outputPath: z.string().min(1).optional(),
@@ -1621,8 +1621,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       const schema = z.object({
         locator: z.string().min(1).optional(),
         projectId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -1720,8 +1720,8 @@ const DEV_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const schema = buildIdentifierSchema.and(
         z.object({
-          pageSize: z.number().int().min(1).max(1000).optional(),
-          maxPages: z.number().int().min(1).max(1000).optional(),
+          pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+          maxPages: z.coerce.number().int().min(1).max(1000).optional(),
           all: z.boolean().optional(),
           fields: z.string().min(1).optional(),
         })
@@ -1786,8 +1786,8 @@ const DEV_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const schema = z.object({
         projectId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -2040,8 +2040,8 @@ const DEV_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const schema = z.object({
         locator: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -2485,8 +2485,8 @@ const DEV_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const schema = z.object({
         locator: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -2548,8 +2548,8 @@ const DEV_TOOLS: ToolDefinition[] = [
     },
     handler: async (args: unknown) => {
       const schema = z.object({
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -2643,13 +2643,13 @@ const DEV_TOOLS: ToolDefinition[] = [
         .object({
           buildId: z.string().min(1).optional(),
           buildTypeId: z.string().min(1).optional(),
-          buildNumber: z.union([z.string().min(1), z.number().int()]).optional(),
+          buildNumber: z.union([z.string().min(1), z.coerce.number().int()]).optional(),
           includeArtifacts: z.boolean().optional(),
           includeStatistics: z.boolean().optional(),
           includeChanges: z.boolean().optional(),
           includeDependencies: z.boolean().optional(),
           artifactFilter: z.string().min(1).optional(),
-          maxArtifactSize: z.number().int().min(1).optional(),
+          maxArtifactSize: z.coerce.number().int().min(1).optional(),
           artifactEncoding: z.enum(['base64', 'stream']).default('base64'),
         })
         .superRefine((value, ctx) => {
@@ -2764,7 +2764,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         z.object({
           artifactPath: z.string().min(1),
           encoding: z.enum(['base64', 'text', 'stream']).default('base64'),
-          maxSize: z.number().int().positive().optional(),
+          maxSize: z.coerce.number().int().positive().optional(),
           outputPath: z.string().min(1).optional(),
         })
       );
@@ -2858,7 +2858,7 @@ const DEV_TOOLS: ToolDefinition[] = [
           .object({
             artifactPaths: z.array(artifactInputSchema).min(1),
             encoding: z.enum(['base64', 'text', 'stream']).default('base64'),
-            maxSize: z.number().int().positive().optional(),
+            maxSize: z.coerce.number().int().positive().optional(),
             outputDir: z
               .string()
               .min(1)
@@ -3083,8 +3083,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         locator: z.string().min(1).optional(),
         projectId: z.string().min(1).optional(),
         buildId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -3158,8 +3158,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         locator: z.string().min(1).optional(),
         projectId: z.string().min(1).optional(),
         buildId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -3239,8 +3239,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         locator: z.string().min(1).optional(),
         buildId: z.string().min(1).optional(),
         problemId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -3327,8 +3327,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         projectId: z.string().min(1).optional(),
         buildTypeId: z.string().min(1).optional(),
         assigneeUsername: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -3409,8 +3409,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         projectId: z.string().min(1).optional(),
         buildTypeId: z.string().min(1).optional(),
         testNameId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -3522,8 +3522,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       const schema = z.object({
         locator: z.string().min(1).optional(),
         groupId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
