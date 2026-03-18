@@ -80,6 +80,10 @@ describe('VCS root property updates: full mode', () => {
     expect(branchSpec?.value?.includes('+:refs/heads/*')).toBe(true);
     expect(branchSpec?.value?.includes('+:refs/pull/*/head')).toBe(true);
 
+    // Verify that url survived the partial update (not wiped by PUT)
+    const url = props.find((p) => p.name === 'url');
+    expect(url?.value).toBe('https://example.com/repo.git');
+
     const listStep = devBatch.results[1];
     if (!listStep?.ok) {
       throw new Error(`list_vcs_roots failed: ${listStep?.error}`);
@@ -109,6 +113,13 @@ describe('VCS root property updates: full mode', () => {
     const branchSpec2 = props2.find((p) => p.name === 'branchSpec');
     expect(branchSpec2?.value?.includes('+:refs/heads/*')).toBe(true);
     expect(branchSpec2?.value?.includes('+:refs/tags/*')).toBe(true);
+
+    // Verify that url and branch survived the branchSpec-only update
+    const url = props2.find((p) => p.name === 'url');
+    expect(url?.value).toBe('https://example.com/repo.git');
+    const branch2 = props2.find((p) => p.name === 'branch');
+    expect(branch2?.value).toBe('refs/heads/main');
+
     // Optionally assert it contains exactly two lines
     const lines = (branchSpec2?.value ?? '').split('\n').filter(Boolean);
     expect(lines.length).toBe(2);
