@@ -1998,11 +1998,12 @@ const DEV_TOOLS: ToolDefinition[] = [
             });
           }
 
-          await adapter.modules.vcsRoots.setVcsRootProperties(
-            typed.id,
-            undefined,
-            { property: properties },
-            { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+          await Promise.all(
+            properties.map((p) =>
+              adapter.modules.vcsRoots.setVcsRootProperty(typed.id, p.name, p.value, {
+                headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' },
+              })
+            )
           );
           return json({
             success: true,
