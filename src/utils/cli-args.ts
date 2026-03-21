@@ -17,6 +17,8 @@ export interface CliArgs {
   token?: string;
   /** MCP mode: dev (limited tools) or full (all tools) */
   mode?: 'dev' | 'full';
+  /** Transport mode: stdio (local) or http (central server) */
+  transport?: 'stdio' | 'http';
   /** Path to .env format config file */
   config?: string;
   /** Show help and exit */
@@ -77,6 +79,17 @@ export function parseCliArgs(argv: string[]): CliArgs {
       result.config = arg.slice('--config='.length);
       continue;
     }
+    if (arg.startsWith('--transport=')) {
+      const transport = arg.slice('--transport='.length);
+      if (transport === 'stdio' || transport === 'http') {
+        result.transport = transport;
+      } else if (transport.length > 0) {
+        process.stderr.write(
+          `Warning: Invalid transport '${transport}'. Valid values are 'stdio' or 'http'.\n`
+        );
+      }
+      continue;
+    }
 
     // Handle --key value format (value is next argument)
     const nextArg = argv[i + 1];
@@ -104,6 +117,17 @@ export function parseCliArgs(argv: string[]): CliArgs {
       }
       if (arg === '--config') {
         result.config = nextArg;
+        i++;
+        continue;
+      }
+      if (arg === '--transport') {
+        if (nextArg === 'stdio' || nextArg === 'http') {
+          result.transport = nextArg;
+        } else {
+          process.stderr.write(
+            `Warning: Invalid transport '${nextArg}'. Valid values are 'stdio' or 'http'.\n`
+          );
+        }
         i++;
         continue;
       }
@@ -154,18 +178,25 @@ USAGE:
   teamcity-mcp [OPTIONS]
 
 OPTIONS:
-  --url <url>         TeamCity server URL (e.g., https://tc.example.com)
-  --token <token>     TeamCity API token for authentication
-  --mode <dev|full>   Tool exposure mode: dev (limited) or full (all tools)
-  --config <path>     Path to .env format configuration file
+  --url <url>              TeamCity server URL (e.g., https://tc.example.com)
+  --token <token>          TeamCity API token for authentication
+  --mode <dev|full>        Tool exposure mode: dev (limited) or full (all tools)
+  --transport <stdio|http> Transport mode: stdio (default) or http (central server)
+  --config <path>          Path to .env format configuration file
 
-  -h, --help          Show this help message
-  -v, --version       Show version number
+  -h, --help               Show this help message
+  -v, --version            Show version number
+
+TRANSPORT MODES:
+  stdio  (default)  Runs as a local process. Credentials from env/config/CLI.
+  http              Starts an HTTP server. Each request must include
+                    X-TeamCity-Url and X-TeamCity-Token headers.
+                    Port configurable via HTTP_PORT (default: 3000).
 
 CONFIGURATION PRECEDENCE (highest to lowest):
-  1. CLI arguments (--url, --token, --mode)
+  1. CLI arguments (--url, --token, --mode, --transport)
   2. Config file (--config)
-  3. Environment variables (TEAMCITY_URL, TEAMCITY_TOKEN, MCP_MODE)
+  3. Environment variables (TEAMCITY_URL, TEAMCITY_TOKEN, MCP_MODE, TRANSPORT_MODE)
   4. .env file in current directory
 
 SECURITY WARNING:

@@ -1,12 +1,24 @@
 /**
  * Simple TeamCity MCP Server Entry Point
  * Minimal implementation without complex DI or abstractions
+ *
+ * Supports two transport modes:
+ *   - stdio (default): local process, single-user, credentials from env
+ *   - http:  central HTTP server, multi-user, credentials per request via headers
  */
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import * as dotenv from 'dotenv';
+import type { Server as HttpServer } from 'http';
 
-import { getTeamCityToken, getTeamCityUrl, setServerInstance } from '@/config';
+import {
+  getHttpPort,
+  getTeamCityToken,
+  getTeamCityUrl,
+  getTransportMode,
+  setServerInstance,
+} from '@/config';
+import { startHttpServer } from '@/http-server';
 import { startServerLifecycle } from '@/server-runner';
 import { getHelpText, getVersion, parseCliArgs } from '@/utils/cli-args';
 import { loadEnvFile } from '@/utils/env-file';
@@ -59,13 +71,18 @@ if (cliArgs.token) {
 if (cliArgs.mode) {
   process.env['MCP_MODE'] = cliArgs.mode;
 }
+if (cliArgs.transport) {
+  process.env['TRANSPORT_MODE'] = cliArgs.transport;
+}
 
 let activeServer: Server | null = null;
+let activeHttpServer: HttpServer | null = null;
 let lifecyclePromise: Promise<void> | null = null;
 let shuttingDown = false;
 
 const clearServerState = () => {
   activeServer = null;
+  activeHttpServer = null;
   lifecyclePromise = null;
 };
 
@@ -79,9 +96,13 @@ async function shutdown(exitCode: number): Promise<never> {
 
   try {
     const serverToClose = activeServer;
+    const httpToClose = activeHttpServer;
     const lifecycleToAwait = lifecyclePromise;
 
     await serverToClose?.close();
+    if (httpToClose) {
+      await new Promise<void>((resolve) => httpToClose.close(() => resolve()));
+    }
     await lifecycleToAwait;
   } catch (error) {
     process.stderr.write(
@@ -94,45 +115,71 @@ async function shutdown(exitCode: number): Promise<never> {
 }
 
 async function main() {
-  try {
-    // Validate required environment variables via centralized config
-    let hasUrl: string;
+  const transportMode = getTransportMode();
+
+  if (transportMode === 'http') {
+    // ---- HTTP transport mode: credentials come per-request via headers ----
+    const httpPort = getHttpPort();
+    process.stderr.write('Starting TeamCity MCP Server (HTTP transport)\n');
+    process.stderr.write(`Listening on port ${httpPort}\n`);
+    process.stderr.write('Users must pass X-TeamCity-Url and X-TeamCity-Token headers\n');
+
     try {
-      hasUrl = getTeamCityUrl();
-      getTeamCityToken();
-    } catch (e) {
-      process.stderr.write(`${(e as Error).message}\n`);
+      const httpServer = await startHttpServer({ port: httpPort });
+      activeHttpServer = httpServer;
       process.stderr.write(
-        'Please configure TEAMCITY_URL and TEAMCITY_TOKEN via:\n' +
-          '  - CLI arguments: --url <url> --token <token>\n' +
-          '  - Config file: --config <path>\n' +
-          '  - Environment variables\n' +
-          '  - .env file\n' +
-          'Run with --help for more information.\n'
+        'TeamCity MCP Server (HTTP) is running and ready to accept connections\n'
       );
+
+      // Keep the process alive until shutdown
+      await new Promise<void>(() => {
+        // Intentionally never resolves — the process stays up until SIGINT/SIGTERM
+      });
+    } catch (error) {
+      clearServerState();
+      process.stderr.write(`Failed to start HTTP server: ${error}\n`);
       process.exit(1);
     }
+  } else {
+    // ---- stdio transport mode (default): credentials from env/config ------
+    try {
+      let hasUrl: string;
+      try {
+        hasUrl = getTeamCityUrl();
+        getTeamCityToken();
+      } catch (e) {
+        process.stderr.write(`${(e as Error).message}\n`);
+        process.stderr.write(
+          'Please configure TEAMCITY_URL and TEAMCITY_TOKEN via:\n' +
+            '  - CLI arguments: --url <url> --token <token>\n' +
+            '  - Config file: --config <path>\n' +
+            '  - Environment variables\n' +
+            '  - .env file\n' +
+            'Run with --help for more information.\n'
+        );
+        process.exit(1);
+      }
 
-    process.stderr.write('Starting TeamCity MCP Server\n');
-    process.stderr.write(`TeamCity URL: ${hasUrl}\n`);
+      process.stderr.write('Starting TeamCity MCP Server\n');
+      process.stderr.write(`TeamCity URL: ${hasUrl}\n`);
 
-    // Create and start server
-    const server = createSimpleServer();
-    const transport = new StdioServerTransport();
-    const lifecycle = startServerLifecycle(server, transport);
+      const server = createSimpleServer();
+      const transport = new StdioServerTransport();
+      const lifecycle = startServerLifecycle(server, transport);
 
-    activeServer = server;
-    setServerInstance(server);
-    lifecyclePromise = lifecycle;
-    process.stderr.write('TeamCity MCP Server is running and ready to accept connections\n');
+      activeServer = server;
+      setServerInstance(server);
+      lifecyclePromise = lifecycle;
+      process.stderr.write('TeamCity MCP Server is running and ready to accept connections\n');
 
-    await lifecycle;
-    clearServerState();
-    process.stderr.write('TeamCity MCP Server connection closed\n');
-  } catch (error) {
-    clearServerState();
-    process.stderr.write(`Failed to start server: ${error}\n`);
-    process.exit(1);
+      await lifecycle;
+      clearServerState();
+      process.stderr.write('TeamCity MCP Server connection closed\n');
+    } catch (error) {
+      clearServerState();
+      process.stderr.write(`Failed to start server: ${error}\n`);
+      process.exit(1);
+    }
   }
 }
 
