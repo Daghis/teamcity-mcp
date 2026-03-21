@@ -16,6 +16,7 @@ import { TeamCityAPIError, isRetryableError } from '@/teamcity/errors';
 import type { TeamCityApiSurface } from '@/teamcity/types/client';
 import { toBuildLocator } from '@/teamcity/utils/build-locator';
 import { info } from '@/utils/logger';
+import { getRequestCredentials } from '@/utils/request-context';
 
 import { AgentApi } from './teamcity-client/api/agent-api';
 import { AgentPoolApi } from './teamcity-client/api/agent-pool-api';
@@ -241,11 +242,17 @@ export class TeamCityAPI {
   }
 
   /**
-   * Get or create singleton instance
+   * Get or create singleton instance.
+   *
+   * When running inside an HTTP request (AsyncLocalStorage context with
+   * per-request credentials), returns a **non-cached** instance bound to those
+   * credentials so that each user talks to their own TeamCity server.
+   * In stdio mode (no request context), the classic singleton behaviour applies.
    */
   static getInstance(config: TeamCityAPIClientConfig): TeamCityAPI;
   static getInstance(baseUrl?: string, token?: string): TeamCityAPI;
   static getInstance(arg1?: string | TeamCityAPIClientConfig, arg2?: string): TeamCityAPI {
+    // If explicit config was passed, honour it (existing behaviour)
     const requestedConfig = this.normalizeArgs(arg1, arg2);
 
     if (requestedConfig) {
@@ -258,6 +265,17 @@ export class TeamCityAPI {
       return this.instance;
     }
 
+    // Check AsyncLocalStorage for per-request credentials (HTTP transport mode)
+    const reqCreds = getRequestCredentials();
+    if (reqCreds) {
+      // Per-request: always create a fresh (non-singleton) instance
+      return new TeamCityAPI({
+        baseUrl: reqCreds.teamcityUrl,
+        token: reqCreds.teamcityToken,
+      });
+    }
+
+    // Fallback: classic singleton from environment variables (stdio transport)
     if (this.instance == null) {
       const envConfig = this.normalizeConfig({
         baseUrl: getTeamCityUrl(),
