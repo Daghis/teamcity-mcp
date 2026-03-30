@@ -71,14 +71,14 @@ jobs:
         run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit --shard=${{ matrix.shard }}/4 --passWithNoTests
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && github.actor != 'dependabot[bot]' }}
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/junit-${{ matrix.shard }}.xml
           report_type: test_results
       - name: Upload coverage to Codecov
         if: ${{ success() && github.actor != 'dependabot[bot]' }}
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./coverage/lcov.info
           flags: unittests
@@ -89,7 +89,7 @@ jobs:
         run: npm run build:bundle
       - name: Upload bundle analysis to Codecov
         if: ${{ success() && github.actor != 'dependabot[bot]' && hashFiles('coverage/bundles/*.json') != '' }}
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           plugin: javascript-bundle
           files: ./coverage/bundles/*.json
