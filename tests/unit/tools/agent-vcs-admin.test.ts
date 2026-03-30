@@ -67,6 +67,33 @@ describe('tools: agent admin & VCS', () => {
     });
   });
 
+  it('remove_agent calls deleteAgent and returns JSON', async () => {
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const deleteAgent = jest.fn(async () => ({}));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: { getInstance: () => ({ agents: { deleteAgent } }) },
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('remove_agent').handler({
+            agentId: 'A1',
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'remove_agent',
+            agentId: 'A1',
+          });
+          expect(deleteAgent).toHaveBeenCalledWith('A1');
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
   it('add_vcs_root_to_build attaches root and returns JSON', async () => {
     await new Promise<void>((resolve, reject) => {
       jest.isolateModules(() => {

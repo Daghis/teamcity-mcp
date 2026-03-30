@@ -576,6 +576,9 @@ interface AssignAgentToPoolArgs {
   agentId: string;
   poolId: string;
 }
+interface RemoveAgentArgs {
+  agentId: string;
+}
 interface ManageBuildTriggersArgs {
   buildTypeId: string;
   action: 'add' | 'delete';
@@ -5269,6 +5272,26 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         agentId: typedArgs.agentId,
         poolId: typedArgs.poolId,
       });
+    },
+    mode: 'full',
+  },
+  {
+    name: 'remove_agent',
+    description:
+      'Remove (delete) a build agent from the TeamCity server. Use this to clean up disconnected or ghost agent entries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        agentId: { type: 'string', description: 'Agent ID to remove' },
+      },
+      required: ['agentId'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as RemoveAgentArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      await adapter.modules.agents.deleteAgent(typedArgs.agentId);
+      return json({ success: true, action: 'remove_agent', agentId: typedArgs.agentId });
     },
     mode: 'full',
   },
