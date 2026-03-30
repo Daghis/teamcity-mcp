@@ -17,6 +17,10 @@ The TeamCity MCP Server allows developers using AI-powered coding assistants (Cl
 
 > **Upgrading from 1.x?** Version 2.0.0 moved 15 tools from Dev to Full mode, including queue management, agent compatibility checks, and server health monitoring. If you relied on these tools in Dev mode, switch to `MCP_MODE=full` or use runtime mode switching (v2.1.0+). See [CHANGELOG.md](CHANGELOG.md) for details.
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/daghis-teamcity-mcp).
+
 ## Features
 
 ### 🚀 Two Operational Modes
