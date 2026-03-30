@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.5.0...teamcity-mcp-v2.6.0) (2026-03-30)
+
+
+### Features
+
+* add remove_agent tool to delete stale build agents ([#444](https://github.com/Daghis/teamcity-mcp/issues/444)) ([c32824b](https://github.com/Daghis/teamcity-mcp/commit/c32824b8952d862349b3f39d99f1ca2c306f1493)), closes [#439](https://github.com/Daghis/teamcity-mcp/issues/439)
+
 ## [2.5.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.4.3...teamcity-mcp-v2.5.0) (2026-03-18)
 
 
