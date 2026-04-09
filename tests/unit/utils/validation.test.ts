@@ -135,8 +135,7 @@ describe('validation utilities', () => {
     });
 
     it('returns empty for non-string', () => {
-      // @ts-expect-error testing runtime behavior
-      expect(sanitizeString(undefined)).toBe('');
+      expect(sanitizeString(undefined as unknown as string)).toBe('');
     });
 
     it('createSanitizedStringSchema transforms value', () => {

@@ -16,13 +16,7 @@ module.exports = {
   ],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
-      tsconfig: {
-        esModuleInterop: true,
-        allowJs: true,
-        strict: false,
-        noUnusedLocals: false,
-        noUnusedParameters: false
-      }
+      tsconfig: '<rootDir>/tsconfig.test.json',
     }]
   },
   collectCoverageFrom: [

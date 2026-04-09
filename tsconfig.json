@@ -45,7 +45,7 @@
     "declarationMap": true,
     "removeComments": true,
     "importHelpers": true,
-    "downlevelIteration": true,
+    "ignoreDeprecations": "6.0",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
