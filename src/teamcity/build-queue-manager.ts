@@ -630,7 +630,7 @@ export class BuildQueueManager extends EventEmitter {
 
     // Check for snapshot dependencies
     const deps = (
-      build as {
+      build as unknown as {
         'snapshot-dependencies'?: { build?: Array<{ id?: string }> };
       }
     )['snapshot-dependencies'];

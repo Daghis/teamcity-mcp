@@ -880,7 +880,7 @@ describe('BuildParametersManager', () => {
       ['valid_param', true],
       ['valid-param', true],
       ['valid123', true],
-    ])('should validate parameter name "%s" as %s', (name, isValid) => {
+    ])('should validate parameter name "%s" as %s', (name: string, isValid: boolean) => {
       if (isValid) {
         expect(() => manager.parseParameters({ [name]: 'value' })).not.toThrow();
       } else {

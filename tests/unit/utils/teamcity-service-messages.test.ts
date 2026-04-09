@@ -14,10 +14,8 @@ describe('utils: TeamCity service messages', () => {
 
   it('handles empty and nullish inputs safely', () => {
     expect(escapeTeamCityServiceMessage('')).toBe('');
-    // @ts-expect-error forcing null to hit nullish branch
-    expect(escapeTeamCityServiceMessage(null)).toBe('');
-    // @ts-expect-error forcing undefined to hit nullish branch
-    expect(escapeTeamCityServiceMessage(undefined)).toBe('');
+    expect(escapeTeamCityServiceMessage(null as unknown as string)).toBe('');
+    expect(escapeTeamCityServiceMessage(undefined as unknown as string)).toBe('');
 
     const msg = formatServiceMessage('buildStatus', { text: '' });
     expect(msg).toBe("##teamcity[buildStatus text='']");
