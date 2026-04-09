@@ -218,7 +218,6 @@ export function asyncDebounce<TArgs extends unknown[], TReturn>(
   delay: number
 ): (...args: TArgs) => Promise<TReturn> {
   let timeoutId: NodeJS.Timeout | undefined;
-  let latestPromise: Promise<TReturn> | undefined;
 
   return (...args: TArgs): Promise<TReturn> => {
     return new Promise((resolve, reject) => {
@@ -227,19 +226,18 @@ export function asyncDebounce<TArgs extends unknown[], TReturn>(
       }
 
       timeoutId = setTimeout(async () => {
+        const myId = timeoutId;
         try {
           const result = await fn(...args);
-          if (latestPromise === timeoutId) {
+          if (timeoutId === myId) {
             resolve(result);
           }
         } catch (error) {
-          if (latestPromise === timeoutId) {
+          if (timeoutId === myId) {
             reject(error);
           }
         }
       }, delay);
-
-      latestPromise = Promise.resolve(timeoutId) as Promise<TReturn>;
     });
   };
 }

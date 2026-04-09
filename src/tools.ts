@@ -3085,7 +3085,9 @@ const DEV_TOOLS: ToolDefinition[] = [
             failureCount: results.filter((item) => !item.success).length,
           });
 
-          const failures = results.filter((item) => !item.success);
+          const failures = results.filter(
+            (item): item is Extract<ArtifactBatchResult, { success: false }> => !item.success
+          );
           if (results.length > 0 && failures.length === results.length) {
             const reason = failures
               .map((item) => `${item.path}: ${item.error ?? 'unknown error'}`)
@@ -5933,7 +5935,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           const agentsResp = await adapter.modules.agents.getAllAgents(
             `agentPool:(id:${typed.poolId})`
           );
-          const agents = (agentsResp.data?.agent ?? []) as Array<{ id?: string }>;
+          const agents = (agentsResp.data?.agent ?? []) as unknown as Array<{ id?: string }>;
           const body: { status: boolean; comment?: { text?: string }; statusSwitchTime?: string } =
             {
               status: false,
@@ -6001,7 +6003,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           const agentsResp = await adapter.modules.agents.getAllAgents(
             `agentPool:(id:${typed.poolId})`
           );
-          const agents = (agentsResp.data?.agent ?? []) as Array<{ id?: string }>;
+          const agents = (agentsResp.data?.agent ?? []) as unknown as Array<{ id?: string }>;
           let enabled = 0;
           for (const a of agents) {
             const id = a.id;
@@ -6130,7 +6132,10 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           const locator = filters.join(',');
 
           const list = await adapter.modules.agents.getAllAgents(locator);
-          const agents = (list.data?.agent ?? []) as Array<{ id?: string; name?: string }>;
+          const agents = (list.data?.agent ?? []) as unknown as Array<{
+            id?: string;
+            name?: string;
+          }>;
           const body: {
             status: boolean;
             comment?: { text?: string };
