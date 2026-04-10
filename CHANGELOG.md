@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.6.0...teamcity-mcp-v2.6.1) (2026-04-10)
+
+
+### Bug Fixes
+
+* **deps:** upgrade axios to 1.15.0 to fix CVE-2025-62718 SSRF ([#451](https://github.com/Daghis/teamcity-mcp/issues/451)) ([f9068c7](https://github.com/Daghis/teamcity-mcp/commit/f9068c7a4e5515474c3a75d10763cbca8f66fd49))
+
 ## [2.6.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.5.0...teamcity-mcp-v2.6.0) (2026-03-30)
 
 
