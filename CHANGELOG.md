@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.6.1...teamcity-mcp-v2.6.2) (2026-04-10)
+
+
+### Bug Fixes
+
+* **deps:** resolve 7 Dependabot security alerts (hono, undici) ([#453](https://github.com/Daghis/teamcity-mcp/issues/453)) ([e43de4a](https://github.com/Daghis/teamcity-mcp/commit/e43de4ac131477b8fe545ecd3ed8fab365cfd1c6))
+
 ## [2.6.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.6.0...teamcity-mcp-v2.6.1) (2026-04-10)
 
 
