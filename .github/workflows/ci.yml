@@ -85,16 +85,13 @@ jobs:
           name: codecov-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
-      - name: Analyze bundle
-        run: npm run build:bundle
-      - name: Upload bundle analysis to Codecov
-        if: ${{ success() && github.actor != 'dependabot[bot]' && hashFiles('coverage/bundles/*.json') != '' }}
-        uses: codecov/codecov-action@v6
-        with:
-          plugin: javascript-bundle
-          files: ./coverage/bundles/*.json
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+      - name: Codecov bundle analysis
+        if: ${{ success() && github.actor != 'dependabot[bot]' && matrix.node == 20 && matrix.shard == 1 }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          npm run build
+          npm run bundle:analyze
 
   aggregate:
     name: Lint, Typecheck, Test (Node 20, 22, 24)

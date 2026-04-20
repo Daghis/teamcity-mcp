@@ -15,8 +15,8 @@
     "dev": "node ./node_modules/tsx/dist/cli.mjs watch src/index.ts",
     "dev:interactive": "bash scripts/interact.sh",
     "build": "node scripts/build.cjs",
-    "build:bundle": "CODECOV_BUNDLE=true npm run build",
     "build:tsc": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "bundle:analyze": "node scripts/codecov-bundle.cjs",
     "start": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -73,7 +73,7 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
-    "@codecov/bundler-plugin-core": "^1.9.1",
+    "@codecov/bundle-analyzer": "^2.0.1",
     "@esbuild-plugins/tsconfig-paths": "^0.1.2",
     "@eslint/js": "^10.0.1",
     "@trivago/prettier-plugin-sort-imports": "^6.0.1",
