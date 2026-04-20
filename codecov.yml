@@ -25,10 +25,18 @@ component_management:
       name: MCP Tools
       paths:
         - src/tools.ts
+      statuses:
+        - type: project
+          target: 85%
+          threshold: 1%
     - component_id: teamcity
       name: TeamCity Managers
       paths:
         - src/teamcity/**
+      statuses:
+        - type: project
+          target: 85%
+          threshold: 1%
     - component_id: utils
       name: Utilities
       paths:

@@ -329,6 +329,103 @@ describe('createAdapterFromTeamCityAPI', () => {
     expect(warnMock).not.toHaveBeenCalled();
   });
 
+  it('strips Bearer prefix from axios Authorization header', () => {
+    const httpBearer = axios.create({
+      baseURL: baseUrl,
+      timeout: 1234,
+      headers: { Authorization: 'Bearer secret-token' },
+    });
+    const withBearer = { modules, http: httpBearer } as unknown as TeamCityAPI;
+    const adapter = createAdapterFromTeamCityAPI(withBearer);
+    expect(adapter.getApiConfig().token).toBe('secret-token');
+  });
+
+  it('returns raw Authorization value when the prefix is not Bearer', () => {
+    const httpToken = axios.create({
+      baseURL: baseUrl,
+      headers: { Authorization: 'Token abc123' },
+    });
+    const api = { modules, http: httpToken } as unknown as TeamCityAPI;
+    const adapter = createAdapterFromTeamCityAPI(api);
+    expect(adapter.getApiConfig().token).toBe('Token abc123');
+  });
+
+  it('extracts Authorization via the getter when headers expose a getter function', () => {
+    const captured: string[] = [];
+    const headers = {
+      common: undefined,
+      get(name: string) {
+        captured.push(name);
+        return 'Bearer via-getter';
+      },
+    } as unknown as AxiosInstance['defaults']['headers'];
+    const httpGetter = axios.create({ baseURL: baseUrl });
+    httpGetter.defaults.headers = headers;
+    const api = { modules, http: httpGetter } as unknown as TeamCityAPI;
+    const adapter = createAdapterFromTeamCityAPI(api);
+    expect(adapter.getApiConfig().token).toBe('via-getter');
+    expect(captured).toEqual(['Authorization']);
+  });
+
+  it('handles array-valued Authorization headers by taking the first entry', () => {
+    const httpArray = axios.create({ baseURL: baseUrl });
+    httpArray.defaults.headers = {
+      Authorization: ['Bearer array-token', 'ignored'],
+    } as unknown as AxiosInstance['defaults']['headers'];
+    const api = { modules, http: httpArray } as unknown as TeamCityAPI;
+    const adapter = createAdapterFromTeamCityAPI(api);
+    expect(adapter.getApiConfig().token).toBe('array-token');
+  });
+
+  it('returns undefined when Authorization getter throws', () => {
+    const httpThrowing = axios.create({ baseURL: baseUrl });
+    httpThrowing.defaults.headers = {
+      get: () => {
+        throw new Error('denied');
+      },
+    } as unknown as AxiosInstance['defaults']['headers'];
+    const api = { modules, http: httpThrowing } as unknown as TeamCityAPI;
+    const adapter = createAdapterFromTeamCityAPI(api);
+    expect(adapter.getApiConfig().token).toBe('');
+  });
+
+  it('falls back to picking top-level API properties when modules is missing', async () => {
+    const projectsApi = { getAllProjects: jest.fn(async () => ({ data: {} })) };
+    const buildsApi: BuildApiLike = {
+      getAllBuilds: jest.fn(),
+      getBuild: jest.fn(),
+      getMultipleBuilds: jest.fn(),
+      getBuildProblems: jest.fn(),
+    };
+    const legacyApi = {
+      http,
+      getBaseUrl: () => baseUrl,
+      projects: projectsApi,
+      builds: buildsApi,
+    } as unknown as TeamCityAPI;
+    const adapter = createAdapterFromTeamCityAPI(legacyApi);
+    await adapter.modules.projects.getAllProjects?.('P1');
+    expect(projectsApi.getAllProjects).toHaveBeenCalledWith('P1');
+    // Missing keys resolve to empty objects so the surface stays safe to call.
+    expect(adapter.modules.mutes).toEqual({});
+    // Object is frozen.
+    expect(Object.isFrozen(adapter.modules)).toBe(true);
+  });
+
+  it('ignores invalid timeout values on http.defaults', () => {
+    const httpNoTimeout = axios.create({ baseURL: baseUrl });
+    httpNoTimeout.defaults.timeout = 0;
+    const api = { modules, http: httpNoTimeout } as unknown as TeamCityAPI;
+    const adapter = createAdapterFromTeamCityAPI(api);
+    expect(adapter.getApiConfig().timeout).toBeUndefined();
+
+    const httpNaN = axios.create({ baseURL: baseUrl });
+    httpNaN.defaults.timeout = Number.NaN as unknown as number;
+    const apiNaN = { modules, http: httpNaN } as unknown as TeamCityAPI;
+    const adapterNaN = createAdapterFromTeamCityAPI(apiNaN);
+    expect(adapterNaN.getApiConfig().timeout).toBeUndefined();
+  });
+
   it('warns and uses the placeholder baseUrl when no sources are available', async () => {
     const projects = { getAllProjects: jest.fn().mockResolvedValue({}) };
     const builds: BuildApiLike = {
