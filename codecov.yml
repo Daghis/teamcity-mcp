@@ -24,7 +24,7 @@ component_management:
     - component_id: tools
       name: MCP Tools
       paths:
-        - src/tools/**
+        - src/tools.ts
     - component_id: teamcity
       name: TeamCity Managers
       paths:
@@ -33,10 +33,6 @@ component_management:
       name: Utilities
       paths:
         - src/utils/**
-    - component_id: formatters
-      name: Formatters
-      paths:
-        - src/formatters/**
 
 ignore:
   - "src/teamcity-client/**"
