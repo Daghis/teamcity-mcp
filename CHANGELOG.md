@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.6.2...teamcity-mcp-v2.6.3) (2026-04-20)
+
+
+### Bug Fixes
+
+* **codecov:** repair bundle analysis and expand codecov.yml ([#459](https://github.com/Daghis/teamcity-mcp/issues/459)) ([78aae2b](https://github.com/Daghis/teamcity-mcp/commit/78aae2b1471c88d88da110810454219a5b2269b9))
+
 ## [2.6.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.6.1...teamcity-mcp-v2.6.2) (2026-04-10)
 
 
