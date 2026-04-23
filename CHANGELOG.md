@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.6.3...teamcity-mcp-v2.7.0) (2026-04-23)
+
+
+### Features
+
+* add MCP behavioral annotations to all 93 tool registrations ([#473](https://github.com/Daghis/teamcity-mcp/issues/473)) ([be71f71](https://github.com/Daghis/teamcity-mcp/commit/be71f71730ad9ac87a17dbcad999b0f02a23868b))
+
 ## [2.6.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.6.2...teamcity-mcp-v2.6.3) (2026-04-20)
 
 
