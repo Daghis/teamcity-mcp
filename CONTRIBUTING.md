@@ -72,6 +72,34 @@ SERIAL_BUILD_TESTS=true npm run test:integration
 - Inspecting axios request headers/payload shapes for managers/tools.
 - Counting calls without a documented behavior that warrants it.
 
+## Tool Annotations
+
+Every tool registered in `src/tools.ts` must declare all four MCP behavioral annotation hints. These tell agents which tools are safe to retry, which mutate state, and which are destructive — without running them.
+
+```typescript
+annotations: {
+  readOnlyHint: boolean,    // true = tool only reads, never writes
+  destructiveHint: boolean, // true = tool can irreversibly destroy data
+  idempotentHint: boolean,  // true = safe to call twice with same args
+  openWorldHint: boolean,   // true = contacts TeamCity / network
+},
+```
+
+### Standard taxonomy
+
+| Pattern | readOnly | destructive | idempotent | openWorld |
+|---------|----------|-------------|------------|-----------|
+| `list_*`, `get_*`, `count_*`, `check_*`, `fetch_*`, `analyze_*`, `ping` | `true` | `false` | `true` | `true` |
+| `trigger_build`, `cancel_*`, `mute_*`, `move_queued_*`, `reorder_*` | `false` | `false` | `false` | `true` |
+| `delete_*`, `remove_*` | `false` | `true` | `true` | `true` |
+| `update_*`, `set_*`, `manage_*`, `assign_*`, `authorize_*`, `add_*`, `clone_*` | `false` | `false` | `true` | `true` |
+| `create_*`, `upload_*`, `download_*` | `false` | `false` | `false` | `true` |
+| Local-only tools (`get_mcp_mode`, `set_mcp_mode`) | varies | `false` | `true` | `false` |
+
+Per-tool exceptions are fine — apply judgment over pattern-matching when a tool doesn't fit the table.
+
+A CI test (`tests/unit/tools/tool-annotations.test.ts`) will fail if any tool ships without all four hints set.
+
 ## Code Style
 
 - TypeScript, strict mode. No `any`. Prefer precise types and generics.
