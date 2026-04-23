@@ -25,7 +25,6 @@ describe('Tool Annotations Coverage', () => {
     for (const tool of allTools) {
       const a = tool.annotations;
       if (
-        !a ||
         typeof a.readOnlyHint !== 'boolean' ||
         typeof a.destructiveHint !== 'boolean' ||
         typeof a.idempotentHint !== 'boolean' ||
