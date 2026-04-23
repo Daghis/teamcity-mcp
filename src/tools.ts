@@ -469,9 +469,190 @@ export interface ToolDefinition {
   description: string;
   annotations: ToolAnnotations;
   inputSchema: unknown;
+  /**
+   * Optional JSON Schema describing the structured response. When present it is
+   * surfaced via `tools/list` and the server will parse the text content of the
+   * handler's result back into `structuredContent` on `tools/call`, per the
+   * MCP spec (2025-06-18: tools declaring `outputSchema` must return structured
+   * content).
+   */
+  outputSchema?: Record<string, unknown>;
   handler: (args: unknown) => Promise<ToolResponse>;
   mode?: 'dev' | 'full'; // If not specified, available in both modes
 }
+
+/**
+ * Reusable JSON Schema fragments for the first batch of tools that declare
+ * `outputSchema`. Schemas stay permissive (`additionalProperties: true`) since
+ * the underlying TeamCity responses include many fields and fields-selector
+ * projections can further narrow them — the goal is to document the stable
+ * top-level shape, not to constrain every nested field.
+ */
+const paginationMetaSchema: Record<string, unknown> = {
+  type: 'object',
+  description: 'Pagination metadata describing which slice was returned.',
+  additionalProperties: true,
+  properties: {
+    page: { type: 'number' },
+    pageSize: { type: 'number' },
+    mode: { type: 'string', enum: ['all'] },
+    fetched: { type: 'number' },
+  },
+};
+
+const buildObjectSchema: Record<string, unknown> = {
+  type: 'object',
+  description: 'TeamCity build representation.',
+  additionalProperties: true,
+  properties: {
+    id: { type: ['number', 'string'] },
+    buildTypeId: { type: 'string' },
+    number: { type: 'string' },
+    state: { type: 'string' },
+    status: { type: 'string' },
+    statusText: { type: 'string' },
+    branchName: { type: 'string' },
+    href: { type: 'string' },
+    webUrl: { type: 'string' },
+  },
+};
+
+const projectObjectSchema: Record<string, unknown> = {
+  type: 'object',
+  description: 'TeamCity project representation.',
+  additionalProperties: true,
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    parentProjectId: { type: 'string' },
+    href: { type: 'string' },
+    webUrl: { type: 'string' },
+    archived: { type: 'boolean' },
+    description: { type: 'string' },
+  },
+};
+
+const buildTypeObjectSchema: Record<string, unknown> = {
+  type: 'object',
+  description: 'TeamCity build configuration (buildType) representation.',
+  additionalProperties: true,
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    projectId: { type: 'string' },
+    projectName: { type: 'string' },
+    href: { type: 'string' },
+    webUrl: { type: 'string' },
+    paused: { type: 'boolean' },
+    description: { type: 'string' },
+  },
+};
+
+const listOutputSchema = (itemSchema: Record<string, unknown>): Record<string, unknown> => ({
+  type: 'object',
+  additionalProperties: false,
+  required: ['items', 'pagination'],
+  properties: {
+    items: { type: 'array', items: itemSchema },
+    pagination: paginationMetaSchema,
+  },
+});
+
+const buildStatusOutputSchema: Record<string, unknown> = {
+  type: 'object',
+  description: 'Aggregated status for a queued, running, or finished build.',
+  additionalProperties: true,
+  required: ['buildId', 'state', 'percentageComplete'],
+  properties: {
+    buildId: { type: 'string' },
+    buildNumber: { type: 'string' },
+    buildTypeId: { type: 'string' },
+    state: { type: 'string', enum: ['queued', 'running', 'finished', 'failed', 'canceled'] },
+    status: { type: 'string', enum: ['SUCCESS', 'FAILURE', 'ERROR', 'UNKNOWN'] },
+    statusText: { type: 'string' },
+    percentageComplete: { type: 'number' },
+    currentStageText: { type: 'string' },
+    branchName: { type: 'string' },
+    webUrl: { type: 'string' },
+    queuedDate: { type: 'string' },
+    startDate: { type: 'string' },
+    finishDate: { type: 'string' },
+    elapsedSeconds: { type: 'number' },
+    estimatedTotalSeconds: { type: 'number' },
+    estimatedStartTime: { type: 'string' },
+    queuePosition: { type: 'number' },
+    waitReason: { type: 'string' },
+    failureReason: { type: 'string' },
+    canceledBy: { type: 'string' },
+    canceledDate: { type: 'string' },
+    totalQueued: { type: 'number' },
+    canMoveToTop: { type: 'boolean' },
+    testSummary: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        total: { type: 'number' },
+        passed: { type: 'number' },
+        failed: { type: 'number' },
+        ignored: { type: 'number' },
+        muted: { type: 'number' },
+        newFailed: { type: 'number' },
+      },
+    },
+    problems: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          type: { type: 'string' },
+          identity: { type: 'string' },
+          description: { type: 'string' },
+        },
+      },
+    },
+  },
+};
+
+const buildResultsOutputSchema: Record<string, unknown> = {
+  type: 'object',
+  description:
+    'Rich build result bundle assembled by BuildResultsManager. The core build summary is always under `build`; optional sections (artifacts, statistics, changes, dependencies) are present when requested via the corresponding include* flags.',
+  additionalProperties: true,
+  required: ['build'],
+  properties: {
+    build: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        id: { type: ['string', 'number'] },
+        number: { type: 'string' },
+        status: { type: 'string' },
+        state: { type: 'string' },
+        buildTypeId: { type: 'string' },
+        projectId: { type: 'string' },
+        branchName: { type: 'string' },
+        statusText: { type: 'string' },
+        webUrl: { type: 'string' },
+      },
+    },
+    artifacts: { type: 'array', items: { type: 'object', additionalProperties: true } },
+    statistics: { type: 'object', additionalProperties: true },
+    changes: { type: 'array', items: { type: 'object', additionalProperties: true } },
+    dependencies: { type: 'array', items: { type: 'object', additionalProperties: true } },
+  },
+};
+
+export const FIRST_BATCH_OUTPUT_SCHEMAS = {
+  list_builds: listOutputSchema(buildObjectSchema),
+  get_build: buildObjectSchema,
+  get_build_status: buildStatusOutputSchema,
+  get_build_results: buildResultsOutputSchema,
+  list_projects: listOutputSchema(projectObjectSchema),
+  get_project: projectObjectSchema,
+  list_build_configs: listOutputSchema(buildTypeObjectSchema),
+  get_build_config: buildTypeObjectSchema,
+} as const;
 
 // Specific argument types are intentionally scoped to the handlers that use them.
 // Zod validates at runtime; these interfaces keep compile-time safety and clean linting.
@@ -726,6 +907,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description: 'List TeamCity projects (supports pagination)',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.list_projects,
     inputSchema: {
       type: 'object',
       properties: {
@@ -805,6 +987,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description: 'Get details of a specific project',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_project,
     inputSchema: {
       type: 'object',
       properties: {
@@ -837,6 +1020,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description: 'List TeamCity builds (supports pagination)',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.list_builds,
     inputSchema: {
       type: 'object',
       properties: {
@@ -944,6 +1128,7 @@ const DEV_TOOLS: ToolDefinition[] = [
     },
     description:
       'Get details of a specific build (works for both queued and running/finished builds)',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_build,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1266,6 +1451,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description: 'Get build status with optional test/problem and queue context details',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_build_status,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1802,6 +1988,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description: 'List build configurations (supports pagination)',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.list_build_configs,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1881,6 +2068,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description: 'Get details of a build configuration',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_build_config,
     inputSchema: {
       type: 'object',
       properties: {
@@ -2941,6 +3129,7 @@ const DEV_TOOLS: ToolDefinition[] = [
     },
     description:
       'Get detailed results of a build including tests, artifacts, changes, and statistics',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_build_results,
     inputSchema: {
       type: 'object',
       properties: {
