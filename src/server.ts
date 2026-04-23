@@ -57,6 +57,7 @@ export function createSimpleServer(): Server {
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema,
+        annotations: tool.annotations,
       })),
     };
     logDebug('MCP response: tools/list', { count: response.tools.length, success: true });
