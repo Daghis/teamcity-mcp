@@ -312,6 +312,32 @@ describe('Tool outputSchema: first batch', () => {
     });
   });
 
+  it('runTool error envelope is flagged success=false on the outer ToolResponse', async () => {
+    // Regression for PR #477 review: when a tool with outputSchema rejects bad
+    // input via Zod, runTool's error envelope must NOT be surfaced as
+    // structuredContent. The outer ToolResponse's `success` flag is what
+    // server.ts uses to gate that surfacing, so it must be false.
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: { getInstance: () => ({ getProject: jest.fn() }) },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('get_project').handler({});
+          expect(res.success).toBe(false);
+          expect(typeof res.error).toBe('string');
+          // Inner payload is a validation error envelope — not the declared
+          // project shape — confirming why the outer flag must be false.
+          const payload = parsePayload(res);
+          expect(payload['success']).toBe(false);
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
   it('get_build_config response conforms to declared schema', async () => {
     await new Promise<void>((resolve, reject) => {
       jest.isolateModules(() => {

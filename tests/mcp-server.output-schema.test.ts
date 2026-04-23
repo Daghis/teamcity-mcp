@@ -202,4 +202,59 @@ describe('MCP server: outputSchema surfacing', () => {
     })) as Record<string, unknown>;
     expect('structuredContent' in result).toBe(false);
   });
+
+  it('tools/call omits structuredContent when the handler returns success=false', async () => {
+    // Regression: a tool with outputSchema whose handler returns a validation
+    // error envelope (success=false, JSON-stringified error) must NOT surface
+    // that envelope as structuredContent — it does not conform to the declared
+    // schema. See review on PR #477.
+    const handler = jest.fn().mockResolvedValue({
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            success: false,
+            error: { code: 'VALIDATION_ERROR', message: 'bad input' },
+          }),
+        },
+      ],
+      success: false,
+      error: 'bad input',
+    });
+    const tool: ToolDefinition = {
+      name: 'strict_list',
+      description: 'declares strict list outputSchema',
+      inputSchema: { type: 'object' },
+      outputSchema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['items', 'pagination'],
+        properties: {
+          items: { type: 'array' },
+          pagination: { type: 'object' },
+        },
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+      handler,
+    };
+    (getAvailableTools as jest.Mock).mockReturnValue([tool]);
+    (getTool as jest.Mock).mockImplementation((n: string) =>
+      n === 'strict_list' ? tool : undefined
+    );
+
+    const setRequestHandler = jest.fn();
+    (Server as jest.Mock).mockImplementation(() => ({ setRequestHandler }));
+    createMCPServer();
+    const callHandler = setRequestHandler.mock.calls[1][1];
+
+    const result = (await callHandler({
+      params: { name: 'strict_list', arguments: {} },
+    })) as Record<string, unknown>;
+    expect('structuredContent' in result).toBe(false);
+  });
 });
