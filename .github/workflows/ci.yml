@@ -71,6 +71,7 @@ jobs:
         run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit --shard=${{ matrix.shard }}/4 --passWithNoTests
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && github.actor != 'dependabot[bot]' }}
+        continue-on-error: true
         uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -78,13 +79,14 @@ jobs:
           report_type: test_results
       - name: Upload coverage to Codecov
         if: ${{ success() && github.actor != 'dependabot[bot]' }}
+        continue-on-error: true
         uses: codecov/codecov-action@v6
         with:
           files: ./coverage/lcov.info
           flags: unittests
           name: codecov-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+          fail_ci_if_error: false
       - name: Codecov bundle analysis
         if: ${{ success() && github.actor != 'dependabot[bot]' && matrix.node == 20 && matrix.shard == 1 }}
         env:
