@@ -354,17 +354,52 @@ const getErrorMessage = (error: unknown): string => {
   return String(error ?? 'Unknown error');
 };
 
+const urlOrigin = (value: string): string | undefined => {
+  try {
+    const parsed = new URL(value);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return undefined;
+  }
+};
+
+const assertSameOriginAsTeamCity = (
+  downloadUrl: string,
+  teamCityBaseUrl: string | undefined
+): void => {
+  const target = urlOrigin(downloadUrl);
+  if (!target) {
+    throw new Error(`Invalid downloadUrl: ${downloadUrl}`);
+  }
+  const expected = teamCityBaseUrl ? urlOrigin(teamCityBaseUrl) : undefined;
+  if (!expected) {
+    throw new Error(
+      'TeamCity base URL is not configured; refusing to fetch downloadUrl with credentials'
+    );
+  }
+  if (target !== expected) {
+    throw new Error(
+      `downloadUrl origin "${target}" does not match configured TeamCity origin "${expected}"`
+    );
+  }
+};
+
 const downloadArtifactByUrl = async (
   adapter: TeamCityClientAdapter,
   request: NormalizedArtifactRequest & { downloadUrl: string },
   encoding: 'base64' | 'text' | 'stream',
   options: StreamOptions & { maxSize?: number }
 ): Promise<ArtifactToolPayload> => {
+  // The shared axios instance carries the TeamCity PAT in its default headers.
+  // Reject cross-origin downloadUrls and cross-origin redirects so the token
+  // cannot leak to an attacker-controlled host via a prompt-injected argument.
+  assertSameOriginAsTeamCity(request.downloadUrl, adapter.getApiConfig().baseUrl);
+
   const axios = adapter.getAxios();
   const responseType =
     encoding === 'stream' ? 'stream' : encoding === 'text' ? 'text' : 'arraybuffer';
 
-  const response = await axios.get(request.downloadUrl, { responseType });
+  const response = await axios.get(request.downloadUrl, { responseType, maxRedirects: 0 });
   const mimeType =
     typeof response.headers?.['content-type'] === 'string'
       ? response.headers['content-type']

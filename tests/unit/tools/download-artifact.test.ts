@@ -171,7 +171,10 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
           'content-length': '16',
         },
       });
-      const mockAdapter = { getAxios: () => ({ get: mockGet }) };
+      const mockAdapter = {
+        getAxios: () => ({ get: mockGet }),
+        getApiConfig: () => ({ baseUrl: 'https://tc.example' }),
+      };
 
       const ArtifactManager = jest.fn().mockImplementation(() => ({}));
       const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue(mockAdapter);
@@ -204,6 +207,7 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
       expect(payload.artifacts[0].content).toBe('hello world text');
       expect(mockGet).toHaveBeenCalledWith('https://tc.example/artifact.txt', {
         responseType: 'text',
+        maxRedirects: 0,
       });
     });
 
@@ -218,7 +222,10 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
           data: Buffer.from('not a string'),
           headers: { 'content-type': 'application/octet-stream' },
         });
-      const mockAdapter = { getAxios: () => ({ get: mockGet }) };
+      const mockAdapter = {
+        getAxios: () => ({ get: mockGet }),
+        getApiConfig: () => ({ baseUrl: 'https://tc.example' }),
+      };
 
       const ArtifactManager = jest.fn().mockImplementation(() => ({}));
       const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue(mockAdapter);
@@ -259,7 +266,10 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
         data: Buffer.from('buffer data'),
         headers: { 'content-type': 'application/octet-stream', 'content-length': '11' },
       });
-      const mockAdapter = { getAxios: () => ({ get: mockGet }) };
+      const mockAdapter = {
+        getAxios: () => ({ get: mockGet }),
+        getApiConfig: () => ({ baseUrl: 'https://tc.example' }),
+      };
 
       const ArtifactManager = jest.fn().mockImplementation(() => ({}));
       const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue(mockAdapter);
@@ -301,7 +311,10 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
         data: arrayBuffer,
         headers: { 'content-type': 'application/octet-stream' },
       });
-      const mockAdapter = { getAxios: () => ({ get: mockGet }) };
+      const mockAdapter = {
+        getAxios: () => ({ get: mockGet }),
+        getApiConfig: () => ({ baseUrl: 'https://tc.example' }),
+      };
 
       const ArtifactManager = jest.fn().mockImplementation(() => ({}));
       const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue(mockAdapter);
@@ -343,7 +356,10 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
         data: uint8,
         headers: { 'content-type': 'application/octet-stream' },
       });
-      const mockAdapter = { getAxios: () => ({ get: mockGet }) };
+      const mockAdapter = {
+        getAxios: () => ({ get: mockGet }),
+        getApiConfig: () => ({ baseUrl: 'https://tc.example' }),
+      };
 
       const ArtifactManager = jest.fn().mockImplementation(() => ({}));
       const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue(mockAdapter);
@@ -386,7 +402,10 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
           data: { not: 'a buffer' },
           headers: { 'content-type': 'application/octet-stream' },
         });
-      const mockAdapter = { getAxios: () => ({ get: mockGet }) };
+      const mockAdapter = {
+        getAxios: () => ({ get: mockGet }),
+        getApiConfig: () => ({ baseUrl: 'https://tc.example' }),
+      };
 
       const ArtifactManager = jest.fn().mockImplementation(() => ({}));
       const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue(mockAdapter);
@@ -433,7 +452,10 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
           data: 'this will be rejected',
           headers: { 'content-type': 'text/plain', 'content-length': '1000' },
         });
-      const mockAdapter = { getAxios: () => ({ get: mockGet }) };
+      const mockAdapter = {
+        getAxios: () => ({ get: mockGet }),
+        getApiConfig: () => ({ baseUrl: 'https://tc.example' }),
+      };
 
       const ArtifactManager = jest.fn().mockImplementation(() => ({}));
       const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue(mockAdapter);
@@ -481,7 +503,10 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
           data: largeText,
           headers: { 'content-type': 'text/plain' },
         });
-      const mockAdapter = { getAxios: () => ({ get: mockGet }) };
+      const mockAdapter = {
+        getAxios: () => ({ get: mockGet }),
+        getApiConfig: () => ({ baseUrl: 'https://tc.example' }),
+      };
 
       const ArtifactManager = jest.fn().mockImplementation(() => ({}));
       const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue(mockAdapter);
@@ -528,7 +553,10 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
           data: largeBuffer,
           headers: { 'content-type': 'application/octet-stream' },
         });
-      const mockAdapter = { getAxios: () => ({ get: mockGet }) };
+      const mockAdapter = {
+        getAxios: () => ({ get: mockGet }),
+        getApiConfig: () => ({ baseUrl: 'https://tc.example' }),
+      };
 
       const ArtifactManager = jest.fn().mockImplementation(() => ({}));
       const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue(mockAdapter);
@@ -576,7 +604,10 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
           data: 'not a stream',
           headers: { 'content-type': 'text/plain' },
         });
-      const mockAdapter = { getAxios: () => ({ get: mockGet }) };
+      const mockAdapter = {
+        getAxios: () => ({ get: mockGet }),
+        getApiConfig: () => ({ baseUrl: 'https://tc.example' }),
+      };
 
       const ArtifactManager = jest.fn().mockImplementation(() => ({}));
       const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue(mockAdapter);
@@ -632,7 +663,10 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
         data: streamData,
         headers: { 'content-type': 'application/octet-stream', 'content-length': '15' },
       });
-      const mockAdapter = { getAxios: () => ({ get: mockGet }) };
+      const mockAdapter = {
+        getAxios: () => ({ get: mockGet }),
+        getApiConfig: () => ({ baseUrl: 'https://tc.example' }),
+      };
 
       const ArtifactManager = jest.fn().mockImplementation(() => ({}));
       const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue(mockAdapter);
@@ -678,6 +712,50 @@ describe('tools: downloadArtifactByUrl branch coverage via download_build_artifa
       } finally {
         await fs.rm(targetDir, { recursive: true, force: true });
       }
+    });
+  });
+
+  describe('downloadUrl origin enforcement', () => {
+    it('rejects downloadUrl whose origin differs from configured TeamCity baseUrl', async () => {
+      const mockGet = jest.fn();
+      const mockAdapter = {
+        getAxios: () => ({ get: mockGet }),
+        getApiConfig: () => ({ baseUrl: 'https://tc.example' }),
+      };
+
+      const ArtifactManager = jest.fn().mockImplementation(() => ({}));
+      const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue(mockAdapter);
+      const getInstance = jest.fn().mockReturnValue({});
+
+      jest.doMock('@/teamcity/artifact-manager', () => ({ ArtifactManager }));
+      jest.doMock('@/teamcity/client-adapter', () => ({ createAdapterFromTeamCityAPI }));
+      jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance } }));
+
+      let handler: ToolHandler | undefined;
+      jest.isolateModules(() => {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { getRequiredTool } = require('@/tools');
+        handler = getRequiredTool('download_build_artifacts').handler;
+      });
+
+      if (!handler) throw new Error('handler not found');
+
+      const response = await handler({
+        buildId: '123',
+        artifactPaths: [
+          {
+            path: 'leak.bin',
+            buildId: '123',
+            downloadUrl: 'https://attacker.example/steal',
+          },
+        ],
+        encoding: 'base64',
+      });
+
+      const payload = JSON.parse(response.content?.[0]?.text ?? '{}');
+      expect(payload.success).toBe(false);
+      expect(payload.error?.message).toContain('does not match configured TeamCity origin');
+      expect(mockGet).not.toHaveBeenCalled();
     });
   });
 });
