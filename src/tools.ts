@@ -796,7 +796,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Test MCP server connectivity',
+    description: 'Test MCP server connectivity. Returns a confirmation echo and optional message.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -826,7 +826,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: false,
     },
     description:
-      'Get current MCP mode. Dev mode: read-only tools for safe exploration. Full mode: all tools including admin operations.',
+      'Get the current MCP mode. Dev mode is read-only; full mode enables all operations.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -852,8 +852,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    description:
-      'Switch MCP mode at runtime. Dev mode: safe read-only operations. Full mode: all operations including writes. Clients are notified of tool list changes.',
+    description: 'Switch MCP mode at runtime. Clients are notified when the tool list changes.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -906,7 +905,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List TeamCity projects (supports pagination)',
+    description: 'List TeamCity projects. Supports pagination and locator filtering.',
     outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.list_projects,
     inputSchema: {
       type: 'object',
@@ -986,7 +985,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Get details of a specific project',
+    description: 'Get details of a specific project.',
     outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_project,
     inputSchema: {
       type: 'object',
@@ -1019,7 +1018,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List TeamCity builds (supports pagination)',
+    description: 'List TeamCity builds. Supports pagination and locator filtering.',
     outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.list_builds,
     inputSchema: {
       type: 'object',
@@ -1126,8 +1125,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description:
-      'Get details of a specific build (works for both queued and running/finished builds)',
+    description: 'Get details of a specific build. Works for queued, running, and finished builds.',
     outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_build,
     inputSchema: {
       type: 'object',
@@ -1189,7 +1187,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Trigger a new build',
+    description:
+      'Trigger a new build. Returns the queued build id; the build runs asynchronously, use `wait_for_build` to monitor.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1363,7 +1362,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Cancel a queued build by ID',
+    description:
+      'Cancel a queued (not-yet-running) build. Idempotent; returns 404 if the build already started or was cancelled.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1396,7 +1396,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Cancel or stop a running (or queued) build by ID. Supports an optional comment and requeue flag.',
+      'Cancel or stop a running or queued build. Supports an optional comment and requeue flag.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1450,7 +1450,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Get build status with optional test/problem and queue context details',
+    description:
+      'Get build status. Optionally includes test and problem summaries plus queue context.',
     outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_build_status,
     inputSchema: {
       type: 'object',
@@ -1570,7 +1571,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Wait for a build to complete by polling until it reaches a terminal state (finished, canceled, failed) or timeout',
+      'Wait for a build to reach a terminal state (finished, canceled, failed). Long-running; polls until completion or timeout.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1678,7 +1679,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Fetch build log with pagination (by lines)',
+    description: 'Fetch a build log. Supports line-based pagination and streaming output.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1987,7 +1988,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List build configurations (supports pagination)',
+    description: 'List build configurations. Supports pagination and locator filtering.',
     outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.list_build_configs,
     inputSchema: {
       type: 'object',
@@ -2067,7 +2068,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Get details of a build configuration',
+    description: 'Get details of a build configuration.',
     outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_build_config,
     inputSchema: {
       type: 'object',
@@ -2102,7 +2103,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List test failures for a build (supports pagination)',
+    description: 'List test failures for a build. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2174,7 +2175,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List VCS roots (supports pagination)',
+    description: 'List VCS roots. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2250,7 +2251,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Get details of a VCS root (including properties)',
+    description: 'Get details of a VCS root, including its properties.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2291,7 +2292,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Set a single VCS root property (e.g., branch, branchSpec, url)',
+    description: 'Set a single VCS root property such as branch, branchSpec, or url.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2336,7 +2337,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Delete a single VCS root property',
+    description: 'Delete a single VCS root property.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2374,7 +2375,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Update common VCS root properties in one call',
+    description: 'Update common VCS root properties in a single call.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2456,7 +2457,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List queued builds (supports TeamCity queue locator + pagination)',
+    description: 'List queued builds. Supports TeamCity queue locator filtering and pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2535,7 +2536,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Fetch server metrics (CPU/memory/disk/load) if available',
+    description: 'Fetch TeamCity server metrics (CPU, memory, disk, load) when available.',
     inputSchema: { type: 'object', properties: {} },
     handler: async (_args: unknown) => {
       return runTool(
@@ -2559,7 +2560,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Get TeamCity server info (version, build number, state)',
+    description: 'Get TeamCity server info including version, build number, and state.',
     inputSchema: { type: 'object', properties: {} },
     handler: async (_args: unknown) => {
       return runTool(
@@ -2582,7 +2583,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List server health items (warnings/errors) for readiness checks',
+    description: 'List server health items (warnings and errors). Useful for readiness checks.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2670,7 +2671,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Get a single server health item by locator',
+    description: 'Get a single server health item by locator.',
     inputSchema: {
       type: 'object',
       properties: { locator: { type: 'string', description: 'Health item locator' } },
@@ -2702,7 +2703,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Evaluate server health; returns ok=false if critical health items found (severity ERROR)',
+      'Evaluate server health. Returns ok=false when any ERROR-severity items are present.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2748,7 +2749,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Get build types compatible with the specified agent',
+    description: 'List build types compatible with the specified agent.',
     inputSchema: {
       type: 'object',
       properties: { agentId: { type: 'string', description: 'Agent ID' } },
@@ -2777,7 +2778,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Get build types incompatible with the specified agent',
+    description: 'List build types incompatible with the specified agent.',
     inputSchema: {
       type: 'object',
       properties: { agentId: { type: 'string', description: 'Agent ID' } },
@@ -2806,7 +2807,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Get the enabled/disabled state for an agent, including comment and switch time',
+    description: "Get an agent's enabled/disabled state, including comment and switch time.",
     inputSchema: {
       type: 'object',
       properties: { agentId: { type: 'string', description: 'Agent ID' } },
@@ -2835,7 +2836,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List agents compatible with a build type (optionally filter enabled only)',
+    description:
+      'List agents compatible with a build type. Optionally filters to enabled agents only.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2876,7 +2878,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Return only the count of enabled compatible agents for a build type',
+    description: 'Count enabled agents compatible with a build type.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2919,7 +2921,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'List agents compatible with a queued/running build by buildId (optionally filter enabled only)',
+      'List agents compatible with a queued or running build. Optionally filters to enabled agents only.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2963,7 +2965,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Check connectivity to TeamCity server and basic readiness',
+    description: 'Check connectivity and basic readiness of the TeamCity server.',
     inputSchema: { type: 'object', properties: {} },
     handler: async (_args: unknown) => {
       const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
@@ -2982,7 +2984,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List build agents (supports pagination)',
+    description: 'List build agents. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3053,7 +3055,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List agent pools (supports pagination)',
+    description: 'List agent pools. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3128,7 +3130,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Get detailed results of a build including tests, artifacts, changes, and statistics',
+      'Get detailed results of a build. Optionally includes tests, artifacts, changes, statistics, and dependencies.',
     outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_build_results,
     inputSchema: {
       type: 'object',
@@ -3268,7 +3270,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Download a single artifact with optional streaming output',
+    description: 'Download a single build artifact. Supports base64, text, or streaming output.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3341,7 +3343,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Download multiple artifacts with optional streaming output',
+    description: 'Download multiple build artifacts. Supports base64, text, or streaming output.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3541,7 +3543,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Get detailed information about test failures',
+    description: 'Get detailed information about test failures.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3579,7 +3581,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Analyze and report build problems and failures',
+    description: 'Analyze and report build problems and failures.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3621,7 +3623,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List VCS changes (supports pagination)',
+    description: 'List VCS changes. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3702,7 +3704,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List build problems (supports pagination)',
+    description: 'List build problems. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3783,7 +3785,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List problem occurrences (supports pagination)',
+    description: 'List build problem occurrences. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3872,7 +3874,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List open investigations (supports pagination)',
+    description: 'List open investigations. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3966,7 +3968,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List muted tests (supports pagination)',
+    description: 'List muted tests. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4053,7 +4055,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Get Versioned Settings status for a locator',
+    description: 'Get Versioned Settings status for a project locator.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4098,7 +4100,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List TeamCity users (supports pagination)',
+    description: 'List TeamCity users. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4174,7 +4176,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List defined roles and their permissions',
+    description: 'List defined roles and their permissions.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4209,7 +4211,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List branches for a project or build configuration',
+    description: 'List branches for a project or build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4259,7 +4261,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List parameters for a build configuration',
+    description: 'List parameters for a build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4302,7 +4304,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List project hierarchy showing parent-child relationships',
+    description: 'List project hierarchy showing parent-child relationships.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4382,7 +4384,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Create a new TeamCity project',
+    description: 'Create a new TeamCity project.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4430,7 +4432,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Delete a TeamCity project',
+    description: 'Delete a TeamCity project.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4456,7 +4458,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Update project settings and parameters',
+    description: 'Update project settings and parameters.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4559,7 +4561,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Create a new build configuration',
+    description: 'Create a new build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4596,7 +4598,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Clone an existing build configuration',
+    description: 'Clone an existing build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4706,7 +4708,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Update build configuration settings',
+    description: 'Update build configuration settings.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4818,7 +4820,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Add, update, or delete artifact and snapshot dependencies for a build configuration',
+      'Add, update, or delete artifact and snapshot dependencies for a build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4973,7 +4975,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Add, update, or delete build features such as ssh-agent or requirements enforcement',
+      'Add, update, or delete build features such as ssh-agent or requirements enforcement.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5092,7 +5094,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Add, update, or delete build agent requirements for a configuration',
+    description: 'Add, update, or delete agent requirements for a build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5250,7 +5252,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Enable or disable a build configuration by toggling its paused flag',
+    description: 'Enable or disable a build configuration by toggling its paused flag.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5303,7 +5305,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Attach a VCS root to a build configuration',
+    description: 'Attach a VCS root to a build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5358,7 +5360,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Add a parameter to a build configuration',
+    description: 'Add a parameter to a build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5408,7 +5410,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Update a build configuration parameter',
+    description: 'Update a build configuration parameter.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5459,7 +5461,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Delete a parameter from a build configuration',
+    description: 'Delete a parameter from a build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5495,7 +5497,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List parameters for a project',
+    description: 'List parameters for a project.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5533,7 +5535,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Add a parameter to a project',
+    description: 'Add a parameter to a project.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5585,7 +5587,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Update a project parameter',
+    description: 'Update a project parameter.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5636,7 +5638,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Delete a parameter from a project',
+    description: 'Delete a parameter from a project.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5669,7 +5671,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List output parameters for a build configuration',
+    description: 'List output parameters for a build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5705,7 +5707,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Add an output parameter to a build configuration (for build chains)',
+    description:
+      'Add an output parameter to a build configuration. Used to pass values between builds in a chain.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5748,7 +5751,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Update an output parameter in a build configuration',
+    description: 'Update an output parameter in a build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5791,7 +5794,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Delete an output parameter from a build configuration',
+    description: 'Delete an output parameter from a build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5828,7 +5831,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Create a new VCS root',
+    description: 'Create a new VCS root.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5874,7 +5877,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Authorize or unauthorize a build agent',
+    description: 'Authorize or unauthorize a build agent.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5911,7 +5914,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Assign an agent to a different pool',
+    description: 'Assign an agent to a different pool.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5945,7 +5948,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Remove (delete) a build agent from the TeamCity server. Use this to clean up disconnected or ghost agent entries.',
+      'Remove a build agent from the TeamCity server. Useful for cleaning up disconnected or ghost agent entries.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5972,7 +5975,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Add, update, or delete build steps',
+    description: 'Add, update, or delete build steps.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6208,7 +6211,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Add, update, or delete build triggers',
+    description: 'Add, update, or delete build triggers.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6286,7 +6289,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Set paused/unpaused for a list of build configurations; optionally cancel queued',
+    description:
+      'Pause or unpause a list of build configurations. Optionally cancels their queued builds.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6360,7 +6364,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Mute tests within a project or build configuration scope',
+    description: 'Mute tests within a project or build configuration scope.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6466,7 +6470,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Move a queued build to the top of the queue',
+    description: 'Move a queued build to the top of the queue.',
     inputSchema: {
       type: 'object',
       properties: { buildId: { type: 'string', description: 'Queued build ID' } },
@@ -6501,7 +6505,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Reorder queued builds by providing the desired sequence of IDs',
+    description: 'Reorder queued builds by providing the desired sequence of IDs.',
     inputSchema: {
       type: 'object',
       properties: { buildIds: { type: 'array', items: { type: 'string' } } },
@@ -6536,7 +6540,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Cancel all queued builds for a specific build configuration',
+    description: 'Cancel all queued builds for a specific build configuration.',
     inputSchema: {
       type: 'object',
       properties: { buildTypeId: { type: 'string', description: 'Build type ID' } },
@@ -6579,7 +6583,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Cancel all queued builds matching a queue locator expression',
+    description: 'Cancel all queued builds matching a queue locator expression.',
     inputSchema: {
       type: 'object',
       properties: { locator: { type: 'string', description: 'Queue locator expression' } },
@@ -6624,7 +6628,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Disable all agents in a pool to pause queue processing; optionally cancel queued builds for a build type',
+      'Pause queue processing by disabling all agents in a pool. Optionally cancels queued builds for a build type.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6712,7 +6716,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Re-enable all agents in a pool to resume queue processing',
+    description: 'Resume queue processing by re-enabling all agents in a pool.',
     inputSchema: {
       type: 'object',
       properties: { poolId: { type: 'string', description: 'Agent pool ID' } },
@@ -6763,7 +6767,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Enable/disable an agent, with optional comment and schedule',
+    description: 'Enable or disable an agent. Supports optional comment and schedule.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6820,7 +6824,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Bulk enable/disable agents selected by pool or locator; supports comment/schedule',
+      'Bulk enable or disable agents selected by pool or locator. Supports optional comment and schedule.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6928,7 +6932,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'List SSH keys configured for a project',
+    description: 'List SSH keys configured for a project.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6962,7 +6966,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Upload an SSH key to a project. Provide either privateKeyContent (raw PEM string) or privateKeyPath (path to key file), but not both.',
+      'Upload an SSH key to a project. Provide either privateKeyContent or privateKeyPath, not both.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -7020,7 +7024,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Delete an SSH key from a project',
+    description: 'Delete an SSH key from a project.',
     inputSchema: {
       type: 'object',
       properties: {
