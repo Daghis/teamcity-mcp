@@ -17,6 +17,28 @@ import { getConfig } from './config';
 import { getAvailableTools, getMCPMode, getTool } from './tools';
 
 /**
+ * Extract a JSON-object payload from a tool's text content to surface as
+ * `structuredContent`. Returns undefined when the content is absent, empty,
+ * not JSON, or not a JSON object (the MCP spec requires structuredContent to
+ * be a JSON object, not a primitive or array).
+ */
+function parseStructuredContent(
+  content: Array<{ type: string; text: string }>
+): Record<string, unknown> | undefined {
+  const first = content[0];
+  if (first?.type !== 'text' || typeof first.text !== 'string') return undefined;
+  try {
+    const parsed: unknown = JSON.parse(first.text);
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // not JSON — leave structuredContent unset
+  }
+  return undefined;
+}
+
+/**
  * Create a simple MCP server
  */
 export function createMCPServer(): Server {
@@ -58,6 +80,7 @@ export function createSimpleServer(): Server {
         description: tool.description,
         inputSchema: tool.inputSchema,
         annotations: tool.annotations,
+        ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
       })),
     };
     logDebug('MCP response: tools/list', { count: response.tools.length, success: true });
@@ -90,11 +113,23 @@ export function createSimpleServer(): Server {
       const result = await tool.handler(args ?? {});
       // Tool executed successfully
       // MCP SDK expects a specific format for tool responses
-      const response = {
-        content: result.content ?? [
-          { type: 'text', text: result.error ?? 'Tool executed successfully' },
-        ],
-      };
+      const content = result.content ?? [
+        { type: 'text', text: result.error ?? 'Tool executed successfully' },
+      ];
+      const response: {
+        content: Array<{ type: string; text: string }>;
+        structuredContent?: Record<string, unknown>;
+      } = { content };
+      // Per the MCP spec, tools that declare `outputSchema` must return their
+      // payload in `structuredContent`. Our handlers emit a single JSON text
+      // block via the `json()` helper; parse it back into an object so the
+      // wire response matches what the declared schema describes.
+      if (tool.outputSchema && result.success !== false) {
+        const structured = parseStructuredContent(content);
+        if (structured !== undefined) {
+          response.structuredContent = structured;
+        }
+      }
       const duration = Date.now() - started;
       const success = result?.success !== false;
       logDebug('MCP response: tools/call', {

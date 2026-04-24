@@ -89,7 +89,10 @@ describe('utils/mcp runTool', () => {
     const handler = jest.fn();
 
     const out = await runTool('sum', schema, handler, { n: 'bad' });
-    expect(out.success).toBe(true); // json() wrapper marks success true
+    // Error envelopes must be flagged as failures so consumers (e.g. the
+    // server's structuredContent gate) do not treat them as valid output.
+    expect(out.success).toBe(false);
+    expect(typeof out.error).toBe('string');
     expect(out.content?.[0]?.text).toContain('zod');
     expect(handler).not.toHaveBeenCalled();
   });
@@ -101,7 +104,8 @@ describe('utils/mcp runTool', () => {
     });
 
     const out = await runTool('f', schema, handler, { x: '1' });
-    expect(out.success).toBe(true);
+    expect(out.success).toBe(false);
+    expect(out.error).toBe('boom');
     expect(out.content?.[0]?.text).toContain('handled');
 
     expect(globalErrorHandler.handleToolError).toHaveBeenCalled();

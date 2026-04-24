@@ -71,16 +71,26 @@ export async function runTool<T>(
       duration,
       { requestId: reqId }
     );
-    // Preserve validation error details for proper shaping
+    // Preserve validation error details for proper shaping. The inner JSON
+    // payload is an error envelope, not the tool's declared output shape, so
+    // mark the outer response with success=false to prevent downstream
+    // consumers (e.g. server.ts surfacing structuredContent for tools with an
+    // outputSchema) from treating it as a conforming payload.
     if (err instanceof z.ZodError) {
       const formatted = formatError(err, { ...context, requestId: reqId });
-      return json(formatted);
+      const response = json(formatted);
+      response.success = false;
+      response.error = msg;
+      return response;
     }
     // Pass through original error so handler can extract rich details
     const formatted = globalErrorHandler.handleToolError(err, toolName, {
       ...context,
       requestId: reqId,
     });
-    return json(formatted);
+    const response = json(formatted);
+    response.success = false;
+    response.error = msg;
+    return response;
   }
 }
