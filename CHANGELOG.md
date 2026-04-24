@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.9.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.8.0...teamcity-mcp-v2.9.0) (2026-04-24)
+
+
+### Features
+
+* **tools:** unify tool descriptions under a single skeleton ([#479](https://github.com/Daghis/teamcity-mcp/issues/479)) ([19aa256](https://github.com/Daghis/teamcity-mcp/commit/19aa2565f21938639bd9d40f7b1c9cbb524d8e22))
+
 ## [2.8.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.7.0...teamcity-mcp-v2.8.0) (2026-04-24)
 
 
