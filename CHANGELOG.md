@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.8.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.7.0...teamcity-mcp-v2.8.0) (2026-04-24)
+
+
+### Features
+
+* **tools:** declare outputSchema for first batch of read tools ([#477](https://github.com/Daghis/teamcity-mcp/issues/477)) ([932fee9](https://github.com/Daghis/teamcity-mcp/commit/932fee9e09988555cda13b8f7282128de8a7e3f5))
+
 ## [2.7.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.6.3...teamcity-mcp-v2.7.0) (2026-04-23)
 
 
