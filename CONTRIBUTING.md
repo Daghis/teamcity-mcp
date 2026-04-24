@@ -100,6 +100,35 @@ Per-tool exceptions are fine — apply judgment over pattern-matching when a too
 
 A CI test (`tests/unit/tools/tool-annotations.test.ts`) will fail if any tool ships without all four hints set.
 
+## Tool Descriptions
+
+Agents pick tools by pattern-matching names and descriptions, so a uniform shape improves routing. Every tool description in `src/tools.ts` must match this skeleton:
+
+```
+<Verb> <resource>[, scoped to <scope>]. [<One short behavioral clause if non-obvious — e.g. "Supports pagination.", "Idempotent.", "Long-running, use wait_for_build to monitor.">].
+```
+
+Rules:
+
+- Start with an imperative verb (`List`, `Get`, `Trigger`, `Cancel`, …) and name the resource.
+- Keep it to **at most two sentences**, both ending with a period.
+- Use the optional second sentence only for a non-obvious behavior trait — pagination, async/queued behavior, idempotency caveats, cross-references to sibling tools.
+- **Do not** repeat parameter information that the input schema already documents.
+- **Do not** add "use this when not `list_X` / `get_X`" disambiguators (tracked separately for targeted cases).
+- **Do not** expand into multi-paragraph essays — agent context is a scarce resource.
+
+### Examples
+
+| Tool | Description |
+| --- | --- |
+| `ping` | `Test MCP server connectivity. Returns a confirmation echo and optional message.` |
+| `list_builds` | `List TeamCity builds. Supports pagination and locator filtering.` |
+| `trigger_build` | `` Trigger a new build. Returns the queued build id; the build runs asynchronously, use `wait_for_build` to monitor. `` |
+| `cancel_queued_build` | `Cancel a queued (not-yet-running) build. Idempotent; returns 404 if the build already started or was cancelled.` |
+| `delete_project` | `Delete a TeamCity project.` |
+
+A CI test (`tests/unit/tools/tool-descriptions.test.ts`) enforces these rules on every registered tool.
+
 ## Code Style
 
 - TypeScript, strict mode. No `any`. Prefer precise types and generics.
