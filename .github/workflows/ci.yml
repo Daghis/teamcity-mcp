@@ -93,6 +93,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: |
           npm run build
+          npm install --no-save --no-package-lock @codecov/bundle-analyzer@^2.0.1
           npm run bundle:analyze
 
   aggregate:

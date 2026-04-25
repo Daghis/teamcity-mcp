@@ -10,13 +10,14 @@
 
 const path = require('path');
 const fs = require('fs');
-const { createAndUploadReport } = require('@codecov/bundle-analyzer');
 
 const uploadToken = process.env.CODECOV_TOKEN;
 if (!uploadToken) {
   console.log('CODECOV_TOKEN not set — skipping Codecov bundle analysis upload.');
   process.exit(0);
 }
+
+const { createAndUploadReport } = require('@codecov/bundle-analyzer');
 
 const distDir = path.resolve(__dirname, '..', 'dist');
 if (!fs.existsSync(distDir)) {
