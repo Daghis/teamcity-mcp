@@ -98,9 +98,6 @@
     "tsx": "^4.6.0",
     "typescript": "^6.0.2"
   },
-  "optionalDependencies": {
-    "@codecov/bundle-analyzer": "^2.0.1"
-  },
   "overrides": {
     "@hono/node-server": "^1.19.13",
     "axios": "^1.15.0",
