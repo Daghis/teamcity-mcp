@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.10.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.9.0...teamcity-mcp-v2.10.0) (2026-04-26)
+
+
+### Features
+
+* **tools:** disclose principal return and primary error for mutators ([#484](https://github.com/Daghis/teamcity-mcp/issues/484)) ([0a4d747](https://github.com/Daghis/teamcity-mcp/commit/0a4d7479823f034b04d4623446f71b17b4b30d49))
+
 ## [2.9.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.8.0...teamcity-mcp-v2.9.0) (2026-04-24)
 
 
