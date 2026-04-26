@@ -852,7 +852,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: false,
     },
-    description: 'Switch MCP mode at runtime. Clients are notified when the tool list changes.',
+    description:
+      'Switch MCP mode at runtime. Returns previous and current modes with the updated tool count; idempotent and notifies clients of the list change.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1188,7 +1189,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Trigger a new build. Returns the queued build id; the build runs asynchronously, use `wait_for_build` to monitor.',
+      'Trigger a new build; runs asynchronously, use `wait_for_build` to monitor. Returns the queued build id; returns 404 if buildTypeId is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1396,7 +1397,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Cancel or stop a running or queued build. Supports an optional comment and requeue flag.',
+      'Cancel or stop a running or queued build, with optional comment and requeue flag. Returns the cancelled build; returns 404 if the build is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2292,7 +2293,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Set a single VCS root property such as branch, branchSpec, or url.',
+    description:
+      'Set a single VCS root property such as branch, branchSpec, or url. Returns the updated value; returns 404 if the VCS root or property is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2337,7 +2339,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Delete a single VCS root property.',
+    description:
+      'Delete a single VCS root property. Idempotent; returns 404 if the VCS root is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2375,7 +2378,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Update common VCS root properties in a single call.',
+    description:
+      'Update common VCS root properties in a single call. Returns the updated VCS root; returns 404 if the VCS root is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3270,7 +3274,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Download a single build artifact. Supports base64, text, or streaming output.',
+    description:
+      'Download a single build artifact, with base64, text, or streaming output. Returns the artifact bytes or stream metadata; returns 404 if the build or path is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3343,7 +3348,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Download multiple build artifacts. Supports base64, text, or streaming output.',
+    description:
+      'Download multiple build artifacts, with base64, text, or streaming output. Returns per-artifact payloads or stream metadata; returns 404 if the build or any path is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4384,7 +4390,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Create a new TeamCity project.',
+    description:
+      'Create a new TeamCity project. Returns the created project (id and name); returns 409 if a project with the same id already exists.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4432,7 +4439,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Delete a TeamCity project.',
+    description:
+      'Delete a TeamCity project. Irreversible; returns 404 if the project does not exist.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4458,7 +4466,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Update project settings and parameters.',
+    description:
+      'Update project settings and parameters. Returns the updated project; returns 404 if the project does not exist.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4561,7 +4570,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Create a new build configuration.',
+    description:
+      'Create a new build configuration. Returns the created configuration (id and name); returns 409 if a configuration with the same id already exists.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4598,7 +4608,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Clone an existing build configuration.',
+    description:
+      'Clone an existing build configuration. Returns the new configuration (id and name); returns 404 if the source configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4708,7 +4719,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Update build configuration settings.',
+    description:
+      'Update build configuration settings. Returns the updated configuration; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4820,7 +4832,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Add, update, or delete artifact and snapshot dependencies for a build configuration.',
+      'Add, update, or delete artifact and snapshot dependencies for a build configuration. Returns the affected dependency or a delete confirmation; returns 404 if the configuration or dependency id is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4975,7 +4987,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Add, update, or delete build features such as ssh-agent or requirements enforcement.',
+      'Add, update, or delete build features such as ssh-agent or requirements enforcement. Returns the affected feature or a delete confirmation; returns 404 if the configuration or feature id is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5094,7 +5106,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Add, update, or delete agent requirements for a build configuration.',
+    description:
+      'Add, update, or delete agent requirements for a build configuration. Returns the affected requirement or a delete confirmation; returns 404 if the configuration or requirement id is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5252,7 +5265,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Enable or disable a build configuration by toggling its paused flag.',
+    description:
+      'Enable or disable a build configuration by toggling its paused flag. Returns the new paused state; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5305,7 +5319,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Attach a VCS root to a build configuration.',
+    description:
+      'Attach a VCS root to a build configuration. Returns the attached VCS root entry; returns 404 if the configuration or VCS root is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5360,7 +5375,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Add a parameter to a build configuration.',
+    description:
+      'Add a parameter to a build configuration. Returns the created parameter; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5410,7 +5426,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Update a build configuration parameter.',
+    description:
+      'Update a build configuration parameter. Returns the updated parameter; returns 404 if the configuration or parameter name is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5461,7 +5478,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Delete a parameter from a build configuration.',
+    description:
+      'Delete a parameter from a build configuration. Idempotent; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5535,7 +5553,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Add a parameter to a project.',
+    description:
+      'Add a parameter to a project. Returns the created parameter; returns 404 if the project does not exist.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5587,7 +5606,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Update a project parameter.',
+    description:
+      'Update a project parameter. Returns the updated parameter; returns 404 if the project or parameter name is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5638,7 +5658,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Delete a parameter from a project.',
+    description:
+      'Delete a parameter from a project. Idempotent; returns 404 if the project does not exist.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5708,7 +5729,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Add an output parameter to a build configuration. Used to pass values between builds in a chain.',
+      'Add an output parameter to a build configuration; used to pass values between builds in a chain. Returns the created parameter; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5751,7 +5772,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Update an output parameter in a build configuration.',
+    description:
+      'Update an output parameter in a build configuration. Returns the updated parameter; returns 404 if the configuration or parameter name is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5794,7 +5816,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Delete an output parameter from a build configuration.',
+    description:
+      'Delete an output parameter from a build configuration. Idempotent; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5831,7 +5854,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Create a new VCS root.',
+    description:
+      'Create a new VCS root. Returns the created VCS root id; returns 409 if a VCS root with the same id already exists.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5877,7 +5901,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Authorize or unauthorize a build agent.',
+    description:
+      'Authorize or unauthorize a build agent. Returns the new authorization state; returns 404 if the agent is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5914,7 +5939,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Assign an agent to a different pool.',
+    description:
+      "Assign an agent to a different pool. Returns the agent's new pool assignment; returns 404 if the agent or pool is unknown.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -5948,7 +5974,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Remove a build agent from the TeamCity server. Useful for cleaning up disconnected or ghost agent entries.',
+      'Remove a build agent from the TeamCity server, useful for cleaning up disconnected or ghost agent entries. Idempotent; returns 404 if the agent is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5975,7 +6001,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Add, update, or delete build steps.',
+    description:
+      'Add, update, or delete build steps. Returns the affected step or a delete confirmation; returns 404 if the configuration or step id is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6211,7 +6238,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Add, update, or delete build triggers.',
+    description:
+      'Add, update, or delete build triggers. Returns the affected trigger or a delete confirmation; returns 404 if the configuration or trigger id is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6290,7 +6318,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Pause or unpause a list of build configurations. Optionally cancels their queued builds.',
+      'Pause or unpause a list of build configurations, optionally cancelling their queued builds. Returns the count of configurations updated; returns 404 if any configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6364,7 +6392,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Mute tests within a project or build configuration scope.',
+    description:
+      'Mute tests within a project or build configuration scope. Returns the created mute id; returns 404 if the scope id is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6470,7 +6499,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Move a queued build to the top of the queue.',
+    description:
+      'Move a queued build to the top of the queue. Idempotent; returns 404 if the build is no longer queued.',
     inputSchema: {
       type: 'object',
       properties: { buildId: { type: 'string', description: 'Queued build ID' } },
@@ -6505,7 +6535,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Reorder queued builds by providing the desired sequence of IDs.',
+    description:
+      'Reorder queued builds by providing the desired sequence of IDs. Returns the new queue order; returns 404 if any build id is no longer queued.',
     inputSchema: {
       type: 'object',
       properties: { buildIds: { type: 'array', items: { type: 'string' } } },
@@ -6540,7 +6571,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Cancel all queued builds for a specific build configuration.',
+    description:
+      'Cancel all queued builds for a specific build configuration. Returns the count of cancelled builds; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: { buildTypeId: { type: 'string', description: 'Build type ID' } },
@@ -6583,7 +6615,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Cancel all queued builds matching a queue locator expression.',
+    description:
+      'Cancel all queued builds matching a queue locator expression. Returns the count of cancelled builds; returns 400 if the locator is malformed.',
     inputSchema: {
       type: 'object',
       properties: { locator: { type: 'string', description: 'Queue locator expression' } },
@@ -6628,7 +6661,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Pause queue processing by disabling all agents in a pool. Optionally cancels queued builds for a build type.',
+      'Pause queue processing by disabling all agents in a pool, optionally cancelling queued builds for a build type. Returns counts of agents disabled and builds cancelled; returns 404 if the pool is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6716,7 +6749,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Resume queue processing by re-enabling all agents in a pool.',
+    description:
+      'Resume queue processing by re-enabling all agents in a pool. Returns the count of agents re-enabled; returns 404 if the pool is unknown.',
     inputSchema: {
       type: 'object',
       properties: { poolId: { type: 'string', description: 'Agent pool ID' } },
@@ -6767,7 +6801,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Enable or disable an agent. Supports optional comment and schedule.',
+    description:
+      'Enable or disable an agent, with optional comment and schedule. Returns the new enabled state; returns 404 if the agent is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6824,7 +6859,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Bulk enable or disable agents selected by pool or locator. Supports optional comment and schedule.',
+      'Bulk enable or disable agents selected by pool or locator, with optional comment and schedule. Returns counts of agents updated and skipped; returns 404 if the pool is unknown or 400 if the locator is malformed.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -6966,7 +7001,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Upload an SSH key to a project. Provide either privateKeyContent or privateKeyPath, not both.',
+      "Upload an SSH key to a project; provide either privateKeyContent or privateKeyPath, not both. Returns the uploaded key's name; returns 404 if the project does not exist.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -7024,7 +7059,8 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
       idempotentHint: true,
       openWorldHint: true,
     },
-    description: 'Delete an SSH key from a project.',
+    description:
+      'Delete an SSH key from a project. Idempotent; returns 404 if the project or key is unknown.',
     inputSchema: {
       type: 'object',
       properties: {

@@ -1,8 +1,11 @@
 /**
- * Guardrail for the unified tool-description skeleton introduced in #469.
+ * Guardrail for the unified tool-description skeleton introduced in #469,
+ * extended in #470 with a return/error disclosure rule for mutating tools.
  *
  * Every tool in `src/tools.ts` must follow:
  *   <Verb> <resource>[, scoped to <scope>]. [<One short behavioral clause>].
+ * Mutating tools (`readOnlyHint: false`) additionally disclose the principal
+ * return value and the dominant failure mode in a third sentence.
  *
  * This test mechanically enforces the hard rules: sentence count, first-word
  * shape, punctuation, length bounds, and a small blocklist of known
@@ -105,11 +108,39 @@ describe('tool descriptions (issue #469)', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('no tool description exceeds two sentences', () => {
+  it('no read-only tool description exceeds two sentences', () => {
     const offenders: string[] = [];
     for (const t of tools) {
+      if (t.annotations?.readOnlyHint !== true) continue;
       const count = sentenceCount(t.description);
       if (count > 2) offenders.push(`${t.name}: ${count} sentences — ${t.description}`);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('no mutating tool description exceeds three sentences', () => {
+    const offenders: string[] = [];
+    for (const t of tools) {
+      if (t.annotations?.readOnlyHint !== false) continue;
+      const count = sentenceCount(t.description);
+      if (count > 3) offenders.push(`${t.name}: ${count} sentences — ${t.description}`);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('every mutating tool discloses principal return and primary error (issue #470)', () => {
+    const RETURN_CLAUSE = /\breturns\b/i;
+    const SAFETY_MARKER = /\b(idempotent|irreversible|no-?op)\b/i;
+    const STATUS_CODE = /\breturns\s+\d{3}\b/i;
+    const offenders: string[] = [];
+    for (const t of tools) {
+      if (t.annotations?.readOnlyHint !== false) continue;
+      const d = t.description;
+      const hasReturn = RETURN_CLAUSE.test(d) || SAFETY_MARKER.test(d);
+      const hasError = STATUS_CODE.test(d) || SAFETY_MARKER.test(d);
+      if (!hasReturn || !hasError) {
+        offenders.push(`${t.name}: missing return and/or error clause — ${d}`);
+      }
     }
     expect(offenders).toEqual([]);
   });

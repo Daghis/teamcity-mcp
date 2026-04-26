@@ -111,11 +111,20 @@ Agents pick tools by pattern-matching names and descriptions, so a uniform shape
 Rules:
 
 - Start with an imperative verb (`List`, `Get`, `Trigger`, `Cancel`, …) and name the resource.
-- Keep it to **at most two sentences**, both ending with a period.
+- Read-only tools: **at most two sentences**. Mutating tools (`readOnlyHint: false`): **at most three**, with the extra sentence reserved for the return/error disclosure described below.
 - Use the optional second sentence only for a non-obvious behavior trait — pagination, async/queued behavior, idempotency caveats, cross-references to sibling tools.
 - **Do not** repeat parameter information that the input schema already documents.
 - **Do not** add "use this when not `list_X` / `get_X`" disambiguators (tracked separately for targeted cases).
 - **Do not** expand into multi-paragraph essays — agent context is a scarce resource.
+
+### Mutating tools: return-value and primary-error disclosure (issue #470)
+
+Every tool registered with `readOnlyHint: false` must end its description with a clause that names:
+
+1. **The principal return value on success** — an id, a count, the updated resource, etc.
+2. **The single most likely failure mode** — usually `Returns 404 if X is unknown` or a safety marker like `Idempotent`/`Irreversible` for cases where the dominant guarantee is more relevant than a specific status code.
+
+Limit the disclosure to one short clause; do not enumerate every possible error — name the dominant one. Read-only tools are out of scope; their `outputSchema` (issue #468) handles return shape.
 
 ### Examples
 
@@ -123,11 +132,12 @@ Rules:
 | --- | --- |
 | `ping` | `Test MCP server connectivity. Returns a confirmation echo and optional message.` |
 | `list_builds` | `List TeamCity builds. Supports pagination and locator filtering.` |
-| `trigger_build` | `` Trigger a new build. Returns the queued build id; the build runs asynchronously, use `wait_for_build` to monitor. `` |
+| `trigger_build` | `` Trigger a new build; runs asynchronously, use `wait_for_build` to monitor. Returns the queued build id; returns 404 if buildTypeId is unknown. `` |
 | `cancel_queued_build` | `Cancel a queued (not-yet-running) build. Idempotent; returns 404 if the build already started or was cancelled.` |
-| `delete_project` | `Delete a TeamCity project.` |
+| `delete_project` | `Delete a TeamCity project. Irreversible; returns 404 if the project does not exist.` |
+| `set_vcs_root_property` | `Set a single VCS root property such as branch, branchSpec, or url. Returns the updated value; returns 404 if the VCS root or property is unknown.` |
 
-A CI test (`tests/unit/tools/tool-descriptions.test.ts`) enforces these rules on every registered tool.
+A CI test (`tests/unit/tools/tool-descriptions.test.ts`) enforces these rules on every registered tool, including the return/error disclosure for mutators.
 
 ## Code Style
 
