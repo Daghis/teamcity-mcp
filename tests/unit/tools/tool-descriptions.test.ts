@@ -128,18 +128,48 @@ describe('tool descriptions (issue #469)', () => {
     expect(offenders).toEqual([]);
   });
 
+  // The success-return clause must be independent of the error clause.
+  // The negative lookahead excludes status-code contexts (e.g. "returns 404 …")
+  // from the success-return match so a description that only carries an error
+  // clause cannot satisfy both checks with the same evidence.
+  const SUCCESS_RETURN = /\breturns\b(?!\s+\d{3}\b)/i;
+  const SAFETY_MARKER = /\b(idempotent|irreversible|no-?op)\b/i;
+  const STATUS_CODE = /\breturns\s+\d{3}\b/i;
+
+  const isMutatorDescriptionConformant = (d: string): boolean => {
+    const hasReturn = SUCCESS_RETURN.test(d) || SAFETY_MARKER.test(d);
+    const hasError = STATUS_CODE.test(d) || SAFETY_MARKER.test(d);
+    return hasReturn && hasError;
+  };
+
+  it('mutator description rule rejects descriptions with no independent success-return clause', () => {
+    // Regression guard: an earlier draft of the rule used /\breturns\b/i for the
+    // success-return match, which also matched "returns 404 …" inside the error
+    // clause — so a description with only an error clause silently passed both
+    // checks. Probe the predicate with known-bad and known-good shapes to catch
+    // any future weakening of the regex.
+    expect(
+      isMutatorDescriptionConformant('Delete a project. Returns 404 if the project does not exist.')
+    ).toBe(false);
+    expect(isMutatorDescriptionConformant('Mute tests within a scope.')).toBe(false);
+    expect(
+      isMutatorDescriptionConformant(
+        'Delete a project. Irreversible; returns 404 if the project does not exist.'
+      )
+    ).toBe(true);
+    expect(
+      isMutatorDescriptionConformant(
+        'Update build configuration settings. Returns the updated configuration; returns 404 if the configuration is unknown.'
+      )
+    ).toBe(true);
+  });
+
   it('every mutating tool discloses principal return and primary error (issue #470)', () => {
-    const RETURN_CLAUSE = /\breturns\b/i;
-    const SAFETY_MARKER = /\b(idempotent|irreversible|no-?op)\b/i;
-    const STATUS_CODE = /\breturns\s+\d{3}\b/i;
     const offenders: string[] = [];
     for (const t of tools) {
       if (t.annotations?.readOnlyHint !== false) continue;
-      const d = t.description;
-      const hasReturn = RETURN_CLAUSE.test(d) || SAFETY_MARKER.test(d);
-      const hasError = STATUS_CODE.test(d) || SAFETY_MARKER.test(d);
-      if (!hasReturn || !hasError) {
-        offenders.push(`${t.name}: missing return and/or error clause — ${d}`);
+      if (!isMutatorDescriptionConformant(t.description)) {
+        offenders.push(`${t.name}: missing return and/or error clause — ${t.description}`);
       }
     }
     expect(offenders).toEqual([]);
