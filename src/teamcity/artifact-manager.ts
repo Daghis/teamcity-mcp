@@ -27,6 +27,10 @@ export interface ArtifactListOptions {
   minSize?: number;
   maxSize?: number;
   includeNested?: boolean;
+  /** Include directory entries in the result (default: false — directories are skipped). */
+  includeDirectories?: boolean;
+  /** Sub-path to list (e.g. "okd" lists contents of the okd directory). */
+  path?: string;
   limit?: number;
   offset?: number;
   forceRefresh?: boolean;
@@ -104,14 +108,21 @@ export class ArtifactManager {
       // Fetch artifacts from API
       const response = await this.client.modules.builds.getFilesListOfBuild(
         buildLocator,
-        undefined,
+        options.path,
         undefined,
         'file(name,fullName,size,modificationTime,href,children(file(name,fullName,size,modificationTime,href)))'
       );
 
       const baseUrl = this.getBaseUrl();
       const artifactPayload = this.ensureArtifactListingResponse(response.data, buildId);
-      let artifacts = this.parseArtifacts(artifactPayload, buildId, options.includeNested, baseUrl);
+      let artifacts = this.parseArtifacts(
+        artifactPayload,
+        buildId,
+        options.includeNested,
+        baseUrl,
+        [],
+        options.includeDirectories
+      );
 
       // Apply filters
       artifacts = this.applyFilters(artifacts, options);
@@ -410,7 +421,8 @@ export class ArtifactManager {
     buildId: string,
     includeNested: boolean | undefined,
     baseUrl: string,
-    parentSegments: string[] = []
+    parentSegments: string[] = [],
+    includeDirectories?: boolean
   ): ArtifactInfo[] {
     const artifacts: ArtifactInfo[] = [];
     const files = data.file ?? [];
@@ -421,13 +433,24 @@ export class ArtifactManager {
       const isDirectory = Boolean(file.children);
 
       if (isDirectory) {
+        if (includeDirectories && resolvedPath) {
+          artifacts.push({
+            name: file.name ?? pathSegments[pathSegments.length - 1] ?? '',
+            path: resolvedPath,
+            size: file.size ?? 0,
+            modificationTime: file.modificationTime ?? '',
+            downloadUrl: `${baseUrl}/app/rest/builds/id:${buildId}/artifacts/content/${this.encodeArtifactPath(pathSegments)}`,
+            isDirectory: true,
+          });
+        }
         if (includeNested && file.children) {
           const nested = this.parseArtifacts(
             file.children,
             buildId,
             includeNested,
             baseUrl,
-            pathSegments
+            pathSegments,
+            includeDirectories
           );
           artifacts.push(...nested);
         }
