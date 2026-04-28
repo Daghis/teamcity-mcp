@@ -156,6 +156,14 @@ MCP_MODE=dev
 # TEAMCITY_KEEP_ALIVE=true
 # TEAMCITY_COMPRESSION=true
 
+# Extra headers attached to every TeamCity request — useful when TeamCity
+# sits behind a reverse proxy that gates access on custom headers (e.g.
+# Cloudflare Zero Trust service tokens). One env var per header; the part
+# after `TEAMCITY_HEADER_` is used verbatim as the HTTP header name.
+# Example (note the literal hyphens — most shells need quoting):
+# TEAMCITY_HEADER_CF-Access-Client-Id=<id>
+# TEAMCITY_HEADER_CF-Access-Client-Secret=<secret>
+
 # Retry
 # TEAMCITY_RETRY_ENABLED=true
 # TEAMCITY_MAX_RETRIES=3

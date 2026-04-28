@@ -288,6 +288,34 @@ export function getTeamCityOptions(): {
   };
 }
 
+const HEADER_ENV_PREFIX = 'TEAMCITY_HEADER_';
+
+/**
+ * Collect extra HTTP headers from `TEAMCITY_HEADER_<NAME>` env vars.
+ *
+ * The `<NAME>` suffix is used verbatim as the HTTP header name — write
+ * `TEAMCITY_HEADER_CF-Access-Client-Id` for a literal `CF-Access-Client-Id`
+ * header. Most shells require quoting around the env var name when it
+ * contains hyphens (e.g. `env "TEAMCITY_HEADER_CF-Access-Client-Id=…"`),
+ * but Claude Code's `claude mcp add -e KEY=VAL` splits only on `=` and
+ * passes the key through unchanged.
+ *
+ * Useful for reverse proxies that gate access on custom headers (e.g.
+ * Cloudflare Zero Trust service tokens).
+ */
+export function getTeamCityExtraHeaders(): Record<string, string> | undefined {
+  const headers: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(process.env)) {
+    if (!key.startsWith(HEADER_ENV_PREFIX) || value === undefined) continue;
+    const headerName = key.slice(HEADER_ENV_PREFIX.length);
+    if (headerName === '') continue;
+    headers[headerName] = value;
+  }
+
+  return Object.keys(headers).length > 0 ? headers : undefined;
+}
+
 /**
  * Get TeamCity URL from configuration
  */

@@ -5,6 +5,7 @@ import { SwaggerValidator } from '@/swagger/swagger-validator';
 
 jest.mock('@/config', () => ({
   getConfig: () => ({ teamcity: { url: 'https://teamcity.example.com', token: 't' } }),
+  getTeamCityExtraHeaders: () => undefined,
 }));
 
 describe('SwaggerManager', () => {

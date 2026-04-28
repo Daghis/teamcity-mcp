@@ -5,7 +5,7 @@
 import axios, { type AxiosInstance, type AxiosResponse, type RawAxiosRequestConfig } from 'axios';
 import axiosRetry from 'axios-retry';
 
-import { getTeamCityToken, getTeamCityUrl } from '@/config';
+import { getTeamCityExtraHeaders, getTeamCityToken, getTeamCityUrl } from '@/config';
 import {
   addRequestId,
   logAndTransformError,
@@ -53,6 +53,12 @@ export interface TeamCityAPIClientConfig {
   baseUrl: string;
   token: string;
   timeout?: number;
+  /**
+   * Extra HTTP headers attached as defaults on every TeamCity request.
+   * Canonical headers (Authorization/Accept/Content-Type) always win — entries
+   * here can't accidentally clobber auth.
+   */
+  extraHeaders?: Record<string, string>;
 }
 
 const extractRetryAfterMilliseconds = (value: unknown): number | undefined => {
@@ -71,6 +77,7 @@ interface NormalizedClientConfig {
   baseUrl: string;
   token: string;
   timeout?: number;
+  extraHeaders?: Record<string, string>;
 }
 
 export class TeamCityAPI {
@@ -133,6 +140,7 @@ export class TeamCityAPI {
       baseURL: basePath,
       timeout,
       headers: {
+        ...(config.extraHeaders ?? {}),
         Authorization: `Bearer ${config.token}`,
         Accept: 'application/json',
         'Content-Type': 'application/json',
@@ -167,6 +175,7 @@ export class TeamCityAPI {
       baseOptions: {
         timeout,
         headers: {
+          ...(config.extraHeaders ?? {}),
           Authorization: `Bearer ${config.token}`,
           Accept: 'application/json',
         },
@@ -262,6 +271,7 @@ export class TeamCityAPI {
       const envConfig = this.normalizeConfig({
         baseUrl: getTeamCityUrl(),
         token: getTeamCityToken(),
+        extraHeaders: getTeamCityExtraHeaders(),
       });
       this.instance = new TeamCityAPI(envConfig);
       this.instanceConfig = envConfig;
@@ -573,6 +583,7 @@ export class TeamCityAPI {
       baseUrl: config.baseUrl.replace(/\/$/, ''),
       token: config.token,
       timeout: config.timeout,
+      extraHeaders: normalizeExtraHeaders(config.extraHeaders),
     };
   }
 
@@ -581,6 +592,37 @@ export class TeamCityAPI {
       return false;
     }
 
-    return a.baseUrl === b.baseUrl && a.token === b.token && a.timeout === b.timeout;
+    return (
+      a.baseUrl === b.baseUrl &&
+      a.token === b.token &&
+      a.timeout === b.timeout &&
+      extraHeadersEqual(a.extraHeaders, b.extraHeaders)
+    );
   }
 }
+
+const normalizeExtraHeaders = (
+  headers: Record<string, string> | undefined
+): Record<string, string> | undefined => {
+  if (headers == null) {
+    return undefined;
+  }
+  const entries = Object.entries(headers);
+  if (entries.length === 0) {
+    return undefined;
+  }
+  // Sort so equality is order-insensitive.
+  return Object.fromEntries(entries.sort(([a], [b]) => a.localeCompare(b)));
+};
+
+const extraHeadersEqual = (
+  a: Record<string, string> | undefined,
+  b: Record<string, string> | undefined
+): boolean => {
+  if (a === b) return true;
+  if (a == null || b == null) return a == null && b == null;
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((key) => a[key] === b[key]);
+};
