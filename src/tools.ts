@@ -2842,6 +2842,72 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
 
   {
+    name: 'list_build_artifacts',
+    description:
+      'List artifact files and directories for a build, optionally browsing into subdirectories',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...buildIdentifierInputProperties,
+        path: {
+          type: 'string',
+          description:
+            'Sub-path to list (e.g. "okd" or "okd/subdir"). Omit or leave empty to list top-level artifacts.',
+        },
+        includeNested: {
+          type: 'boolean',
+          description: 'Recursively include all files within subdirectories (default: false)',
+        },
+        nameFilter: {
+          type: 'string',
+          description: 'Glob pattern to filter artifacts by name (e.g. "*.yaml")',
+        },
+        pathFilter: {
+          type: 'string',
+          description: 'Glob pattern to filter artifacts by full path',
+        },
+        extension: {
+          type: 'string',
+          description: 'Filter by file extension (e.g. "yaml", ".yaml")',
+        },
+      },
+    },
+    handler: async (args: unknown) => {
+      const schema = buildIdentifierSchema.and(
+        z.object({
+          path: z.string().optional(),
+          includeNested: z.boolean().optional(),
+          nameFilter: z.string().min(1).optional(),
+          pathFilter: z.string().min(1).optional(),
+          extension: z.string().min(1).optional(),
+        })
+      );
+
+      return runTool(
+        'list_build_artifacts',
+        schema,
+        async (typed) => {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const { locator: buildLocator } = resolveBuildLocator(typed);
+
+          const manager = new ArtifactManager(adapter);
+          const artifacts = await manager.listArtifacts(buildLocator, {
+            path: typed.path,
+            includeNested: typed.includeNested,
+            includeDirectories: true,
+            nameFilter: typed.nameFilter,
+            pathFilter: typed.pathFilter,
+            extension: typed.extension,
+          });
+
+          return json({ artifacts });
+        },
+        args
+      );
+    },
+  },
+
+  {
     name: 'download_build_artifact',
     description: 'Download a single artifact with optional streaming output',
     inputSchema: {
