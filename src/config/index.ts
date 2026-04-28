@@ -11,6 +11,8 @@ const envSchema = z.object({
   PORT: z.string().default('3000').transform(Number),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   MCP_MODE: z.enum(['dev', 'full']).default('dev'),
+  TRANSPORT_MODE: z.enum(['stdio', 'http']).default('stdio'),
+  HTTP_PORT: z.string().default('3000').transform(Number),
   // TeamCity credentials (primary names only; aliases handled separately for cleaner public schema)
   TEAMCITY_URL: z.string().url().optional(),
   TEAMCITY_TOKEN: z.string().optional(),
@@ -322,3 +324,17 @@ export function getTeamCityToken(): string {
 
 // Export type alias for backward compatibility
 export type Config = ApplicationConfig;
+
+/**
+ * Get the configured transport mode
+ */
+export function getTransportMode(): 'stdio' | 'http' {
+  return (process.env['TRANSPORT_MODE'] as 'stdio' | 'http') ?? 'stdio';
+}
+
+/**
+ * Get the HTTP server port (only relevant when TRANSPORT_MODE=http)
+ */
+export function getHttpPort(): number {
+  return Number.parseInt(process.env['HTTP_PORT'] ?? process.env['PORT'] ?? '3000', 10);
+}
