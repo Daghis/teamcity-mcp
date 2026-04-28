@@ -74,9 +74,21 @@ interface NormalizedClientConfig {
   timeout?: number;
 }
 
+/** Cache entry for per-credential API instances (HTTP transport mode). */
+interface CredentialCacheEntry {
+  api: TeamCityAPI;
+  lastAccess: number;
+}
+
+/** TTL for per-credential cache entries (30 min, matches session TTL). */
+const CREDENTIAL_CACHE_TTL_MS = 30 * 60 * 1000;
+
 export class TeamCityAPI {
   private static instance: TeamCityAPI | undefined;
   private static instanceConfig: NormalizedClientConfig | undefined;
+  /** Per-credential cache keyed by `url:token` for HTTP transport mode. */
+  private static credentialCache = new Map<string, CredentialCacheEntry>();
+  private static cleanupTimer: ReturnType<typeof setInterval> | undefined;
   private readonly axiosInstance: AxiosInstance;
   private readonly config: Configuration;
   private readonly baseUrl: string;
@@ -245,8 +257,10 @@ export class TeamCityAPI {
    * Get or create singleton instance.
    *
    * When running inside an HTTP request (AsyncLocalStorage context with
-   * per-request credentials), returns a **non-cached** instance bound to those
-   * credentials so that each user talks to their own TeamCity server.
+   * per-request credentials), returns a **cached** instance keyed by the
+   * credential tuple (url + token) so that repeated calls within the same
+   * request — or across requests with the same credentials — reuse the
+   * same client. Cache entries expire after 30 min of inactivity.
    * In stdio mode (no request context), the classic singleton behaviour applies.
    */
   static getInstance(config: TeamCityAPIClientConfig): TeamCityAPI;
@@ -268,11 +282,19 @@ export class TeamCityAPI {
     // Check AsyncLocalStorage for per-request credentials (HTTP transport mode)
     const reqCreds = getRequestCredentials();
     if (reqCreds) {
-      // Per-request: always create a fresh (non-singleton) instance
-      return new TeamCityAPI({
+      const cacheKey = `${reqCreds.teamcityUrl}:${reqCreds.teamcityToken}`;
+      const cached = this.credentialCache.get(cacheKey);
+      if (cached) {
+        cached.lastAccess = Date.now();
+        return cached.api;
+      }
+      const api = new TeamCityAPI({
         baseUrl: reqCreds.teamcityUrl,
         token: reqCreds.teamcityToken,
       });
+      this.credentialCache.set(cacheKey, { api, lastAccess: Date.now() });
+      this.ensureCleanupTimer();
+      return api;
     }
 
     // Fallback: classic singleton from environment variables (stdio transport)
@@ -297,6 +319,27 @@ export class TeamCityAPI {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  /** Start the periodic credential cache cleanup if not already running. */
+  private static ensureCleanupTimer(): void {
+    if (this.cleanupTimer) return;
+    this.cleanupTimer = setInterval(() => {
+      const now = Date.now();
+      for (const [key, entry] of this.credentialCache) {
+        if (now - entry.lastAccess > CREDENTIAL_CACHE_TTL_MS) {
+          this.credentialCache.delete(key);
+        }
+      }
+      if (this.credentialCache.size === 0 && this.cleanupTimer) {
+        clearInterval(this.cleanupTimer);
+        this.cleanupTimer = undefined;
+      }
+    }, 60_000);
+    // Prevent the timer from keeping the process alive
+    if (this.cleanupTimer && typeof this.cleanupTimer === 'object' && 'unref' in this.cleanupTimer) {
+      (this.cleanupTimer as NodeJS.Timeout).unref();
     }
   }
 

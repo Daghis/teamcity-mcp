@@ -2,8 +2,8 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Copy package files and .npmrc for Artifactory registry
-COPY package.json package-lock.json .npmrc ./
+# Copy package files
+COPY package.json package-lock.json ./
 
 # Install all dependencies (including devDependencies for build)
 RUN npm ci
@@ -21,8 +21,8 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Copy package files and .npmrc, then install production deps only
-COPY package.json package-lock.json .npmrc ./
+# Copy package files, then install production deps only
+COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && rm -rf /root/.npm
 
 # Copy the built artifact

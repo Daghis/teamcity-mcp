@@ -100,9 +100,21 @@ function parseJsonBody(req: IncomingMessage): Promise<unknown> {
 // CORS helper
 // ---------------------------------------------------------------------------
 
-function setCorsHeaders(res: ServerResponse, allowedOrigins: string[]): void {
-  const origin = allowedOrigins.includes('*') ? '*' : allowedOrigins.join(',');
+function setCorsHeaders(req: IncomingMessage, res: ServerResponse, allowedOrigins: string[]): void {
+  const requestOrigin = req.headers['origin'] ?? '';
+  let origin: string;
+  if (allowedOrigins.includes('*')) {
+    origin = '*';
+  } else if (typeof requestOrigin === 'string' && allowedOrigins.includes(requestOrigin)) {
+    origin = requestOrigin;
+  } else {
+    // Origin not allowed — omit the header so the browser blocks the request
+    return;
+  }
   res.setHeader('Access-Control-Allow-Origin', origin);
+  if (origin !== '*') {
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
@@ -133,13 +145,13 @@ export function startHttpServer(options: HttpServerOptions): Promise<HttpServer>
 
     // ---- CORS preflight ---------------------------------------------------
     if (method === 'OPTIONS') {
-      setCorsHeaders(res, allowedOrigins);
+      setCorsHeaders(req, res, allowedOrigins);
       res.writeHead(204);
       res.end();
       return;
     }
 
-    setCorsHeaders(res, allowedOrigins);
+    setCorsHeaders(req, res, allowedOrigins);
 
     // ---- Health check -----------------------------------------------------
     if (url === '/health' && method === 'GET') {
@@ -263,8 +275,8 @@ async function handlePost(req: IncomingMessage, res: ServerResponse): Promise<vo
 
   if (sessionId !== undefined && sessions.has(sessionId)) {
     // Existing session — forward to its transport inside correct credential context
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const entry = sessions.get(sessionId)!;
+    const entry = sessions.get(sessionId);
+    if (!entry) return;
     entry.lastActivity = Date.now();
 
     await runWithCredentials(entry.credentials, async () => {
@@ -342,12 +354,12 @@ async function handleGet(req: IncomingMessage, res: ServerResponse): Promise<voi
     return;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const entry = sessions.get(sessionId)!;
-  entry.lastActivity = Date.now();
+  const entryGet = sessions.get(sessionId);
+  if (!entryGet) return;
+  entryGet.lastActivity = Date.now();
 
-  await runWithCredentials(entry.credentials, async () => {
-    await entry.transport.handleRequest(req, res);
+  await runWithCredentials(entryGet.credentials, async () => {
+    await entryGet.transport.handleRequest(req, res);
   });
 }
 
@@ -366,9 +378,9 @@ async function handleDelete(req: IncomingMessage, res: ServerResponse): Promise<
     return;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  const entry = sessions.get(sessionId)!;
-  await entry.transport.close();
+  const entryDel = sessions.get(sessionId);
+  if (!entryDel) return;
+  await entryDel.transport.close();
   sessions.delete(sessionId);
 
   res.writeHead(200, { 'Content-Type': 'application/json' });
