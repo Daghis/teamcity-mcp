@@ -9,6 +9,8 @@ export interface SwaggerFetcherConfig {
   baseUrl: string;
   token: string;
   timeout?: number;
+  /** Extra HTTP headers attached as defaults on every spec fetch. */
+  extraHeaders?: Record<string, string>;
 }
 
 export interface SwaggerSpec {
@@ -34,6 +36,7 @@ export class SwaggerFetcher {
       baseURL: baseUrl,
       timeout: config.timeout ?? 30000,
       headers: {
+        ...(config.extraHeaders ?? {}),
         Authorization: `Bearer ${config.token}`,
         Accept: 'application/json',
       },

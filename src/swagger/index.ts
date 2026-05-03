@@ -1,7 +1,7 @@
 /**
  * Main module for TeamCity Swagger spec management
  */
-import { getConfig } from '@/config';
+import { getConfig, getTeamCityExtraHeaders } from '@/config';
 import { info, error as logError, warn } from '@/utils/logger';
 
 import { SwaggerCache } from './swagger-cache';
@@ -18,6 +18,7 @@ export interface SwaggerManagerConfig {
   cacheDir?: string;
   cacheTTL?: number;
   forceRefresh?: boolean;
+  extraHeaders?: Record<string, string>;
 }
 
 export class SwaggerManager {
@@ -46,6 +47,7 @@ export class SwaggerManager {
       cacheDir: this.config.cacheDir ?? '.cache',
       cacheTTL: this.config.cacheTTL ?? 24 * 60 * 60 * 1000, // 24 hours
       forceRefresh: this.config.forceRefresh ?? false,
+      extraHeaders: this.config.extraHeaders ?? getTeamCityExtraHeaders(),
     };
 
     if (this.config.baseUrl === '' || this.config.token === '') {
@@ -57,6 +59,7 @@ export class SwaggerManager {
     this.fetcher = new SwaggerFetcher({
       baseUrl,
       token,
+      extraHeaders: this.config.extraHeaders,
     });
 
     this.cache = new SwaggerCache({
