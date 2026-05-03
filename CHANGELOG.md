@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.11.0...teamcity-mcp-v2.12.0) (2026-05-03)
+
+
+### Features
+
+* **http:** forward TEAMCITY_HEADER_* env vars on every request ([#492](https://github.com/Daghis/teamcity-mcp/issues/492)) ([c406511](https://github.com/Daghis/teamcity-mcp/commit/c4065111e2e8c6e807ec9a4383cbbe8d280ca00e))
+
 ## [2.11.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.10.0...teamcity-mcp-v2.11.0) (2026-05-03)
 
 
