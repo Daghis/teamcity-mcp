@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.11.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.10.0...teamcity-mcp-v2.11.0) (2026-05-03)
+
+
+### Features
+
+* **artifacts:** add list_build_artifacts tool for subdirectory browsing ([#489](https://github.com/Daghis/teamcity-mcp/issues/489)) ([eacad61](https://github.com/Daghis/teamcity-mcp/commit/eacad6115cbb33a6e660bd096e59869c4fcf4ea8))
+
 ## [2.10.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.9.0...teamcity-mcp-v2.10.0) (2026-04-26)
 
 
