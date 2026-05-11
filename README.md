@@ -47,6 +47,24 @@ See the [Tools Mode Matrix](docs/mcp-tools-mode-matrix.md) for the complete list
 - Performance-conscious: fast startup with minimal overhead
 - Clean codebase with clear module boundaries
 
+## Choosing between teamcity-mcp and the built-in MCP
+
+TeamCity 2026.1 ships with a built-in MCP endpoint at `<server-url>/app/mcp` exposing three tools: build log retrieval, a generic REST GET, and a build trigger (forced to `personal=true`). It is server-resident, requires no install, and is a sensible default for read-and-rerun workflows.
+
+teamcity-mcp is a different shape: a 96-tool typed surface focused on AI-driven workflows that need writes, multi-server support, or pre-2026.1 compatibility.
+
+| Use case                                                              | Recommendation                                                                             |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Read build logs, trigger builds, simple read flows                    | Built-in (TeamCity 2026.1+) — zero install                                                 |
+| Manage parameters, agents, queue, mutes, build configs, VCS roots     | teamcity-mcp                                                                               |
+| TeamCity server older than 2026.1                                     | teamcity-mcp                                                                               |
+| Multi-server / multi-tenant deployment                                | teamcity-mcp (HTTP transport — [PR #491](https://github.com/Daghis/teamcity-mcp/pull/491)) |
+| Typed tool surface for better agent reliability on chained operations | teamcity-mcp                                                                               |
+
+Both can coexist. The built-in is a good first stop; teamcity-mcp is the power tool for everything the built-in doesn't reach.
+
+For the design reasoning, see [docs/strategy.md](docs/strategy.md) and [docs/non-goals.md](docs/non-goals.md).
+
 ## Installation
 
 ### Prerequisites
@@ -110,7 +128,14 @@ On Windows, Claude Code's MCP configuration [may not properly merge environment 
   "mcpServers": {
     "teamcity": {
       "command": "npx",
-      "args": ["-y", "@daghis/teamcity-mcp", "--url", "https://teamcity.example.com", "--token", "YOUR_TOKEN"]
+      "args": [
+        "-y",
+        "@daghis/teamcity-mcp",
+        "--url",
+        "https://teamcity.example.com",
+        "--token",
+        "YOUR_TOKEN"
+      ]
     }
   }
 }
