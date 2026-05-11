@@ -87,14 +87,14 @@ annotations: {
 
 ### Standard taxonomy
 
-| Pattern                                                                        | readOnly | destructive | idempotent | openWorld |
-| ------------------------------------------------------------------------------ | -------- | ----------- | ---------- | --------- |
-| `list_*`, `get_*`, `count_*`, `check_*`, `fetch_*`, `analyze_*`, `ping`        | `true`   | `false`     | `true`     | `true`    |
-| `trigger_build`, `cancel_*`, `mute_*`, `move_queued_*`, `reorder_*`            | `false`  | `false`     | `false`    | `true`    |
-| `delete_*`, `remove_*`                                                         | `false`  | `true`      | `true`     | `true`    |
-| `update_*`, `set_*`, `manage_*`, `assign_*`, `authorize_*`, `add_*`, `clone_*` | `false`  | `false`     | `true`     | `true`    |
-| `create_*`, `upload_*`, `download_*`                                           | `false`  | `false`     | `false`    | `true`    |
-| Local-only tools (`get_mcp_mode`, `set_mcp_mode`)                              | varies   | `false`     | `true`     | `false`   |
+| Pattern                                                                               | readOnly | destructive | idempotent | openWorld |
+| ------------------------------------------------------------------------------------- | -------- | ----------- | ---------- | --------- |
+| `list_*`, `get_*`, `count_*`, `check_*`, `fetch_*`, `analyze_*`, `download_*`, `ping` | `true`   | `false`     | `true`     | `true`    |
+| `trigger_build`, `cancel_*`, `mute_*`, `move_queued_*`, `reorder_*`                   | `false`  | `false`     | `false`    | `true`    |
+| `delete_*`, `remove_*`                                                                | `false`  | `true`      | `true`     | `true`    |
+| `update_*`, `set_*`, `manage_*`, `assign_*`, `authorize_*`, `add_*`, `clone_*`        | `false`  | `false`     | `true`     | `true`    |
+| `create_*`, `upload_*`                                                                | `false`  | `false`     | `false`    | `true`    |
+| Local-only tools (`get_mcp_mode`, `set_mcp_mode`)                                     | varies   | `false`     | `true`     | `false`   |
 
 Per-tool exceptions are fine — apply judgment over pattern-matching when a tool doesn't fit the table.
 
@@ -132,7 +132,7 @@ Limit the disclosure to one short clause; do not enumerate every possible error 
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ping`                  | `Test MCP server connectivity. Returns a confirmation echo and optional message.`                                                                   |
 | `list_builds`           | `List TeamCity builds. Supports pagination and locator filtering.`                                                                                  |
-| `trigger_build`         | ``Trigger a new build; runs asynchronously, use `wait_for_build` to monitor. Returns the queued build id; returns 404 if buildTypeId is unknown.``  |
+| `trigger_build`         | `Trigger a new build; runs asynchronously, use wait_for_build to monitor. Returns the queued build id; returns 404 if buildTypeId is unknown.`      |
 | `cancel_queued_build`   | `Cancel a queued (not-yet-running) build. Idempotent; returns 404 if the build already started or was cancelled.`                                   |
 | `delete_project`        | `Delete a TeamCity project. Irreversible; returns 404 if the project does not exist.`                                                               |
 | `set_vcs_root_property` | `Set a single VCS root property such as branch, branchSpec, or url. Returns the updated value; returns 404 if the VCS root or property is unknown.` |
