@@ -3341,9 +3341,9 @@ const DEV_TOOLS: ToolDefinition[] = [
   {
     name: 'download_build_artifact',
     annotations: {
-      readOnlyHint: false,
+      readOnlyHint: true,
       destructiveHint: false,
-      idempotentHint: false,
+      idempotentHint: true,
       openWorldHint: true,
     },
     description:
@@ -3415,9 +3415,9 @@ const DEV_TOOLS: ToolDefinition[] = [
   {
     name: 'download_build_artifacts',
     annotations: {
-      readOnlyHint: false,
+      readOnlyHint: true,
       destructiveHint: false,
-      idempotentHint: false,
+      idempotentHint: true,
       openWorldHint: true,
     },
     description:
