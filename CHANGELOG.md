@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.0...teamcity-mcp-v2.12.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* **tools:** mark download_* as readOnly and idempotent ([#507](https://github.com/Daghis/teamcity-mcp/issues/507)) ([0a09663](https://github.com/Daghis/teamcity-mcp/commit/0a09663a5ff39e82f9b471e1aa7102ffc4d68163))
+
 ## [2.12.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.11.0...teamcity-mcp-v2.12.0) (2026-05-03)
 
 
