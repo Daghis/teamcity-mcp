@@ -51,7 +51,7 @@ See the [Tools Mode Matrix](docs/mcp-tools-mode-matrix.md) for the complete list
 
 TeamCity 2026.1 ships with a built-in MCP endpoint at `<server-url>/app/mcp` exposing three tools: build log retrieval, a generic REST GET, and a build trigger (forced to `personal=true`). It is server-resident, requires no install, and is a sensible default for read-and-rerun workflows.
 
-teamcity-mcp is a different shape: a 96-tool typed surface focused on AI-driven workflows that need writes, multi-server support, or pre-2026.1 compatibility.
+teamcity-mcp is a different shape: an 87-tool typed surface focused on AI-driven workflows that need writes, multi-server support, or pre-2026.1 compatibility.
 
 | Use case                                                              | Recommendation                                                                             |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
