@@ -360,7 +360,7 @@ export class ProjectNavigator {
       targetProject = targetResponse.data;
       currentProjectId = targetResponse.data.parentProjectId ?? '_Root';
     } catch (error) {
-      throw new Error(`Project not found: ${params.projectId}`);
+      throw new Error(`Project not found: ${params.projectId}`, { cause: error });
     }
 
     // Always add root project first
@@ -432,7 +432,7 @@ export class ProjectNavigator {
         throw new Error(`Project not found: ${params.projectId}`);
       }
     } catch (error) {
-      throw new Error(`Project not found: ${params.projectId}`);
+      throw new Error(`Project not found: ${params.projectId}`, { cause: error });
     }
 
     // Recursive function to collect all descendants
@@ -633,8 +633,6 @@ export class ProjectNavigator {
         case 'level':
           comparison = (a.level ?? 0) - (b.level ?? 0);
           break;
-        default:
-          comparison = 0;
       }
 
       return order === 'desc' ? -comparison : comparison;

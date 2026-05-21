@@ -16,13 +16,7 @@ module.exports = {
   ],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
-      tsconfig: {
-        esModuleInterop: true,
-        allowJs: true,
-        strict: false,
-        noUnusedLocals: false,
-        noUnusedParameters: false
-      }
+      tsconfig: '<rootDir>/tsconfig.test.json',
     }]
   },
   collectCoverageFrom: [
@@ -50,8 +44,7 @@ module.exports = {
     '!src/swagger/**/*.ts',
     '!src/middleware/**/*.ts',
     '!src/errors/index.ts',
-    '!src/config/index.ts',
-    '!src/formatters/*.ts'
+    '!src/config/index.ts'
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],

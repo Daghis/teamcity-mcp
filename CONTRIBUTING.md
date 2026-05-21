@@ -72,6 +72,90 @@ SERIAL_BUILD_TESTS=true npm run test:integration
 - Inspecting axios request headers/payload shapes for managers/tools.
 - Counting calls without a documented behavior that warrants it.
 
+## Tool Annotations
+
+Every tool registered in `src/tools.ts` must declare all four MCP behavioral annotation hints. These tell agents which tools are safe to retry, which mutate state, and which are destructive — without running them.
+
+```typescript
+annotations: {
+  readOnlyHint: boolean,    // true = tool only reads, never writes
+  destructiveHint: boolean, // true = tool can irreversibly destroy data
+  idempotentHint: boolean,  // true = safe to call twice with same args
+  openWorldHint: boolean,   // true = contacts TeamCity / network
+},
+```
+
+### Standard taxonomy
+
+| Pattern                                                                               | readOnly | destructive | idempotent | openWorld |
+| ------------------------------------------------------------------------------------- | -------- | ----------- | ---------- | --------- |
+| `list_*`, `get_*`, `count_*`, `check_*`, `fetch_*`, `analyze_*`, `download_*`, `ping` | `true`   | `false`     | `true`     | `true`    |
+| `trigger_build`, `cancel_*`, `mute_*`, `move_queued_*`, `reorder_*`                   | `false`  | `false`     | `false`    | `true`    |
+| `delete_*`, `remove_*`                                                                | `false`  | `true`      | `true`     | `true`    |
+| `update_*`, `set_*`, `manage_*`, `assign_*`, `authorize_*`, `add_*`, `clone_*`        | `false`  | `false`     | `true`     | `true`    |
+| `create_*`, `upload_*`                                                                | `false`  | `false`     | `false`    | `true`    |
+| Local-only tools (`get_mcp_mode`, `set_mcp_mode`)                                     | varies   | `false`     | `true`     | `false`   |
+
+Per-tool exceptions are fine — apply judgment over pattern-matching when a tool doesn't fit the table.
+
+A CI test (`tests/unit/tools/tool-annotations.test.ts`) will fail if any tool ships without all four hints set.
+
+## Tool Descriptions
+
+Agents pick tools by pattern-matching names and descriptions, so a uniform shape improves routing. Every tool description in `src/tools.ts` must match this skeleton:
+
+```
+<Verb> <resource>[, scoped to <scope>]. [<One short behavioral clause if non-obvious — e.g. "Supports pagination.", "Idempotent.", "Long-running, use wait_for_build to monitor.">].
+```
+
+Rules:
+
+- Start with an imperative verb (`List`, `Get`, `Trigger`, `Cancel`, …) and name the resource.
+- Read-only tools: **at most two sentences**. Mutating tools (`readOnlyHint: false`): **at most three**, with the extra sentence reserved for the return/error disclosure described below.
+- Use the optional second sentence only for a non-obvious behavior trait — pagination, async/queued behavior, idempotency caveats, cross-references to sibling tools.
+- **Do not** repeat parameter information that the input schema already documents.
+- **Do not** add "use this when not `list_X` / `get_X`" disambiguators (tracked separately for targeted cases).
+- **Do not** expand into multi-paragraph essays — agent context is a scarce resource.
+
+### Mutating tools: return-value and primary-error disclosure (issue #470)
+
+Every tool registered with `readOnlyHint: false` must end its description with a clause that names:
+
+1. **The principal return value on success** — an id, a count, the updated resource, etc.
+2. **The single most likely failure mode** — usually `Returns 404 if X is unknown` or a safety marker like `Idempotent`/`Irreversible` for cases where the dominant guarantee is more relevant than a specific status code.
+
+Limit the disclosure to one short clause; do not enumerate every possible error — name the dominant one. Read-only tools are out of scope; their `outputSchema` (issue #468) handles return shape.
+
+### Examples
+
+| Tool                    | Description                                                                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ping`                  | `Test MCP server connectivity. Returns a confirmation echo and optional message.`                                                                   |
+| `list_builds`           | `List TeamCity builds. Supports pagination and locator filtering.`                                                                                  |
+| `trigger_build`         | `Trigger a new build; runs asynchronously, use wait_for_build to monitor. Returns the queued build id; returns 404 if buildTypeId is unknown.`      |
+| `cancel_queued_build`   | `Cancel a queued (not-yet-running) build. Idempotent; returns 404 if the build already started or was cancelled.`                                   |
+| `delete_project`        | `Delete a TeamCity project. Irreversible; returns 404 if the project does not exist.`                                                               |
+| `set_vcs_root_property` | `Set a single VCS root property such as branch, branchSpec, or url. Returns the updated value; returns 404 if the VCS root or property is unknown.` |
+
+A CI test (`tests/unit/tools/tool-descriptions.test.ts`) enforces these rules on every registered tool, including the return/error disclosure for mutators.
+
+## Adding a New Tool
+
+teamcity-mcp commits to the **AI power-user tool** posture — every AI-workflow operation works end-to-end with typed, safe tools. See [`docs/strategy.md`](docs/strategy.md) and [`docs/non-goals.md`](docs/non-goals.md) for the full reasoning and the explicit "no" list.
+
+Before opening a PR that adds a new tool, walk this checklist:
+
+- [ ] The operation closes a real AI workflow — not just "REST has it, we should too."
+- [ ] The operation is NOT on [`docs/non-goals.md`](docs/non-goals.md). If it is, either reconsider, or pair this PR with one that amends the non-goals list and justifies the reversal.
+- [ ] The tool has a typed Zod input schema covering every documented argument.
+- [ ] Tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) are accurate.
+- [ ] Mode placement is correct: `dev` is reserved for read or low-risk write operations; everything else is `full`.
+- [ ] The description is concise and disambiguates against any sibling tools (see issue #471 for the curated sibling set).
+- [ ] Mutating tools return structured failure objects (`{ success: false, error }`) instead of throwing, and disclose at least one common failure mode in the description.
+- [ ] Tests cover the success path, common failure modes, and idempotency where the annotation claims it.
+
+If steps 1-2 fail the operation is out of scope. If steps 3-8 fail, fix the gap before merging.
+
 ## Code Style
 
 - TypeScript, strict mode. No `any`. Prefer precise types and generics.

@@ -58,6 +58,7 @@ describe('tool availability - mode filtering', () => {
         expect(toolNames).toContain('cancel_queued_build');
         expect(toolNames).toContain('create_project');
         expect(toolNames).toContain('delete_project');
+        expect(toolNames).toContain('remove_agent');
       });
     });
 

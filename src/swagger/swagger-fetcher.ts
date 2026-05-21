@@ -9,6 +9,8 @@ export interface SwaggerFetcherConfig {
   baseUrl: string;
   token: string;
   timeout?: number;
+  /** Extra HTTP headers attached as defaults on every spec fetch. */
+  extraHeaders?: Record<string, string>;
 }
 
 export interface SwaggerSpec {
@@ -34,6 +36,7 @@ export class SwaggerFetcher {
       baseURL: baseUrl,
       timeout: config.timeout ?? 30000,
       headers: {
+        ...(config.extraHeaders ?? {}),
         Authorization: `Bearer ${config.token}`,
         Accept: 'application/json',
       },
@@ -75,18 +78,23 @@ export class SwaggerFetcher {
 
       if (axios.isAxiosError(err)) {
         if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-          throw new Error(`Failed to fetch TeamCity Swagger spec: Request timeout`);
+          throw new Error(`Failed to fetch TeamCity Swagger spec: Request timeout`, { cause: err });
         }
         if (err.response?.status === 401) {
-          throw new Error(`Failed to fetch TeamCity Swagger spec: Authentication failed`);
+          throw new Error(`Failed to fetch TeamCity Swagger spec: Authentication failed`, {
+            cause: err,
+          });
         }
         if (err.response?.status === 404) {
-          throw new Error(`Failed to fetch TeamCity Swagger spec: Endpoint not found`);
+          throw new Error(`Failed to fetch TeamCity Swagger spec: Endpoint not found`, {
+            cause: err,
+          });
         }
       }
 
       throw new Error(
-        `Failed to fetch TeamCity Swagger spec: ${err instanceof Error ? err.message : 'Unknown error'}`
+        `Failed to fetch TeamCity Swagger spec: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        { cause: err }
       );
     }
   }

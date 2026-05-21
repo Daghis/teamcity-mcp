@@ -56,6 +56,9 @@ This document lists all Model Context Protocol (MCP) tools exposed by the TeamCi
   - Args: `buildId: string`, `comment?: string`, `readdIntoQueue?: boolean`
 - `get_build_status` — Build status with optional queue context
   - Args: `buildId: string`, `includeTests?: boolean`, `includeProblems?: boolean`, `includeQueueTotals?: boolean` (adds totalQueued; extra call when queued), `includeQueueReason?: boolean` (adds waitReason; extra call when queued)
+- `wait_for_build` — Poll until a build reaches a terminal state (finished/canceled/failed) or timeout
+  - Args: `buildId?: string`, `buildNumber?: string` (requires `buildTypeId`), `buildTypeId?: string`, `timeout?: number` (default 600, max 3600), `pollInterval?: number` (default 15, min 5), `includeTests?: boolean`, `includeProblems?: boolean`
+  - Returns final build status plus `pollCount`, `waitSeconds`, and `timedOut: true` if timeout reached
 - `fetch_build_log` — Build log by lines (pagination/tail or stream-to-file)
   - Args: `buildId?: string`, `buildNumber?: string|number` (with optional `buildTypeId` to disambiguate), `buildTypeId?: string`, `page?: number`, `pageSize?: number`, `startLine?: number`, `lineCount?: number`, `tail?: boolean`, `encoding?: 'text'|'stream'` (default `'text'`), `outputPath?: string` (required when `encoding === 'stream'` if you need a specific destination)
 - `get_build_results` — Rich results (tests, artifacts, stats, changes, deps)

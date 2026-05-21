@@ -54,6 +54,7 @@ Complete infrastructure management including creation, modification, and deletio
 | **Build Management**         |                                                |     |      |
 | `trigger_build`              | Trigger a build                                | ✅  |  ✅  |
 | `get_build_status`           | Get detailed build status and progress         | ✅  |  ✅  |
+| `wait_for_build`             | Poll until build completes or timeout          | ✅  |  ✅  |
 | `list_builds`                | Search and list builds with filtering          | ✅  |  ✅  |
 | `get_build_results`          | Get detailed build results                     | ✅  |  ✅  |
 | `download_build_artifact`    | Download artifact content (base64/text/stream) | ✅  |  ✅  |
@@ -144,6 +145,27 @@ Complete infrastructure management including creation, modification, and deletio
 **Parameters**:
 
 - `buildId` (required): Build identifier
+
+#### `wait_for_build`
+
+**Description**: Poll until a build reaches a terminal state or timeout
+**Mode**: Dev
+**Key Capabilities**:
+
+- Blocks until build finishes, is canceled, or fails
+- Configurable timeout (default 600s, max 3600s) and poll interval (default 15s, min 5s)
+- Returns final build status with poll count and elapsed time
+- Non-error timeout: returns last status with `timedOut: true`
+
+**Parameters**:
+
+- `buildId`: Build ID to wait for
+- `buildNumber`: Human build number (requires `buildTypeId`)
+- `buildTypeId`: Build configuration ID (required with `buildNumber`)
+- `timeout`: Max seconds to wait (default 600, max 3600)
+- `pollInterval`: Seconds between polls (default 15, min 5)
+- `includeTests`: Include test summary in result
+- `includeProblems`: Include build problems in result
 
 #### `list_builds`
 

@@ -71,30 +71,30 @@ jobs:
         run: npm run test:coverage:ci -- --reporters=default --reporters=jest-junit --shard=${{ matrix.shard }}/4 --passWithNoTests
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && github.actor != 'dependabot[bot]' }}
-        uses: codecov/codecov-action@v5
+        continue-on-error: true
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/junit-${{ matrix.shard }}.xml
           report_type: test_results
       - name: Upload coverage to Codecov
         if: ${{ success() && github.actor != 'dependabot[bot]' }}
-        uses: codecov/codecov-action@v5
+        continue-on-error: true
+        uses: codecov/codecov-action@v6
         with:
           files: ./coverage/lcov.info
           flags: unittests
           name: codecov-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
-      - name: Analyze bundle
-        run: npm run build:bundle
-      - name: Upload bundle analysis to Codecov
-        if: ${{ success() && github.actor != 'dependabot[bot]' && hashFiles('coverage/bundles/*.json') != '' }}
-        uses: codecov/codecov-action@v5
-        with:
-          plugin: javascript-bundle
-          files: ./coverage/bundles/*.json
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+          fail_ci_if_error: false
+      - name: Codecov bundle analysis
+        if: ${{ success() && github.actor != 'dependabot[bot]' && matrix.node == 20 && matrix.shard == 1 }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          npm run build
+          npm install --no-save --no-package-lock @codecov/bundle-analyzer@^2.0.1
+          npm run bundle:analyze
 
   aggregate:
     name: Lint, Typecheck, Test (Node 20, 22, 24)

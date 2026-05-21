@@ -108,6 +108,7 @@ describe('Build configuration dependency/feature management (full)', () => {
         dependsOn: SOURCE_BT_ID,
         properties: {
           'run-build-if-dependency-failed': 'false',
+          'take-successful-builds-only': 'true',
         },
       });
       expect(snapshotAdd).toMatchObject({
@@ -127,6 +128,7 @@ describe('Build configuration dependency/feature management (full)', () => {
           dependencyId: snapshotId,
           properties: {
             'run-build-if-dependency-failed': 'true',
+            'take-successful-builds-only': 'false',
           },
         });
         expect(snapshotUpdate).toMatchObject({

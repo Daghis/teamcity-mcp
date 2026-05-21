@@ -166,6 +166,92 @@ describe('ArtifactManager', () => {
 
       await expect(manager.listArtifacts('12345')).rejects.toThrow('non-array file field');
     });
+
+    it('should pass path option as basePath to API for subdirectory browsing', async () => {
+      const mockSubdirArtifacts = {
+        file: [
+          {
+            name: 'deploy.yaml',
+            fullName: 'okd/deploy.yaml',
+            size: 2048,
+            modificationTime: '20250829T121400+0000',
+          },
+          {
+            name: 'service.yaml',
+            fullName: 'okd/service.yaml',
+            size: 1024,
+            modificationTime: '20250829T121500+0000',
+          },
+        ],
+      };
+
+      http.get.mockResolvedValue({ data: mockSubdirArtifacts });
+
+      const result = await manager.listArtifacts('12345', { path: 'okd' });
+
+      expect(result).toHaveLength(2);
+      expect(result[0]?.name).toBe('deploy.yaml');
+      expect(result[1]?.name).toBe('service.yaml');
+    });
+
+    it('should include directory entries when includeDirectories is true', async () => {
+      const mockArtifactsWithDir = {
+        file: [
+          {
+            name: 'okd',
+            fullName: 'okd',
+            size: 0,
+            children: {
+              file: [{ name: 'deploy.yaml', fullName: 'okd/deploy.yaml', size: 2048 }],
+            },
+          },
+          {
+            name: 'readme.txt',
+            fullName: 'readme.txt',
+            size: 512,
+          },
+        ],
+      };
+
+      http.get.mockResolvedValue({ data: mockArtifactsWithDir });
+
+      const result = await manager.listArtifacts('12345', { includeDirectories: true });
+
+      expect(result).toHaveLength(2);
+      expect(result[0]?.name).toBe('okd');
+      expect(result[0]?.isDirectory).toBe(true);
+      expect(result[1]?.name).toBe('readme.txt');
+      expect(result[1]?.isDirectory).toBe(false);
+    });
+
+    it('should include directories and nested files together', async () => {
+      const mockArtifactsWithDir = {
+        file: [
+          {
+            name: 'okd',
+            fullName: 'okd',
+            size: 0,
+            children: {
+              file: [{ name: 'deploy.yaml', fullName: 'okd/deploy.yaml', size: 2048 }],
+            },
+          },
+        ],
+      };
+
+      http.get.mockResolvedValue({ data: mockArtifactsWithDir });
+
+      const result = await manager.listArtifacts('12345', {
+        includeDirectories: true,
+        includeNested: true,
+      });
+
+      expect(result).toHaveLength(2);
+      expect(result[0]?.name).toBe('okd');
+      expect(result[0]?.isDirectory).toBe(true);
+      expect(result[1]?.name).toBe('deploy.yaml');
+      expect(result[1]?.path).toBe('okd/deploy.yaml');
+      expect(result[1]?.isDirectory).toBe(false);
+    });
   });
 
   describe('Artifact Filtering', () => {

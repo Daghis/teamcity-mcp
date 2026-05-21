@@ -130,7 +130,7 @@ export class BuildConfigurationCloneManager {
         return null;
       }
       if (axiosError.response?.status === 403) {
-        throw new Error('Permission denied: No access to source configuration');
+        throw new Error('Permission denied: No access to source configuration', { cause: err });
       }
       throw err;
     }
@@ -222,7 +222,7 @@ export class BuildConfigurationCloneManager {
       return { id: newId, name: newName };
     } catch (err) {
       logError('Failed to clone VCS root', err as Error);
-      throw new Error(`Failed to clone VCS root: ${(err as Error).message}`);
+      throw new Error(`Failed to clone VCS root: ${(err as Error).message}`, { cause: err });
     }
   }
 
@@ -393,14 +393,14 @@ export class BuildConfigurationCloneManager {
       const error = err as { response?: { status?: number; data?: { message?: string } } };
 
       if (error.response?.status === 409) {
-        throw new Error(`Build configuration already exists with ID: ${configId}`);
+        throw new Error(`Build configuration already exists with ID: ${configId}`, { cause: err });
       }
       if (error.response?.status === 403) {
-        throw new Error('Permission denied: You need project edit permissions');
+        throw new Error('Permission denied: You need project edit permissions', { cause: err });
       }
       if (error.response?.status === 400) {
         const message = error.response?.data?.message ?? 'Invalid configuration';
-        throw new Error(`Invalid configuration: ${message}`);
+        throw new Error(`Invalid configuration: ${message}`, { cause: err });
       }
 
       logError(

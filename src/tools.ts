@@ -31,6 +31,7 @@ import {
 } from '@/teamcity/client-adapter';
 import { TeamCityAPIError, TeamCityNotFoundError, isRetryableError } from '@/teamcity/errors';
 import { createPaginatedFetcher, fetchAllPages } from '@/teamcity/pagination';
+import { sleep } from '@/utils/async';
 import {
   buildBranchSegmentInput,
   hasBranchSegment,
@@ -96,7 +97,7 @@ interface NormalizedArtifactRequest {
 const buildIdentifierSchema = z
   .object({
     buildId: z.string().min(1).optional(),
-    buildNumber: z.union([z.string().min(1), z.number().int()]).optional(),
+    buildNumber: z.union([z.string().min(1), z.coerce.number().int()]).optional(),
     buildTypeId: z.string().min(1).optional(),
   })
   .superRefine((value, ctx) => {
@@ -455,14 +456,203 @@ export interface ToolResponse {
   data?: unknown;
 }
 
+export interface ToolAnnotations {
+  readOnlyHint: boolean;
+  destructiveHint: boolean;
+  idempotentHint: boolean;
+  openWorldHint: boolean;
+}
+
 // Tool definition - handlers use unknown but are cast internally
 export interface ToolDefinition {
   name: string;
   description: string;
+  annotations: ToolAnnotations;
   inputSchema: unknown;
+  /**
+   * Optional JSON Schema describing the structured response. When present it is
+   * surfaced via `tools/list` and the server will parse the text content of the
+   * handler's result back into `structuredContent` on `tools/call`, per the
+   * MCP spec (2025-06-18: tools declaring `outputSchema` must return structured
+   * content).
+   */
+  outputSchema?: Record<string, unknown>;
   handler: (args: unknown) => Promise<ToolResponse>;
   mode?: 'dev' | 'full'; // If not specified, available in both modes
 }
+
+/**
+ * Reusable JSON Schema fragments for the first batch of tools that declare
+ * `outputSchema`. Schemas stay permissive (`additionalProperties: true`) since
+ * the underlying TeamCity responses include many fields and fields-selector
+ * projections can further narrow them — the goal is to document the stable
+ * top-level shape, not to constrain every nested field.
+ */
+const paginationMetaSchema: Record<string, unknown> = {
+  type: 'object',
+  description: 'Pagination metadata describing which slice was returned.',
+  additionalProperties: true,
+  properties: {
+    page: { type: 'number' },
+    pageSize: { type: 'number' },
+    mode: { type: 'string', enum: ['all'] },
+    fetched: { type: 'number' },
+  },
+};
+
+const buildObjectSchema: Record<string, unknown> = {
+  type: 'object',
+  description: 'TeamCity build representation.',
+  additionalProperties: true,
+  properties: {
+    id: { type: ['number', 'string'] },
+    buildTypeId: { type: 'string' },
+    number: { type: 'string' },
+    state: { type: 'string' },
+    status: { type: 'string' },
+    statusText: { type: 'string' },
+    branchName: { type: 'string' },
+    href: { type: 'string' },
+    webUrl: { type: 'string' },
+  },
+};
+
+const projectObjectSchema: Record<string, unknown> = {
+  type: 'object',
+  description: 'TeamCity project representation.',
+  additionalProperties: true,
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    parentProjectId: { type: 'string' },
+    href: { type: 'string' },
+    webUrl: { type: 'string' },
+    archived: { type: 'boolean' },
+    description: { type: 'string' },
+  },
+};
+
+const buildTypeObjectSchema: Record<string, unknown> = {
+  type: 'object',
+  description: 'TeamCity build configuration (buildType) representation.',
+  additionalProperties: true,
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    projectId: { type: 'string' },
+    projectName: { type: 'string' },
+    href: { type: 'string' },
+    webUrl: { type: 'string' },
+    paused: { type: 'boolean' },
+    description: { type: 'string' },
+  },
+};
+
+const listOutputSchema = (itemSchema: Record<string, unknown>): Record<string, unknown> => ({
+  type: 'object',
+  additionalProperties: false,
+  required: ['items', 'pagination'],
+  properties: {
+    items: { type: 'array', items: itemSchema },
+    pagination: paginationMetaSchema,
+  },
+});
+
+const buildStatusOutputSchema: Record<string, unknown> = {
+  type: 'object',
+  description: 'Aggregated status for a queued, running, or finished build.',
+  additionalProperties: true,
+  required: ['buildId', 'state', 'percentageComplete'],
+  properties: {
+    buildId: { type: 'string' },
+    buildNumber: { type: 'string' },
+    buildTypeId: { type: 'string' },
+    state: { type: 'string', enum: ['queued', 'running', 'finished', 'failed', 'canceled'] },
+    status: { type: 'string', enum: ['SUCCESS', 'FAILURE', 'ERROR', 'UNKNOWN'] },
+    statusText: { type: 'string' },
+    percentageComplete: { type: 'number' },
+    currentStageText: { type: 'string' },
+    branchName: { type: 'string' },
+    webUrl: { type: 'string' },
+    queuedDate: { type: 'string' },
+    startDate: { type: 'string' },
+    finishDate: { type: 'string' },
+    elapsedSeconds: { type: 'number' },
+    estimatedTotalSeconds: { type: 'number' },
+    estimatedStartTime: { type: 'string' },
+    queuePosition: { type: 'number' },
+    waitReason: { type: 'string' },
+    failureReason: { type: 'string' },
+    canceledBy: { type: 'string' },
+    canceledDate: { type: 'string' },
+    totalQueued: { type: 'number' },
+    canMoveToTop: { type: 'boolean' },
+    testSummary: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        total: { type: 'number' },
+        passed: { type: 'number' },
+        failed: { type: 'number' },
+        ignored: { type: 'number' },
+        muted: { type: 'number' },
+        newFailed: { type: 'number' },
+      },
+    },
+    problems: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: true,
+        properties: {
+          type: { type: 'string' },
+          identity: { type: 'string' },
+          description: { type: 'string' },
+        },
+      },
+    },
+  },
+};
+
+const buildResultsOutputSchema: Record<string, unknown> = {
+  type: 'object',
+  description:
+    'Rich build result bundle assembled by BuildResultsManager. The core build summary is always under `build`; optional sections (artifacts, statistics, changes, dependencies) are present when requested via the corresponding include* flags.',
+  additionalProperties: true,
+  required: ['build'],
+  properties: {
+    build: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        id: { type: ['string', 'number'] },
+        number: { type: 'string' },
+        status: { type: 'string' },
+        state: { type: 'string' },
+        buildTypeId: { type: 'string' },
+        projectId: { type: 'string' },
+        branchName: { type: 'string' },
+        statusText: { type: 'string' },
+        webUrl: { type: 'string' },
+      },
+    },
+    artifacts: { type: 'array', items: { type: 'object', additionalProperties: true } },
+    statistics: { type: 'object', additionalProperties: true },
+    changes: { type: 'array', items: { type: 'object', additionalProperties: true } },
+    dependencies: { type: 'array', items: { type: 'object', additionalProperties: true } },
+  },
+};
+
+export const FIRST_BATCH_OUTPUT_SCHEMAS = {
+  list_builds: listOutputSchema(buildObjectSchema),
+  get_build: buildObjectSchema,
+  get_build_status: buildStatusOutputSchema,
+  get_build_results: buildResultsOutputSchema,
+  list_projects: listOutputSchema(projectObjectSchema),
+  get_project: projectObjectSchema,
+  list_build_configs: listOutputSchema(buildTypeObjectSchema),
+  get_build_config: buildTypeObjectSchema,
+} as const;
 
 // Specific argument types are intentionally scoped to the handlers that use them.
 // Zod validates at runtime; these interfaces keep compile-time safety and clean linting.
@@ -545,6 +735,20 @@ interface DeleteOutputParameterArgs {
   buildTypeId: string;
   name: string;
 }
+// SSH key interfaces
+interface ListProjectSshKeysArgs {
+  projectId: string;
+}
+interface UploadProjectSshKeyArgs {
+  projectId: string;
+  keyName: string;
+  privateKeyContent?: string;
+  privateKeyPath?: string;
+}
+interface DeleteProjectSshKeyArgs {
+  projectId: string;
+  keyName: string;
+}
 interface CreateVCSRootArgs {
   projectId: string;
   name: string;
@@ -560,6 +764,9 @@ interface AuthorizeAgentArgs {
 interface AssignAgentToPoolArgs {
   agentId: string;
   poolId: string;
+}
+interface RemoveAgentArgs {
+  agentId: string;
 }
 interface ManageBuildTriggersArgs {
   buildTypeId: string;
@@ -583,7 +790,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === Basic Tools ===
   {
     name: 'ping',
-    description: 'Test MCP server connectivity',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Test MCP server connectivity. Returns a confirmation echo and optional message.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -606,8 +819,14 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === Mode Management Tools ===
   {
     name: 'get_mcp_mode',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description:
-      'Get current MCP mode. Dev mode: read-only tools for safe exploration. Full mode: all tools including admin operations.',
+      'Get the current MCP mode. Dev mode is read-only; full mode enables all operations.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -627,8 +846,14 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'set_mcp_mode',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description:
-      'Switch MCP mode at runtime. Dev mode: safe read-only operations. Full mode: all operations including writes. Clients are notified of tool list changes.',
+      'Switch MCP mode at runtime. Returns previous and current modes with the updated tool count; idempotent and notifies clients of the list change.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -675,7 +900,14 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === Project Tools ===
   {
     name: 'list_projects',
-    description: 'List TeamCity projects (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List TeamCity projects. Supports pagination and locator filtering.',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.list_projects,
     inputSchema: {
       type: 'object',
       properties: {
@@ -694,8 +926,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       const schema = z.object({
         locator: z.string().min(1).optional(),
         parentProjectId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -748,7 +980,14 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'get_project',
-    description: 'Get details of a specific project',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Get details of a specific project.',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_project,
     inputSchema: {
       type: 'object',
       properties: {
@@ -774,7 +1013,14 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === Build Tools ===
   {
     name: 'list_builds',
-    description: 'List TeamCity builds (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List TeamCity builds. Supports pagination and locator filtering.',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.list_builds,
     inputSchema: {
       type: 'object',
       properties: {
@@ -804,9 +1050,9 @@ const DEV_TOOLS: ToolDefinition[] = [
         buildTypeId: z.string().min(1).optional(),
         branch: z.string().min(1).optional(),
         status: z.enum(['SUCCESS', 'FAILURE', 'ERROR']).optional(),
-        count: z.number().int().min(1).max(1000).default(10).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        count: z.coerce.number().int().min(1).max(1000).default(10).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -874,8 +1120,14 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'get_build',
-    description:
-      'Get details of a specific build (works for both queued and running/finished builds)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Get details of a specific build. Works for queued, running, and finished builds.',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_build,
     inputSchema: {
       type: 'object',
       properties: {
@@ -930,7 +1182,14 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'trigger_build',
-    description: 'Trigger a new build',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      'Trigger a new build; runs asynchronously, use `wait_for_build` to monitor. Returns the queued build id; returns 404 if buildTypeId is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1098,7 +1357,14 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'cancel_queued_build',
-    description: 'Cancel a queued build by ID',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      'Cancel a queued (not-yet-running) build. Idempotent; returns 404 if the build already started or was cancelled.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1124,8 +1390,14 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'cancel_build',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     description:
-      'Cancel or stop a running (or queued) build by ID. Supports an optional comment and requeue flag.',
+      'Cancel or stop a running or queued build, with optional comment and requeue flag. Returns the cancelled build; returns 404 if the build is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1173,7 +1445,15 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'get_build_status',
-    description: 'Get build status with optional test/problem and queue context details',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Get build status. Optionally includes test and problem summaries plus queue context.',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_build_status,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1284,8 +1564,123 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
 
   {
+    name: 'wait_for_build',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      'Wait for a build to reach a terminal state (finished, canceled, failed). Long-running; polls until completion or timeout.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        buildId: { type: 'string', description: 'Build ID to wait for' },
+        buildNumber: {
+          type: 'string',
+          description: 'Human build number (requires buildTypeId)',
+        },
+        buildTypeId: {
+          type: 'string',
+          description: 'Build configuration ID (required with buildNumber)',
+        },
+        timeout: {
+          type: 'number',
+          description: 'Max seconds to wait (default 600, max 3600)',
+        },
+        pollInterval: {
+          type: 'number',
+          description: 'Seconds between polls (default 15, min 5)',
+        },
+        includeTests: { type: 'boolean', description: 'Include test summary in result' },
+        includeProblems: { type: 'boolean', description: 'Include build problems in result' },
+      },
+    },
+    handler: async (args: unknown) => {
+      const schema = z
+        .object({
+          buildId: z.string().min(1).optional(),
+          buildNumber: z.string().min(1).optional(),
+          buildTypeId: z.string().min(1).optional(),
+          timeout: z.coerce.number().int().min(1).max(3600).default(600),
+          pollInterval: z.coerce.number().int().min(5).max(300).default(15),
+          includeTests: z.boolean().optional(),
+          includeProblems: z.boolean().optional(),
+        })
+        .superRefine((value, ctx) => {
+          if (!value.buildId && !value.buildNumber) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['buildId'],
+              message: 'Either buildId or buildNumber must be provided',
+            });
+          }
+
+          if (value.buildNumber && !value.buildTypeId) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['buildTypeId'],
+              message: 'buildTypeId is required when querying by buildNumber',
+            });
+          }
+        });
+
+      return runTool(
+        'wait_for_build',
+        schema,
+        async (typed) => {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const statusManager = new (
+            await import('@/teamcity/build-status-manager')
+          ).BuildStatusManager(adapter);
+
+          const deadline = Date.now() + typed.timeout * 1000;
+          const terminalStates = new Set(['finished', 'canceled', 'failed']);
+          let pollCount = 0;
+          const startTime = Date.now();
+
+          while (true) {
+            pollCount++;
+            const result = await statusManager.getBuildStatus({
+              buildId: typed.buildId,
+              buildNumber: typed.buildNumber,
+              buildTypeId: typed.buildTypeId,
+              includeTests: typed.includeTests,
+              includeProblems: typed.includeProblems,
+              forceRefresh: true,
+            });
+
+            const waitSeconds = Math.round((Date.now() - startTime) / 1000);
+            debug(
+              `wait_for_build poll #${pollCount}: state=${result.state} (${waitSeconds}s elapsed)`
+            );
+
+            if (terminalStates.has(result.state)) {
+              return json({ ...result, pollCount, waitSeconds });
+            }
+
+            if (Date.now() >= deadline) {
+              return json({ ...result, timedOut: true, pollCount, waitSeconds });
+            }
+
+            await sleep(typed.pollInterval * 1000);
+          }
+        },
+        args
+      );
+    },
+  },
+
+  {
     name: 'fetch_build_log',
-    description: 'Fetch build log with pagination (by lines)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Fetch a build log. Supports line-based pagination and streaming output.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1322,12 +1717,12 @@ const DEV_TOOLS: ToolDefinition[] = [
       const schema = z
         .object({
           buildId: z.string().min(1).optional(),
-          buildNumber: z.union([z.string().min(1), z.number().int().min(0)]).optional(),
+          buildNumber: z.union([z.string().min(1), z.coerce.number().int().min(0)]).optional(),
           buildTypeId: z.string().min(1).optional(),
-          page: z.number().int().min(1).optional(),
-          pageSize: z.number().int().min(1).max(5000).optional(),
-          startLine: z.number().int().min(0).optional(),
-          lineCount: z.number().int().min(1).max(5000).optional(),
+          page: z.coerce.number().int().min(1).optional(),
+          pageSize: z.coerce.number().int().min(1).max(5000).optional(),
+          startLine: z.coerce.number().int().min(0).optional(),
+          lineCount: z.coerce.number().int().min(1).max(5000).optional(),
           tail: z.boolean().optional(),
           encoding: z.enum(['text', 'stream']).default('text'),
           outputPath: z.string().min(1).optional(),
@@ -1588,7 +1983,14 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === Build Configuration Tools ===
   {
     name: 'list_build_configs',
-    description: 'List build configurations (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List build configurations. Supports pagination and locator filtering.',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.list_build_configs,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1607,8 +2009,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       const schema = z.object({
         locator: z.string().min(1).optional(),
         projectId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -1661,7 +2063,14 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'get_build_config',
-    description: 'Get details of a build configuration',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Get details of a build configuration.',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_build_config,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1689,7 +2098,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === Test Tools ===
   {
     name: 'list_test_failures',
-    description: 'List test failures for a build (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List test failures for a build. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1706,8 +2121,8 @@ const DEV_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const schema = buildIdentifierSchema.and(
         z.object({
-          pageSize: z.number().int().min(1).max(1000).optional(),
-          maxPages: z.number().int().min(1).max(1000).optional(),
+          pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+          maxPages: z.coerce.number().int().min(1).max(1000).optional(),
           all: z.boolean().optional(),
           fields: z.string().min(1).optional(),
         })
@@ -1755,7 +2170,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === VCS Tools ===
   {
     name: 'list_vcs_roots',
-    description: 'List VCS roots (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List VCS roots. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1772,8 +2193,8 @@ const DEV_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const schema = z.object({
         projectId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -1825,7 +2246,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'get_vcs_root',
-    description: 'Get details of a VCS root (including properties)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Get details of a VCS root, including its properties.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1860,7 +2287,14 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'set_vcs_root_property',
-    description: 'Set a single VCS root property (e.g., branch, branchSpec, url)',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Set a single VCS root property such as branch, branchSpec, or url. Returns the updated value; returns 404 if the VCS root or property is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1899,7 +2333,14 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'delete_vcs_root_property',
-    description: 'Delete a single VCS root property',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Delete a single VCS root property. Idempotent; returns 404 if the VCS root is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1931,7 +2372,14 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'update_vcs_root_properties',
-    description: 'Update common VCS root properties in one call',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Update common VCS root properties in a single call. Returns the updated VCS root; returns 404 if the VCS root is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1984,11 +2432,12 @@ const DEV_TOOLS: ToolDefinition[] = [
             });
           }
 
-          await adapter.modules.vcsRoots.setVcsRootProperties(
-            typed.id,
-            undefined,
-            { property: properties },
-            { headers: { 'Content-Type': 'application/json', Accept: 'application/json' } }
+          await Promise.all(
+            properties.map((p) =>
+              adapter.modules.vcsRoots.setVcsRootProperty(typed.id, p.name, p.value, {
+                headers: { 'Content-Type': 'text/plain', Accept: 'text/plain' },
+              })
+            )
           );
           return json({
             success: true,
@@ -2006,7 +2455,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === Queue (read-only) ===
   {
     name: 'list_queued_builds',
-    description: 'List queued builds (supports TeamCity queue locator + pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List queued builds. Supports TeamCity queue locator filtering and pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2026,8 +2481,8 @@ const DEV_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const schema = z.object({
         locator: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -2079,7 +2534,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === Server Health & Metrics (read-only) ===
   {
     name: 'get_server_metrics',
-    description: 'Fetch server metrics (CPU/memory/disk/load) if available',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Fetch TeamCity server metrics (CPU, memory, disk, load) when available.',
     inputSchema: { type: 'object', properties: {} },
     handler: async (_args: unknown) => {
       return runTool(
@@ -2097,7 +2558,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'get_server_info',
-    description: 'Get TeamCity server info (version, build number, state)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Get TeamCity server info including version, build number, and state.',
     inputSchema: { type: 'object', properties: {} },
     handler: async (_args: unknown) => {
       return runTool(
@@ -2114,7 +2581,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'list_server_health_items',
-    description: 'List server health items (warnings/errors) for readiness checks',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List server health items (warnings and errors). Useful for readiness checks.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2196,7 +2669,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'get_server_health_item',
-    description: 'Get a single server health item by locator',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Get a single server health item by locator.',
     inputSchema: {
       type: 'object',
       properties: { locator: { type: 'string', description: 'Health item locator' } },
@@ -2221,8 +2700,14 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === Availability Policy Guard (read-only) ===
   {
     name: 'check_availability_guard',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description:
-      'Evaluate server health; returns ok=false if critical health items found (severity ERROR)',
+      'Evaluate server health. Returns ok=false when any ERROR-severity items are present.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2262,7 +2747,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === Agent Compatibility (read-only lookups) ===
   {
     name: 'get_compatible_build_types_for_agent',
-    description: 'Get build types compatible with the specified agent',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List build types compatible with the specified agent.',
     inputSchema: {
       type: 'object',
       properties: { agentId: { type: 'string', description: 'Agent ID' } },
@@ -2285,7 +2776,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'get_incompatible_build_types_for_agent',
-    description: 'Get build types incompatible with the specified agent',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List build types incompatible with the specified agent.',
     inputSchema: {
       type: 'object',
       properties: { agentId: { type: 'string', description: 'Agent ID' } },
@@ -2308,7 +2805,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'get_agent_enabled_info',
-    description: 'Get the enabled/disabled state for an agent, including comment and switch time',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: "Get an agent's enabled/disabled state, including comment and switch time.",
     inputSchema: {
       type: 'object',
       properties: { agentId: { type: 'string', description: 'Agent ID' } },
@@ -2331,7 +2834,14 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'get_compatible_agents_for_build_type',
-    description: 'List agents compatible with a build type (optionally filter enabled only)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'List agents compatible with a build type. Optionally filters to enabled agents only.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2366,7 +2876,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'count_compatible_agents_for_build_type',
-    description: 'Return only the count of enabled compatible agents for a build type',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Count enabled agents compatible with a build type.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2402,8 +2918,14 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'get_compatible_agents_for_queued_build',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description:
-      'List agents compatible with a queued/running build by buildId (optionally filter enabled only)',
+      'List agents compatible with a queued or running build. Optionally filters to enabled agents only.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2441,7 +2963,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'check_teamcity_connection',
-    description: 'Check connectivity to TeamCity server and basic readiness',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Check connectivity and basic readiness of the TeamCity server.',
     inputSchema: { type: 'object', properties: {} },
     handler: async (_args: unknown) => {
       const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
@@ -2454,7 +2982,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === Agent Tools ===
   {
     name: 'list_agents',
-    description: 'List build agents (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List build agents. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2471,8 +3005,8 @@ const DEV_TOOLS: ToolDefinition[] = [
     handler: async (args: unknown) => {
       const schema = z.object({
         locator: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -2519,7 +3053,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'list_agent_pools',
-    description: 'List agent pools (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List agent pools. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2534,8 +3074,8 @@ const DEV_TOOLS: ToolDefinition[] = [
     },
     handler: async (args: unknown) => {
       const schema = z.object({
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -2587,8 +3127,15 @@ const DEV_TOOLS: ToolDefinition[] = [
   // Build Analysis Tools
   {
     name: 'get_build_results',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description:
-      'Get detailed results of a build including tests, artifacts, changes, and statistics',
+      'Get detailed results of a build. Optionally includes tests, artifacts, changes, statistics, and dependencies.',
+    outputSchema: FIRST_BATCH_OUTPUT_SCHEMAS.get_build_results,
     inputSchema: {
       type: 'object',
       properties: {
@@ -2629,13 +3176,13 @@ const DEV_TOOLS: ToolDefinition[] = [
         .object({
           buildId: z.string().min(1).optional(),
           buildTypeId: z.string().min(1).optional(),
-          buildNumber: z.union([z.string().min(1), z.number().int()]).optional(),
+          buildNumber: z.union([z.string().min(1), z.coerce.number().int()]).optional(),
           includeArtifacts: z.boolean().optional(),
           includeStatistics: z.boolean().optional(),
           includeChanges: z.boolean().optional(),
           includeDependencies: z.boolean().optional(),
           artifactFilter: z.string().min(1).optional(),
-          maxArtifactSize: z.number().int().min(1).optional(),
+          maxArtifactSize: z.coerce.number().int().min(1).optional(),
           artifactEncoding: z.enum(['base64', 'stream']).default('base64'),
         })
         .superRefine((value, ctx) => {
@@ -2720,8 +3267,87 @@ const DEV_TOOLS: ToolDefinition[] = [
   },
 
   {
+    name: 'list_build_artifacts',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'List artifact files and directories for a build, optionally browsing into subdirectories. Returns an array of artifact entries with name, path, size, and isDirectory flag.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...buildIdentifierInputProperties,
+        path: {
+          type: 'string',
+          description:
+            'Sub-path to list (e.g. "okd" or "okd/subdir"). Omit to list top-level artifacts.',
+        },
+        includeNested: {
+          type: 'boolean',
+          description: 'Recursively include all files within subdirectories (default: false)',
+        },
+        nameFilter: {
+          type: 'string',
+          description: 'Glob pattern to filter artifacts by name (e.g. "*.yaml")',
+        },
+        pathFilter: {
+          type: 'string',
+          description: 'Glob pattern to filter artifacts by full path',
+        },
+        extension: {
+          type: 'string',
+          description: 'Filter by file extension (e.g. "yaml", ".yaml")',
+        },
+      },
+    },
+    handler: async (args: unknown) => {
+      const schema = buildIdentifierSchema.and(
+        z.object({
+          path: z.string().trim().min(1).optional(),
+          includeNested: z.boolean().optional(),
+          nameFilter: z.string().trim().min(1).optional(),
+          pathFilter: z.string().trim().min(1).optional(),
+          extension: z.string().trim().min(1).optional(),
+        })
+      );
+
+      return runTool(
+        'list_build_artifacts',
+        schema,
+        async (typed) => {
+          const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+          const { locator: buildLocator } = resolveBuildLocator(typed);
+
+          const manager = new ArtifactManager(adapter);
+          const artifacts = await manager.listArtifacts(buildLocator, {
+            path: typed.path,
+            includeNested: typed.includeNested,
+            includeDirectories: true,
+            nameFilter: typed.nameFilter,
+            pathFilter: typed.pathFilter,
+            extension: typed.extension,
+          });
+
+          return json({ artifacts });
+        },
+        args
+      );
+    },
+  },
+
+  {
     name: 'download_build_artifact',
-    description: 'Download a single artifact with optional streaming output',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Download a single build artifact, with base64, text, or streaming output. Returns the artifact bytes or stream metadata; returns 404 if the build or path is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2750,7 +3376,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         z.object({
           artifactPath: z.string().min(1),
           encoding: z.enum(['base64', 'text', 'stream']).default('base64'),
-          maxSize: z.number().int().positive().optional(),
+          maxSize: z.coerce.number().int().positive().optional(),
           outputPath: z.string().min(1).optional(),
         })
       );
@@ -2788,7 +3414,14 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'download_build_artifacts',
-    description: 'Download multiple artifacts with optional streaming output',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Download multiple build artifacts, with base64, text, or streaming output. Returns per-artifact payloads or stream metadata; returns 404 if the build or any path is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2844,7 +3477,7 @@ const DEV_TOOLS: ToolDefinition[] = [
           .object({
             artifactPaths: z.array(artifactInputSchema).min(1),
             encoding: z.enum(['base64', 'text', 'stream']).default('base64'),
-            maxSize: z.number().int().positive().optional(),
+            maxSize: z.coerce.number().int().positive().optional(),
             outputDir: z
               .string()
               .min(1)
@@ -2963,7 +3596,9 @@ const DEV_TOOLS: ToolDefinition[] = [
             failureCount: results.filter((item) => !item.success).length,
           });
 
-          const failures = results.filter((item) => !item.success);
+          const failures = results.filter(
+            (item): item is Extract<ArtifactBatchResult, { success: false }> => !item.success
+          );
           if (results.length > 0 && failures.length === results.length) {
             const reason = failures
               .map((item) => `${item.path}: ${item.error ?? 'unknown error'}`)
@@ -2980,7 +3615,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'get_test_details',
-    description: 'Get detailed information about test failures',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Get detailed information about test failures.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3012,7 +3653,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'analyze_build_problems',
-    description: 'Analyze and report build problems and failures',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Analyze and report build problems and failures.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3048,7 +3695,13 @@ const DEV_TOOLS: ToolDefinition[] = [
   // === Changes, Problems & Diagnostics ===
   {
     name: 'list_changes',
-    description: 'List VCS changes (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List VCS changes. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3069,8 +3722,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         locator: z.string().min(1).optional(),
         projectId: z.string().min(1).optional(),
         buildId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -3123,7 +3776,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'list_problems',
-    description: 'List build problems (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List build problems. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3144,8 +3803,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         locator: z.string().min(1).optional(),
         projectId: z.string().min(1).optional(),
         buildId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -3198,7 +3857,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'list_problem_occurrences',
-    description: 'List problem occurrences (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List build problem occurrences. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3225,8 +3890,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         locator: z.string().min(1).optional(),
         buildId: z.string().min(1).optional(),
         problemId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -3281,7 +3946,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'list_investigations',
-    description: 'List open investigations (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List open investigations. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3313,8 +3984,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         projectId: z.string().min(1).optional(),
         buildTypeId: z.string().min(1).optional(),
         assigneeUsername: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -3369,7 +4040,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'list_muted_tests',
-    description: 'List muted tests (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List muted tests. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3395,8 +4072,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         projectId: z.string().min(1).optional(),
         buildTypeId: z.string().min(1).optional(),
         testNameId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -3450,7 +4127,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'get_versioned_settings_status',
-    description: 'Get Versioned Settings status for a locator',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'Get Versioned Settings status for a project locator.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3489,7 +4172,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'list_users',
-    description: 'List TeamCity users (supports pagination)',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List TeamCity users. Supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3508,8 +4197,8 @@ const DEV_TOOLS: ToolDefinition[] = [
       const schema = z.object({
         locator: z.string().min(1).optional(),
         groupId: z.string().min(1).optional(),
-        pageSize: z.number().int().min(1).max(1000).optional(),
-        maxPages: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
         all: z.boolean().optional(),
         fields: z.string().min(1).optional(),
       });
@@ -3559,7 +4248,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'list_roles',
-    description: 'List defined roles and their permissions',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List defined roles and their permissions.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3588,7 +4283,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'list_branches',
-    description: 'List branches for a project or build configuration',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List branches for a project or build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3632,7 +4333,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'list_parameters',
-    description: 'List parameters for a build configuration',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List parameters for a build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3669,7 +4376,13 @@ const DEV_TOOLS: ToolDefinition[] = [
 
   {
     name: 'list_project_hierarchy',
-    description: 'List project hierarchy showing parent-child relationships',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List project hierarchy showing parent-child relationships.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3743,7 +4456,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Project Management Tools ===
   {
     name: 'create_project',
-    description: 'Create a new TeamCity project',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      'Create a new TeamCity project. Returns the created project (id and name); returns 409 if a project with the same id already exists.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3785,7 +4505,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'delete_project',
-    description: 'Delete a TeamCity project',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Delete a TeamCity project. Irreversible; returns 404 if the project does not exist.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3805,7 +4532,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'update_project_settings',
-    description: 'Update project settings and parameters',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Update project settings and parameters. Returns the updated project; returns 404 if the project does not exist.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3902,7 +4636,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Build Configuration Management ===
   {
     name: 'create_build_config',
-    description: 'Create a new build configuration',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      'Create a new build configuration. Returns the created configuration (id and name); returns 409 if a configuration with the same id already exists.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -3933,7 +4674,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'clone_build_config',
-    description: 'Clone an existing build configuration',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      'Clone an existing build configuration. Returns the new configuration (id and name); returns 404 if the source configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4037,7 +4785,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'update_build_config',
-    description: 'Update build configuration settings',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Update build configuration settings. Returns the updated configuration; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4142,8 +4897,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Dependency, Feature, and Requirement Management ===
   {
     name: 'manage_build_dependencies',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description:
-      'Add, update, or delete artifact and snapshot dependencies for a build configuration',
+      'Add, update, or delete artifact and snapshot dependencies for a build configuration. Returns the affected dependency or a delete confirmation; returns 404 if the configuration or dependency id is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4291,8 +5052,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'manage_build_features',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description:
-      'Add, update, or delete build features such as ssh-agent or requirements enforcement',
+      'Add, update, or delete build features such as ssh-agent or requirements enforcement. Returns the affected feature or a delete confirmation; returns 404 if the configuration or feature id is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4405,7 +5172,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'manage_agent_requirements',
-    description: 'Add, update, or delete build agent requirements for a configuration',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Add, update, or delete agent requirements for a build configuration. Returns the affected requirement or a delete confirmation; returns 404 if the configuration or requirement id is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4557,7 +5331,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'set_build_config_state',
-    description: 'Enable or disable a build configuration by toggling its paused flag',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Enable or disable a build configuration by toggling its paused flag. Returns the new paused state; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4604,7 +5385,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === VCS attachment ===
   {
     name: 'add_vcs_root_to_build',
-    description: 'Attach a VCS root to a build configuration',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Attach a VCS root to a build configuration. Returns the attached VCS root entry; returns 404 if the configuration or VCS root is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4653,7 +5441,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Parameter Management ===
   {
     name: 'add_parameter',
-    description: 'Add a parameter to a build configuration',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Add a parameter to a build configuration. Returns the created parameter; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4697,7 +5492,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'update_parameter',
-    description: 'Update a build configuration parameter',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Update a build configuration parameter. Returns the updated parameter; returns 404 if the configuration or parameter name is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4742,7 +5544,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'delete_parameter',
-    description: 'Delete a parameter from a build configuration',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Delete a parameter from a build configuration. Idempotent; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4772,7 +5581,13 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Project Parameter Management ===
   {
     name: 'list_project_parameters',
-    description: 'List parameters for a project',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List parameters for a project.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4804,7 +5619,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'add_project_parameter',
-    description: 'Add a parameter to a project',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Add a parameter to a project. Returns the created parameter; returns 404 if the project does not exist.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4850,7 +5672,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'update_project_parameter',
-    description: 'Update a project parameter',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Update a project parameter. Returns the updated parameter; returns 404 if the project or parameter name is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4895,7 +5724,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'delete_project_parameter',
-    description: 'Delete a parameter from a project',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Delete a parameter from a project. Idempotent; returns 404 if the project does not exist.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4922,7 +5758,13 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Output Parameter Management ===
   {
     name: 'list_output_parameters',
-    description: 'List output parameters for a build configuration',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List output parameters for a build configuration.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4952,7 +5794,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'add_output_parameter',
-    description: 'Add an output parameter to a build configuration (for build chains)',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Add an output parameter to a build configuration; used to pass values between builds in a chain. Returns the created parameter; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -4989,7 +5838,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'update_output_parameter',
-    description: 'Update an output parameter in a build configuration',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Update an output parameter in a build configuration. Returns the updated parameter; returns 404 if the configuration or parameter name is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5026,7 +5882,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'delete_output_parameter',
-    description: 'Delete an output parameter from a build configuration',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Delete an output parameter from a build configuration. Idempotent; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5057,7 +5920,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === VCS Root Management ===
   {
     name: 'create_vcs_root',
-    description: 'Create a new VCS root',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      'Create a new VCS root. Returns the created VCS root id; returns 409 if a VCS root with the same id already exists.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5097,7 +5967,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Agent Management ===
   {
     name: 'authorize_agent',
-    description: 'Authorize or unauthorize a build agent',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Authorize or unauthorize a build agent. Returns the new authorization state; returns 404 if the agent is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5128,7 +6005,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 
   {
     name: 'assign_agent_to_pool',
-    description: 'Assign an agent to a different pool',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      "Assign an agent to a different pool. Returns the agent's new pool assignment; returns 404 if the agent or pool is unknown.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -5153,11 +6037,44 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
     },
     mode: 'full',
   },
+  {
+    name: 'remove_agent',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Remove a build agent from the TeamCity server, useful for cleaning up disconnected or ghost agent entries. Idempotent; returns 404 if the agent is unknown.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        agentId: { type: 'string', description: 'Agent ID to remove' },
+      },
+      required: ['agentId'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as RemoveAgentArgs;
+
+      const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
+      await adapter.modules.agents.deleteAgent(typedArgs.agentId);
+      return json({ success: true, action: 'remove_agent', agentId: typedArgs.agentId });
+    },
+    mode: 'full',
+  },
 
   // === Build Step Management ===
   {
     name: 'manage_build_steps',
-    description: 'Add, update, or delete build steps',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Add, update, or delete build steps. Returns the affected step or a delete confirmation; returns 404 if the configuration or step id is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5387,7 +6304,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Build Trigger Management ===
   {
     name: 'manage_build_triggers',
-    description: 'Add, update, or delete build triggers',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Add, update, or delete build triggers. Returns the affected trigger or a delete confirmation; returns 404 if the configuration or trigger id is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5459,7 +6383,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Batch pause/unpause specific build configurations ===
   {
     name: 'set_build_configs_paused',
-    description: 'Set paused/unpaused for a list of build configurations; optionally cancel queued',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Pause or unpause a list of build configurations, optionally cancelling their queued builds. Returns the count of configurations updated; returns 404 if any configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5527,7 +6458,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Test Administration ===
   {
     name: 'mute_tests',
-    description: 'Mute tests within a project or build configuration scope',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      'Mute tests within a project or build configuration scope. Returns the created mute id; returns 404 if the scope id is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5627,7 +6565,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Queue Maintenance ===
   {
     name: 'move_queued_build_to_top',
-    description: 'Move a queued build to the top of the queue',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      'Move a queued build to the top of the queue. Idempotent; returns 404 if the build is no longer queued.',
     inputSchema: {
       type: 'object',
       properties: { buildId: { type: 'string', description: 'Queued build ID' } },
@@ -5656,7 +6601,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'reorder_queued_builds',
-    description: 'Reorder queued builds by providing the desired sequence of IDs',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      'Reorder queued builds by providing the desired sequence of IDs. Returns the new queue order; returns 404 if any build id is no longer queued.',
     inputSchema: {
       type: 'object',
       properties: { buildIds: { type: 'array', items: { type: 'string' } } },
@@ -5685,7 +6637,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'cancel_queued_builds_for_build_type',
-    description: 'Cancel all queued builds for a specific build configuration',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      'Cancel all queued builds for a specific build configuration. Returns the count of cancelled builds; returns 404 if the configuration is unknown.',
     inputSchema: {
       type: 'object',
       properties: { buildTypeId: { type: 'string', description: 'Build type ID' } },
@@ -5722,7 +6681,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'cancel_queued_builds_by_locator',
-    description: 'Cancel all queued builds matching a queue locator expression',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      'Cancel all queued builds matching a queue locator expression. Returns the count of cancelled builds; returns 400 if the locator is malformed.',
     inputSchema: {
       type: 'object',
       properties: { locator: { type: 'string', description: 'Queue locator expression' } },
@@ -5760,8 +6726,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Scoped Pause/Resume (by pool) ===
   {
     name: 'pause_queue_for_pool',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description:
-      'Disable all agents in a pool to pause queue processing; optionally cancel queued builds for a build type',
+      'Pause queue processing by disabling all agents in a pool, optionally cancelling queued builds for a build type. Returns counts of agents disabled and builds cancelled; returns 404 if the pool is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5791,7 +6763,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           const agentsResp = await adapter.modules.agents.getAllAgents(
             `agentPool:(id:${typed.poolId})`
           );
-          const agents = (agentsResp.data?.agent ?? []) as Array<{ id?: string }>;
+          const agents = (agentsResp.data?.agent ?? []) as unknown as Array<{ id?: string }>;
           const body: { status: boolean; comment?: { text?: string }; statusSwitchTime?: string } =
             {
               status: false,
@@ -5843,7 +6815,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'resume_queue_for_pool',
-    description: 'Re-enable all agents in a pool to resume queue processing',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Resume queue processing by re-enabling all agents in a pool. Returns the count of agents re-enabled; returns 404 if the pool is unknown.',
     inputSchema: {
       type: 'object',
       properties: { poolId: { type: 'string', description: 'Agent pool ID' } },
@@ -5859,7 +6838,7 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           const agentsResp = await adapter.modules.agents.getAllAgents(
             `agentPool:(id:${typed.poolId})`
           );
-          const agents = (agentsResp.data?.agent ?? []) as Array<{ id?: string }>;
+          const agents = (agentsResp.data?.agent ?? []) as unknown as Array<{ id?: string }>;
           let enabled = 0;
           for (const a of agents) {
             const id = a.id;
@@ -5888,7 +6867,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   // === Agent Enable/Disable ===
   {
     name: 'set_agent_enabled',
-    description: 'Enable/disable an agent, with optional comment and schedule',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Enable or disable an agent, with optional comment and schedule. Returns the new enabled state; returns 404 if the agent is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5938,8 +6924,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'bulk_set_agents_enabled',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description:
-      'Bulk enable/disable agents selected by pool or locator; supports comment/schedule',
+      'Bulk enable or disable agents selected by pool or locator, with optional comment and schedule. Returns counts of agents updated and skipped; returns 404 if the pool is unknown or 400 if the locator is malformed.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -5988,7 +6980,10 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
           const locator = filters.join(',');
 
           const list = await adapter.modules.agents.getAllAgents(locator);
-          const agents = (list.data?.agent ?? []) as Array<{ id?: string; name?: string }>;
+          const agents = (list.data?.agent ?? []) as unknown as Array<{
+            id?: string;
+            name?: string;
+          }>;
           const body: {
             status: boolean;
             comment?: { text?: string };
@@ -6031,6 +7026,133 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         },
         args
       );
+    },
+    mode: 'full',
+  },
+
+  // === SSH Key Management ===
+  {
+    name: 'list_project_ssh_keys',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description: 'List SSH keys configured for a project.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+      },
+      required: ['projectId'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as ListProjectSshKeysArgs;
+      const api = TeamCityAPI.getInstance();
+      const response = await api.http.get(
+        `/app/rest/projects/${encodeURIComponent(typedArgs.projectId)}/sshKeys`,
+        { headers: { Accept: 'application/json' } }
+      );
+      return json({
+        success: true,
+        action: 'list_project_ssh_keys',
+        projectId: typedArgs.projectId,
+        sshKeys: response.data,
+      });
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'upload_project_ssh_key',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
+    description:
+      "Upload an SSH key to a project; provide either privateKeyContent or privateKeyPath, not both. Returns the uploaded key's name; returns 404 if the project does not exist.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+        keyName: { type: 'string', description: 'Name for the SSH key' },
+        privateKeyContent: {
+          type: 'string',
+          description: 'Raw private key content (PEM format)',
+        },
+        privateKeyPath: {
+          type: 'string',
+          description: 'Path to the private key file',
+        },
+      },
+      required: ['projectId', 'keyName'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as UploadProjectSshKeyArgs;
+
+      if (!typedArgs.privateKeyContent && !typedArgs.privateKeyPath) {
+        throw new Error('Either privateKeyContent or privateKeyPath must be provided');
+      }
+      if (typedArgs.privateKeyContent && typedArgs.privateKeyPath) {
+        throw new Error('Provide only one of privateKeyContent or privateKeyPath, not both');
+      }
+
+      const keyContent = typedArgs.privateKeyPath
+        ? await fs.readFile(typedArgs.privateKeyPath, 'utf-8')
+        : (typedArgs.privateKeyContent as string);
+
+      const formData = new FormData();
+      formData.append('privateKey', new Blob([keyContent]), 'key');
+
+      const api = TeamCityAPI.getInstance();
+      await api.http.post(
+        `/app/rest/projects/${encodeURIComponent(typedArgs.projectId)}/sshKeys?${new URLSearchParams({ name: typedArgs.keyName })}`,
+        formData
+      );
+
+      return json({
+        success: true,
+        action: 'upload_project_ssh_key',
+        projectId: typedArgs.projectId,
+        keyName: typedArgs.keyName,
+      });
+    },
+    mode: 'full',
+  },
+
+  {
+    name: 'delete_project_ssh_key',
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+    description:
+      'Delete an SSH key from a project. Idempotent; returns 404 if the project or key is unknown.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'Project ID' },
+        keyName: { type: 'string', description: 'Name of the SSH key to delete' },
+      },
+      required: ['projectId', 'keyName'],
+    },
+    handler: async (args: unknown) => {
+      const typedArgs = args as DeleteProjectSshKeyArgs;
+      const api = TeamCityAPI.getInstance();
+      await api.http.delete(
+        `/app/rest/projects/${encodeURIComponent(typedArgs.projectId)}/sshKeys?${new URLSearchParams({ name: typedArgs.keyName })}`
+      );
+      return json({
+        success: true,
+        action: 'delete_project_ssh_key',
+        projectId: typedArgs.projectId,
+        keyName: typedArgs.keyName,
+      });
     },
     mode: 'full',
   },

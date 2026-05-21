@@ -201,6 +201,26 @@ describe('SwaggerFetcher auxiliary methods', () => {
     mockAxiosInstance.get.mockRejectedValueOnce(new Error('boom'));
     await expect(fetcher.getServerVersion()).resolves.toBeNull();
   });
+
+  it('forwards extraHeaders to axios.create without clobbering Authorization', () => {
+    const mockedAxios = axios as unknown as jest.Mocked<typeof axios>;
+    const createSpy = mockedAxios.create as unknown as jest.Mock;
+    createSpy.mockClear();
+
+    new SwaggerFetcher({
+      baseUrl: 'https://teamcity.example.com',
+      token: 'tok',
+      extraHeaders: {
+        'CF-Access-Client-Id': 'id',
+        Authorization: 'Bearer attacker',
+      },
+    });
+
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    const args = createSpy.mock.calls[0][0] as { headers: Record<string, string> };
+    expect(args.headers['CF-Access-Client-Id']).toBe('id');
+    expect(args.headers['Authorization']).toBe('Bearer tok');
+  });
 });
 
 describe('SwaggerValidator', () => {

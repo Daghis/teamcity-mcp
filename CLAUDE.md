@@ -64,7 +64,7 @@ Type support includes: `password`, `text`, `checkbox`, `select` with spec format
 
 When Marc says he wants to "check-in with GitHub", run these steps:
 
-1. Pull latest pulse stats (via project-pulse MCP, repo: `Daghis/teamcity-mcp`, npm: `@daghis/teamcity-mcp`)
+1. Snapshot pulse stats (via project-pulse MCP `snapshot_stats`, name: `teamcity-mcp`, repo: `Daghis/teamcity-mcp`, npm: `@daghis/teamcity-mcp`) — this records a data point for trend tracking
 2. Check new issues
 3. Check new PRs
 4. Check security alerts

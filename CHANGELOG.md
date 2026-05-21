@@ -1,5 +1,139 @@
 # Changelog
 
+## [2.12.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.0...teamcity-mcp-v2.12.1) (2026-05-12)
+
+
+### Bug Fixes
+
+* **tools:** mark download_* as readOnly and idempotent ([#507](https://github.com/Daghis/teamcity-mcp/issues/507)) ([0a09663](https://github.com/Daghis/teamcity-mcp/commit/0a09663a5ff39e82f9b471e1aa7102ffc4d68163))
+
+## [2.12.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.11.0...teamcity-mcp-v2.12.0) (2026-05-03)
+
+
+### Features
+
+* **http:** forward TEAMCITY_HEADER_* env vars on every request ([#492](https://github.com/Daghis/teamcity-mcp/issues/492)) ([c406511](https://github.com/Daghis/teamcity-mcp/commit/c4065111e2e8c6e807ec9a4383cbbe8d280ca00e))
+
+## [2.11.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.10.0...teamcity-mcp-v2.11.0) (2026-05-03)
+
+
+### Features
+
+* **artifacts:** add list_build_artifacts tool for subdirectory browsing ([#489](https://github.com/Daghis/teamcity-mcp/issues/489)) ([eacad61](https://github.com/Daghis/teamcity-mcp/commit/eacad6115cbb33a6e660bd096e59869c4fcf4ea8))
+
+## [2.10.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.9.0...teamcity-mcp-v2.10.0) (2026-04-26)
+
+
+### Features
+
+* **tools:** disclose principal return and primary error for mutators ([#484](https://github.com/Daghis/teamcity-mcp/issues/484)) ([0a4d747](https://github.com/Daghis/teamcity-mcp/commit/0a4d7479823f034b04d4623446f71b17b4b30d49))
+
+## [2.9.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.8.0...teamcity-mcp-v2.9.0) (2026-04-24)
+
+
+### Features
+
+* **tools:** unify tool descriptions under a single skeleton ([#479](https://github.com/Daghis/teamcity-mcp/issues/479)) ([19aa256](https://github.com/Daghis/teamcity-mcp/commit/19aa2565f21938639bd9d40f7b1c9cbb524d8e22))
+
+## [2.8.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.7.0...teamcity-mcp-v2.8.0) (2026-04-24)
+
+
+### Features
+
+* **tools:** declare outputSchema for first batch of read tools ([#477](https://github.com/Daghis/teamcity-mcp/issues/477)) ([932fee9](https://github.com/Daghis/teamcity-mcp/commit/932fee9e09988555cda13b8f7282128de8a7e3f5))
+
+## [2.7.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.6.3...teamcity-mcp-v2.7.0) (2026-04-23)
+
+
+### Features
+
+* add MCP behavioral annotations to all 93 tool registrations ([#473](https://github.com/Daghis/teamcity-mcp/issues/473)) ([be71f71](https://github.com/Daghis/teamcity-mcp/commit/be71f71730ad9ac87a17dbcad999b0f02a23868b))
+
+## [2.6.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.6.2...teamcity-mcp-v2.6.3) (2026-04-20)
+
+
+### Bug Fixes
+
+* **codecov:** repair bundle analysis and expand codecov.yml ([#459](https://github.com/Daghis/teamcity-mcp/issues/459)) ([78aae2b](https://github.com/Daghis/teamcity-mcp/commit/78aae2b1471c88d88da110810454219a5b2269b9))
+
+## [2.6.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.6.1...teamcity-mcp-v2.6.2) (2026-04-10)
+
+
+### Bug Fixes
+
+* **deps:** resolve 7 Dependabot security alerts (hono, undici) ([#453](https://github.com/Daghis/teamcity-mcp/issues/453)) ([e43de4a](https://github.com/Daghis/teamcity-mcp/commit/e43de4ac131477b8fe545ecd3ed8fab365cfd1c6))
+
+## [2.6.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.6.0...teamcity-mcp-v2.6.1) (2026-04-10)
+
+
+### Bug Fixes
+
+* **deps:** upgrade axios to 1.15.0 to fix CVE-2025-62718 SSRF ([#451](https://github.com/Daghis/teamcity-mcp/issues/451)) ([f9068c7](https://github.com/Daghis/teamcity-mcp/commit/f9068c7a4e5515474c3a75d10763cbca8f66fd49))
+
+## [2.6.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.5.0...teamcity-mcp-v2.6.0) (2026-03-30)
+
+
+### Features
+
+* add remove_agent tool to delete stale build agents ([#444](https://github.com/Daghis/teamcity-mcp/issues/444)) ([c32824b](https://github.com/Daghis/teamcity-mcp/commit/c32824b8952d862349b3f39d99f1ca2c306f1493)), closes [#439](https://github.com/Daghis/teamcity-mcp/issues/439)
+
+## [2.5.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.4.3...teamcity-mcp-v2.5.0) (2026-03-18)
+
+
+### Features
+
+* add wait_for_build tool to poll until build completes ([#430](https://github.com/Daghis/teamcity-mcp/issues/430)) ([#433](https://github.com/Daghis/teamcity-mcp/issues/433)) ([a83e6cf](https://github.com/Daghis/teamcity-mcp/commit/a83e6cf99e4c523103bf894ee3d58c91734853f6))
+
+## [2.4.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.4.2...teamcity-mcp-v2.4.3) (2026-03-18)
+
+
+### Bug Fixes
+
+* use individual property PUTs in update_vcs_root_properties to prevent wiping existing properties ([#431](https://github.com/Daghis/teamcity-mcp/issues/431)) ([85bac24](https://github.com/Daghis/teamcity-mcp/commit/85bac244cb55f458bc2d22844c993d7f0446ea57)), closes [#428](https://github.com/Daghis/teamcity-mcp/issues/428)
+* use z.coerce.number() to accept string-encoded numeric params ([#432](https://github.com/Daghis/teamcity-mcp/issues/432)) ([6de9aa4](https://github.com/Daghis/teamcity-mcp/commit/6de9aa4c9b11e9c78a261c57381fc44e5f3ffd7b)), closes [#429](https://github.com/Daghis/teamcity-mcp/issues/429)
+
+## [2.4.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.4.1...teamcity-mcp-v2.4.2) (2026-03-17)
+
+
+### Bug Fixes
+
+* apply npm audit fix for transitive dependency vulnerabilities ([#426](https://github.com/Daghis/teamcity-mcp/issues/426)) ([74fc355](https://github.com/Daghis/teamcity-mcp/commit/74fc355b0501a3a23a9a667b0d75f72bdc656cdb))
+
+## [2.4.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.4.0...teamcity-mcp-v2.4.1) (2026-03-13)
+
+
+### Bug Fixes
+
+* bump hono override to ^4.12.7 to resolve GHSA-v8w9-8mx6-g223 ([#423](https://github.com/Daghis/teamcity-mcp/issues/423)) ([d37b790](https://github.com/Daghis/teamcity-mcp/commit/d37b79098bb5fe8362f435d6ebd54638a82bc774))
+
+## [2.4.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.3.2...teamcity-mcp-v2.4.0) (2026-03-10)
+
+
+### Features
+
+* add SSH key management tools for projects ([#407](https://github.com/Daghis/teamcity-mcp/issues/407)) ([#421](https://github.com/Daghis/teamcity-mcp/issues/421)) ([e00955c](https://github.com/Daghis/teamcity-mcp/commit/e00955c1d4c43955a734c806e42bd8ac4296d21d))
+
+## [2.3.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.3.1...teamcity-mcp-v2.3.2) (2026-03-10)
+
+
+### Bug Fixes
+
+* write snapshot dependency options as properties, not XML options ([#406](https://github.com/Daghis/teamcity-mcp/issues/406)) ([#419](https://github.com/Daghis/teamcity-mcp/issues/419)) ([e13fa2d](https://github.com/Daghis/teamcity-mcp/commit/e13fa2dd1be5c387efd9b4fc0e38cb5e15634be4))
+
+## [2.3.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.3.0...teamcity-mcp-v2.3.1) (2026-03-10)
+
+
+### Bug Fixes
+
+* use toBuildLocator() for all build URL templates in api-client ([#416](https://github.com/Daghis/teamcity-mcp/issues/416)) ([2a10312](https://github.com/Daghis/teamcity-mcp/commit/2a10312e1469ed9d7c9b9e47caaddaac693df400))
+
+## [2.3.0](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.2.3...teamcity-mcp-v2.3.0) (2026-03-10)
+
+
+### Features
+
+* **tools:** accept buildNumber + buildTypeId across all build tools ([#410](https://github.com/Daghis/teamcity-mcp/issues/410)) ([9aa005d](https://github.com/Daghis/teamcity-mcp/commit/9aa005d01bf6db9e7ac53155680876dc36202da7))
+
 ## [2.2.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.2.2...teamcity-mcp-v2.2.3) (2026-03-09)
 
 

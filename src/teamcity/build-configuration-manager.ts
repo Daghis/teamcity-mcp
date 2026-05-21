@@ -86,7 +86,9 @@ export class BuildConfigurationManager {
         'response' in err &&
         (err as { response?: { status?: number } }).response?.status === 403
       ) {
-        throw new Error('Permission denied: You do not have access to this project');
+        throw new Error('Permission denied: You do not have access to this project', {
+          cause: err,
+        });
       }
       throw err;
     }
@@ -420,14 +422,14 @@ export class BuildConfigurationManager {
       const error = err as { response?: { status?: number; data?: { message?: string } } };
 
       if (error.response?.status === 409) {
-        throw new Error(`Build configuration already exists with ID: ${configId}`);
+        throw new Error(`Build configuration already exists with ID: ${configId}`, { cause: err });
       }
       if (error.response?.status === 403) {
-        throw new Error('Permission denied: You need project edit permissions');
+        throw new Error('Permission denied: You need project edit permissions', { cause: err });
       }
       if (error.response?.status === 400) {
         const message = error.response?.data?.message ?? 'Invalid configuration';
-        throw new Error(`Invalid configuration: ${message}`);
+        throw new Error(`Invalid configuration: ${message}`, { cause: err });
       }
 
       logError('Failed to create build configuration', error as Error);

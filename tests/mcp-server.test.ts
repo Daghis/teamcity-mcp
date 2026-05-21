@@ -71,6 +71,12 @@ describe('MCP Server Initialization', () => {
             message: { type: 'string' },
           },
         },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
         handler: jest.fn(),
       },
     ];
@@ -123,6 +129,12 @@ describe('MCP Server Initialization', () => {
               properties: {
                 message: { type: 'string' },
               },
+            },
+            annotations: {
+              readOnlyHint: true,
+              destructiveHint: false,
+              idempotentHint: true,
+              openWorldHint: true,
             },
           },
         ],

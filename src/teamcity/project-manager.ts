@@ -452,8 +452,6 @@ export class ProjectManager {
         case 'level':
           comparison = (a.level ?? 0) - (b.level ?? 0);
           break;
-        default:
-          comparison = 0;
       }
 
       return order === 'asc' ? comparison : -comparison;

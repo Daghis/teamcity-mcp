@@ -125,4 +125,146 @@ describe('ProjectListManager', () => {
       /TeamCity API error \(500\): oops/
     );
   });
+
+  it('re-throws generic Error instances untouched', async () => {
+    const client = makeClient({
+      getAllProjects: async () => {
+        throw new Error('something else');
+      },
+    });
+    await expect(new ProjectListManager(client).listProjects()).rejects.toThrow(/something else/);
+  });
+
+  it('wraps non-Error rejection values in a new Error', async () => {
+    const client = makeClient({
+      getAllProjects: async () => {
+        // eslint-disable-next-line no-throw-literal
+        throw 'plain-string-failure';
+      },
+    });
+    await expect(new ProjectListManager(client).listProjects()).rejects.toThrow(
+      /Unknown error: plain-string-failure/
+    );
+  });
+
+  it('reports TeamCity API error with "unknown" status when none is provided', async () => {
+    const client = makeClient({
+      getAllProjects: async () => {
+        throw Object.assign(new Error('err'), { response: {} });
+      },
+    });
+    await expect(new ProjectListManager(client).listProjects()).rejects.toThrow(
+      /TeamCity API error \(unknown\)/
+    );
+  });
+
+  it('falls back to Error.message when response.data has no message', async () => {
+    const client = makeClient({
+      getAllProjects: async () => {
+        throw Object.assign(new Error('fallback msg'), { response: { status: 500 } });
+      },
+    });
+    await expect(new ProjectListManager(client).listProjects()).rejects.toThrow(/fallback msg/);
+  });
+
+  it('returns an empty list when the API response has no project array', async () => {
+    const client = makeClient({
+      getAllProjects: async () => ({ data: {} as Projects }),
+    });
+    const res = await new ProjectListManager(client).listProjects();
+    expect(res.projects).toEqual([]);
+    expect(res.metadata.hasMore).toBe(false);
+    expect(res.metadata.totalCount).toBeUndefined();
+  });
+
+  it('uses buildTypes.buildType length when count is missing', async () => {
+    const response: Projects = {
+      count: 1,
+      project: [
+        {
+          id: 'P',
+          name: 'Project',
+          buildTypes: {
+            buildType: [{ id: 'b1' }, { id: 'b2' }, { id: 'b3' }],
+          },
+          projects: {
+            project: [{ id: 'c1' }, { id: 'c2' }],
+          },
+        } as unknown as Project,
+      ],
+    };
+    const client = makeClient({
+      getAllProjects: async () => ({ data: response }),
+    });
+    const res = await new ProjectListManager(client).listProjects();
+    expect(res.projects[0]?.buildTypesCount).toBe(3);
+    expect(res.projects[0]?.subprojectsCount).toBe(2);
+  });
+
+  it('returns 0 when neither count nor array is present', async () => {
+    const response: Projects = {
+      count: 1,
+      project: [{ id: 'X', name: 'Lone', buildTypes: {} } as unknown as Project],
+    };
+    const client = makeClient({
+      getAllProjects: async () => ({ data: response }),
+    });
+    const res = await new ProjectListManager(client).listProjects();
+    expect(res.projects[0]?.buildTypesCount).toBe(0);
+    expect(res.projects[0]?.subprojectsCount).toBe(0);
+  });
+
+  it('calculates depth=2 when parent exists but no ancestor list is returned', async () => {
+    const response: Projects = {
+      count: 1,
+      project: [
+        {
+          id: 'Child',
+          name: 'C',
+          parentProjectId: 'Parent',
+        } as unknown as Project,
+      ],
+    };
+    const client = makeClient({
+      getAllProjects: async () => ({ data: response }),
+    });
+    const res = await new ProjectListManager(client).listProjects();
+    expect(res.projects[0]?.depth).toBe(2);
+  });
+
+  it('calculates depth from ancestor list when provided', async () => {
+    const response: Projects = {
+      count: 1,
+      project: [
+        {
+          id: 'Grandchild',
+          name: 'G',
+          parentProjectId: 'Parent',
+          ancestorProjects: {
+            project: [
+              { id: 'Root', name: 'R' },
+              { id: 'Parent', name: 'P' },
+            ] as unknown as Project[],
+          },
+        } as unknown as Project,
+      ],
+    };
+    const client = makeClient({
+      getAllProjects: async () => ({ data: response }),
+    });
+    const res = await new ProjectListManager(client).listProjects();
+    expect(res.projects[0]?.depth).toBe(3);
+  });
+
+  it('reports hasMore=false when returned count is below the limit', async () => {
+    const response: Projects = {
+      count: 5,
+      project: [{ id: 'A' } as unknown as Project],
+    };
+    const client = makeClient({
+      getAllProjects: async () => ({ data: response }),
+    });
+    const res = await new ProjectListManager(client).listProjects({ limit: 100 });
+    expect(res.metadata.hasMore).toBe(false);
+  });
 });

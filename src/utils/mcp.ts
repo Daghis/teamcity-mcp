@@ -25,6 +25,18 @@ export function errorText(message: string): ToolResponse {
   return { content: [{ type: 'text', text: message }], success: false, error: message };
 }
 
+const SECRET_KEY_PATTERN = /token|authorization|password|privateKey/i;
+
+const maskSecrets = (args: unknown): Record<string, unknown> =>
+  typeof args === 'object' && args != null
+    ? Object.fromEntries(
+        Object.entries(args as Record<string, unknown>).map(([k, v]) => [
+          k,
+          SECRET_KEY_PATTERN.test(k) ? '***' : v,
+        ])
+      )
+    : ({} as Record<string, unknown>);
+
 // Validate args with Zod (if provided) and route errors via the global handler
 export async function runTool<T>(
   toolName: string,
@@ -43,15 +55,7 @@ export async function runTool<T>(
     const success = result?.success !== false;
     logger.logToolExecution(
       toolName,
-      // Avoid logging secrets by shallow masking of obvious keys
-      typeof args === 'object' && args != null
-        ? Object.fromEntries(
-            Object.entries(args as Record<string, unknown>).map(([k, v]) => [
-              k,
-              /token|authorization|password/i.test(k) ? '***' : v,
-            ])
-          )
-        : ({} as Record<string, unknown>),
+      maskSecrets(args),
       { success, error: result?.error as string | undefined },
       duration,
       { requestId: reqId }
@@ -62,23 +66,31 @@ export async function runTool<T>(
     const msg = err instanceof Error ? err.message : String(err);
     logger.logToolExecution(
       toolName,
-      typeof rawArgs === 'object' && rawArgs != null
-        ? (rawArgs as Record<string, unknown>)
-        : ({} as Record<string, unknown>),
+      maskSecrets(rawArgs),
       { success: false, error: msg },
       duration,
       { requestId: reqId }
     );
-    // Preserve validation error details for proper shaping
+    // Preserve validation error details for proper shaping. The inner JSON
+    // payload is an error envelope, not the tool's declared output shape, so
+    // mark the outer response with success=false to prevent downstream
+    // consumers (e.g. server.ts surfacing structuredContent for tools with an
+    // outputSchema) from treating it as a conforming payload.
     if (err instanceof z.ZodError) {
       const formatted = formatError(err, { ...context, requestId: reqId });
-      return json(formatted);
+      const response = json(formatted);
+      response.success = false;
+      response.error = msg;
+      return response;
     }
     // Pass through original error so handler can extract rich details
     const formatted = globalErrorHandler.handleToolError(err, toolName, {
       ...context,
       requestId: reqId,
     });
-    return json(formatted);
+    const response = json(formatted);
+    response.success = false;
+    response.error = msg;
+    return response;
   }
 }

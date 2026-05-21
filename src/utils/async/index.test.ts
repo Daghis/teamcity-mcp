@@ -101,7 +101,7 @@ describe('safeAsyncHandler', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.message).toBe('string error');
+      expect((result as { success: false; error: Error }).error.message).toBe('string error');
     }
   });
 });

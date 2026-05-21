@@ -142,41 +142,50 @@ export async function setupProjectFixture(config: ProjectFixtureConfig): Promise
   const results = await callToolsBatchExpect('full', batchSteps);
 
   const projectResult = results[0]?.result as ActionResult | undefined;
-  const buildConfigResult = results[1]?.result as ActionResult | undefined;
+  const projectCreated = projectResult?.success === true;
 
-  if (!projectResult?.success) {
-    throw new Error(`Failed to create project: ${JSON.stringify(projectResult)}`);
-  }
-  if (!buildConfigResult?.success) {
-    throw new Error(`Failed to create build config: ${JSON.stringify(buildConfigResult)}`);
-  }
-
-  if (config.stepScript && results[2]) {
-    const stepResult = results[2].result as ActionResult | undefined;
-    if (!stepResult?.success) {
-      throw new Error(`Failed to add build step: ${JSON.stringify(stepResult)}`);
+  try {
+    if (!projectCreated) {
+      throw new Error(`Failed to create project: ${JSON.stringify(projectResult)}`);
     }
-  }
 
-  // Set artifact rules if specified
-  if (config.artifactRules) {
-    try {
-      await callTool<ActionResult>('full', 'update_build_config', {
-        buildTypeId,
-        artifactRules: config.artifactRules,
-      });
-    } catch {
-      // Some TeamCity servers restrict artifactRules updates; proceed if it fails
+    const buildConfigResult = results[1]?.result as ActionResult | undefined;
+    if (!buildConfigResult?.success) {
+      throw new Error(`Failed to create build config: ${JSON.stringify(buildConfigResult)}`);
     }
-  }
 
-  return {
-    projectId,
-    projectName,
-    buildTypeId,
-    buildTypeName,
-    timestamp: ts,
-  };
+    if (config.stepScript && results[2]) {
+      const stepResult = results[2].result as ActionResult | undefined;
+      if (!stepResult?.success) {
+        throw new Error(`Failed to add build step: ${JSON.stringify(stepResult)}`);
+      }
+    }
+
+    // Set artifact rules if specified
+    if (config.artifactRules) {
+      try {
+        await callTool<ActionResult>('full', 'update_build_config', {
+          buildTypeId,
+          artifactRules: config.artifactRules,
+        });
+      } catch {
+        // Some TeamCity servers restrict artifactRules updates; proceed if it fails
+      }
+    }
+
+    return {
+      projectId,
+      projectName,
+      buildTypeId,
+      buildTypeName,
+      timestamp: ts,
+    };
+  } catch (error) {
+    if (projectCreated) {
+      await teardownProjectFixture(projectId);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -192,44 +201,52 @@ export async function setupArtifactFixture(
     stepScript: config.artifactScript,
   });
 
-  // Trigger the build
-  const trigger = await callTool<TriggerBuildResult>('dev', 'trigger_build', {
-    buildTypeId: fixture.buildTypeId,
-    comment: 'integration-test-setup',
-  });
-
-  if (!trigger.success || !trigger.buildId) {
-    throw new Error(`Failed to trigger build: ${JSON.stringify(trigger)}`);
-  }
-
-  const buildId = trigger.buildId;
-
-  // Try to promote the build in the queue
+  // Wrap post-creation steps so the project is cleaned up if anything fails.
+  // Jest does NOT call afterAll when beforeAll throws, so without this the
+  // project would be orphaned in TeamCity.
   try {
-    await callTool('full', 'move_queued_build_to_top', { buildId });
-  } catch {
-    // Non-fatal: queue manipulation may not be permitted
-  }
+    // Trigger the build
+    const trigger = await callTool<TriggerBuildResult>('dev', 'trigger_build', {
+      buildTypeId: fixture.buildTypeId,
+      comment: 'integration-test-setup',
+    });
 
-  // Wait for build completion if requested
-  if (config.waitForBuild !== false) {
-    await waitForBuildCompletion(buildId, config.buildTimeout ?? 60_000);
-  }
+    if (!trigger.success || !trigger.buildId) {
+      throw new Error(`Failed to trigger build: ${JSON.stringify(trigger)}`);
+    }
 
-  // Get build number
-  let buildNumber: string | undefined;
-  try {
-    const buildRef = await callTool<BuildRef>('dev', 'get_build', { buildId });
-    buildNumber = buildRef.number ? String(buildRef.number) : undefined;
-  } catch {
-    // Non-fatal
-  }
+    const buildId = trigger.buildId;
 
-  return {
-    ...fixture,
-    buildId,
-    buildNumber,
-  };
+    // Try to promote the build in the queue
+    try {
+      await callTool('full', 'move_queued_build_to_top', { buildId });
+    } catch {
+      // Non-fatal: queue manipulation may not be permitted
+    }
+
+    // Wait for build completion if requested
+    if (config.waitForBuild !== false) {
+      await waitForBuildCompletion(buildId, config.buildTimeout ?? 60_000);
+    }
+
+    // Get build number
+    let buildNumber: string | undefined;
+    try {
+      const buildRef = await callTool<BuildRef>('dev', 'get_build', { buildId });
+      buildNumber = buildRef.number ? String(buildRef.number) : undefined;
+    } catch {
+      // Non-fatal
+    }
+
+    return {
+      ...fixture,
+      buildId,
+      buildNumber,
+    };
+  } catch (error) {
+    await teardownProjectFixture(fixture.projectId);
+    throw error;
+  }
 }
 
 /**
@@ -279,28 +296,38 @@ export async function setupVcsFixture(config: VcsFixtureConfig): Promise<VcsFixt
   const results = await callToolsBatchExpect('full', batchSteps);
 
   const projectResult = results[0]?.result as ActionResult | undefined;
-  const buildConfigResult = results[1]?.result as ActionResult | undefined;
-  const vcsResult = results[2]?.result as ActionResult | undefined;
+  const projectCreated = projectResult?.success === true;
 
-  if (!projectResult?.success) {
-    throw new Error(`Failed to create project: ${JSON.stringify(projectResult)}`);
-  }
-  if (!buildConfigResult?.success) {
-    throw new Error(`Failed to create build config: ${JSON.stringify(buildConfigResult)}`);
-  }
-  if (!vcsResult?.success) {
-    throw new Error(`Failed to create VCS root: ${JSON.stringify(vcsResult)}`);
-  }
+  try {
+    if (!projectCreated) {
+      throw new Error(`Failed to create project: ${JSON.stringify(projectResult)}`);
+    }
 
-  return {
-    projectId,
-    projectName,
-    buildTypeId,
-    buildTypeName,
-    vcsRootId,
-    vcsRootName,
-    timestamp: ts,
-  };
+    const buildConfigResult = results[1]?.result as ActionResult | undefined;
+    if (!buildConfigResult?.success) {
+      throw new Error(`Failed to create build config: ${JSON.stringify(buildConfigResult)}`);
+    }
+
+    const vcsResult = results[2]?.result as ActionResult | undefined;
+    if (!vcsResult?.success) {
+      throw new Error(`Failed to create VCS root: ${JSON.stringify(vcsResult)}`);
+    }
+
+    return {
+      projectId,
+      projectName,
+      buildTypeId,
+      buildTypeName,
+      vcsRootId,
+      vcsRootName,
+      timestamp: ts,
+    };
+  } catch (error) {
+    if (projectCreated) {
+      await teardownProjectFixture(projectId);
+    }
+    throw error;
+  }
 }
 
 /**

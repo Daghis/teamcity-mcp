@@ -222,7 +222,7 @@ export class BuildConfigurationResolver {
       }
       const errorWithMessage = error as { message?: string };
       if (errorWithMessage.message?.includes('ECONNREFUSED') === true) {
-        throw new Error('Failed to connect to TeamCity server');
+        throw new Error('Failed to connect to TeamCity server', { cause: error });
       }
       throw error;
     }

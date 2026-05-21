@@ -67,6 +67,33 @@ describe('tools: agent admin & VCS', () => {
     });
   });
 
+  it('remove_agent calls deleteAgent and returns JSON', async () => {
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const deleteAgent = jest.fn(async () => ({}));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: { getInstance: () => ({ agents: { deleteAgent } }) },
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('remove_agent').handler({
+            agentId: 'A1',
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: true,
+            action: 'remove_agent',
+            agentId: 'A1',
+          });
+          expect(deleteAgent).toHaveBeenCalledWith('A1');
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
   it('add_vcs_root_to_build attaches root and returns JSON', async () => {
     await new Promise<void>((resolve, reject) => {
       jest.isolateModules(() => {
@@ -191,9 +218,9 @@ describe('tools: agent admin & VCS', () => {
     await new Promise<void>((resolve, reject) => {
       jest.isolateModules(() => {
         (async () => {
-          const setVcsRootProperties = jest.fn(async () => ({}));
+          const setVcsRootProperty = jest.fn(async () => ({}));
           jest.doMock('@/api-client', () => ({
-            TeamCityAPI: { getInstance: () => ({ vcsRoots: { setVcsRootProperties } }) },
+            TeamCityAPI: { getInstance: () => ({ vcsRoots: { setVcsRootProperty } }) },
           }));
 
           // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -210,16 +237,23 @@ describe('tools: agent admin & VCS', () => {
             id: 'VCS1',
             updated: 2,
           });
-          expect(setVcsRootProperties).toHaveBeenCalled();
-          const [idArg, _fieldsArg, bodyArg] = (setVcsRootProperties.mock.calls[0] ??
-            []) as unknown[];
-          expect(idArg).toBe('VCS1');
-          expect(bodyArg).toMatchObject({
-            property: [
-              { name: 'branch', value: 'refs/heads/main' },
-              { name: 'branchSpec', value: '+:refs/heads/*\n+:refs/pull/*/head' },
-            ],
-          });
+          expect(setVcsRootProperty).toHaveBeenCalledTimes(2);
+          expect(setVcsRootProperty).toHaveBeenCalledWith(
+            'VCS1',
+            'branch',
+            'refs/heads/main',
+            expect.objectContaining({
+              headers: expect.objectContaining({ 'Content-Type': 'text/plain' }),
+            })
+          );
+          expect(setVcsRootProperty).toHaveBeenCalledWith(
+            'VCS1',
+            'branchSpec',
+            '+:refs/heads/*\n+:refs/pull/*/head',
+            expect.objectContaining({
+              headers: expect.objectContaining({ 'Content-Type': 'text/plain' }),
+            })
+          );
           resolve();
         })().catch(reject);
       });

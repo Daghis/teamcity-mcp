@@ -1106,4 +1106,302 @@ describe('BuildTriggerManager', () => {
       // Behavior-first: avoid verifying delete call shape
     });
   });
+
+  describe('validateTrigger branch coverage', () => {
+    it('rejects unknown trigger types via the default switch branch', () => {
+      const result = manager.validateTrigger({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        type: 'mysteryTrigger' as any,
+        properties: {} as VcsTriggerProperties,
+      });
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Unknown trigger type: mysteryTrigger');
+    });
+
+    it('flags VCS trigger validation errors (branch filter, quiet period, rules)', () => {
+      const result = manager.validateTrigger({
+        type: 'vcsTrigger',
+        properties: {
+          branchFilter: 'no-prefix',
+          quietPeriodMode: 'USE_CUSTOM',
+          quietPeriod: -5,
+          triggerRules: 'only-plain-text',
+        } as VcsTriggerProperties,
+      });
+      expect(result.valid).toBe(false);
+      expect(result.errors).toEqual(
+        expect.arrayContaining([
+          'Invalid branch filter pattern',
+          'Quiet period must be non-negative',
+          'Invalid path filter rules syntax',
+        ])
+      );
+    });
+
+    it('requires quietPeriod when quietPeriodMode is USE_CUSTOM without value', () => {
+      const result = manager.validateTrigger({
+        type: 'vcsTrigger',
+        properties: {
+          quietPeriodMode: 'USE_CUSTOM',
+        } as VcsTriggerProperties,
+      });
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Quiet period is required when using USE_CUSTOM mode');
+    });
+
+    it('warns on unrecognized timezone for scheduling triggers', () => {
+      const result = manager.validateTrigger({
+        type: 'schedulingTrigger',
+        properties: {
+          schedulingPolicy: 'weekly',
+          timezone: 'ZZ_Not_A_Real_Zone!',
+        } as ScheduleTriggerProperties,
+      });
+      expect(result.valid).toBe(true);
+      expect(result.warnings).toContain('Unrecognized timezone');
+    });
+
+    it('flags dependency trigger with missing dependsOn, invalid artifact rules and filter', () => {
+      const result = manager.validateTrigger({
+        type: 'buildDependencyTrigger',
+        properties: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          dependsOn: null as any,
+          artifactRules: 'bad-source => ',
+          branchFilter: '+:',
+        } as DependencyTriggerProperties,
+      });
+      expect(result.valid).toBe(false);
+      expect(result.errors).toEqual(
+        expect.arrayContaining([
+          'Dependency trigger requires dependsOn property',
+          'Invalid artifact rule format',
+          'Invalid branch filter pattern',
+        ])
+      );
+    });
+  });
+
+  describe('schedule parsing covers all cron-field branches', () => {
+    const schedule = (policy: string): boolean =>
+      manager.validateTrigger({
+        type: 'schedulingTrigger',
+        properties: { schedulingPolicy: policy } as ScheduleTriggerProperties,
+      }).valid;
+
+    it('accepts wildcards, ranges, steps and lists across each field', () => {
+      expect(schedule('* * * * * *')).toBe(true);
+      expect(schedule('0-30 0 0 1 1 0')).toBe(true);
+      expect(schedule('*/10 * * * * *')).toBe(true);
+      expect(schedule('0 15,30,45 10 * * *')).toBe(true);
+      expect(schedule('0 0 0 ? 1 ? 2030')).toBe(true); // 7 fields: ? allowed for dow/dom
+    });
+
+    it('rejects mis-sized cron expressions (not 6 or 7 fields)', () => {
+      expect(schedule('* * *')).toBe(false);
+      expect(schedule('* * * * * * * *')).toBe(false);
+    });
+
+    it('rejects malformed ranges, steps, lists, and out-of-range numbers', () => {
+      expect(schedule('0 0 25 * * *')).toBe(false); // hour out of range
+      expect(schedule('0 0 0 32 * *')).toBe(false); // day out of range
+      expect(schedule('0 0 0 1 13 *')).toBe(false); // month out of range
+      expect(schedule('0 0 0 1 1 9')).toBe(false); // dow out of range
+      expect(schedule('abc 0 0 1 1 *')).toBe(false); // non-numeric seconds
+      expect(schedule('0-60-2 0 0 1 1 *')).toBe(false); // 3-part range
+      expect(schedule('5-1 0 0 1 1 *')).toBe(false); // reversed range
+      expect(schedule('*/0 0 0 1 1 *')).toBe(false); // zero step
+      expect(schedule('*/ab 0 0 1 1 *')).toBe(false); // non-numeric step
+      expect(schedule('1-10/2/3 0 0 1 1 *')).toBe(false); // 3-part step
+      expect(schedule('1,2,bad 0 0 1 1 *')).toBe(false); // bad list member
+    });
+  });
+
+  describe('calculateNextRunTime covers simple + cron branches', () => {
+    it('rolls forward daily/weekly/nightly/hourly keywords', () => {
+      expect(manager.calculateNextRunTime('daily')).toBeInstanceOf(Date);
+      expect(manager.calculateNextRunTime('weekly')).toBeInstanceOf(Date);
+      expect(manager.calculateNextRunTime('hourly')).toBeInstanceOf(Date);
+      const nightly = manager.calculateNextRunTime('nightly');
+      expect(nightly.getHours()).toBe(2);
+    });
+
+    it('uses calculateNextCronRun fallback (1 hour) for short cron strings', () => {
+      const now = new Date();
+      const next = manager.calculateNextRunTime('* * *');
+      expect(next.getTime()).toBeGreaterThan(now.getTime());
+    });
+
+    it('applies seconds/minutes/hours from a 6-field cron expression', () => {
+      const next = manager.calculateNextRunTime('15 30 5 * * *');
+      expect(next.getSeconds()).toBe(15);
+      expect(next.getMinutes()).toBe(30);
+      expect(next.getHours()).toBe(5);
+    });
+  });
+
+  describe('error-path branches', () => {
+    it('wraps updateTrigger 404 as TriggerNotFoundError', async () => {
+      const notFound = Object.assign(new Error('nf'), { response: { status: 404 } });
+      http.get.mockRejectedValueOnce(notFound);
+      await expect(
+        manager.updateTrigger({ configId: 'cfg', triggerId: 't1', enabled: true })
+      ).rejects.toBeInstanceOf(TriggerNotFoundError);
+    });
+
+    it('wraps deleteTrigger 404 as TriggerNotFoundError', async () => {
+      const notFound = Object.assign(new Error('nf'), { response: { status: 404 } });
+      http.delete.mockRejectedValueOnce(notFound);
+      await expect(
+        manager.deleteTrigger({ configId: 'cfg', triggerId: 't1' })
+      ).rejects.toBeInstanceOf(TriggerNotFoundError);
+    });
+
+    it('wraps createTrigger 404 as BuildConfigurationNotFoundError', async () => {
+      const notFound = Object.assign(new Error('nf'), { response: { status: 404 } });
+      http.post.mockRejectedValueOnce(notFound);
+      await expect(
+        manager.createTrigger({
+          configId: 'ghost',
+          type: 'vcsTrigger',
+          properties: {} as VcsTriggerProperties,
+        })
+      ).rejects.toBeInstanceOf(BuildConfigurationNotFoundError);
+    });
+
+    it('re-throws ValidationError and CircularDependencyError from createTrigger untouched', async () => {
+      http.get.mockRejectedValueOnce(
+        new ValidationError('bad input', { cause: 'ignore' } as Record<string, unknown>)
+      );
+      http.post.mockRejectedValueOnce(
+        new ValidationError('validation boom', {} as Record<string, unknown>)
+      );
+      await expect(
+        manager.createTrigger({
+          configId: 'cfg',
+          type: 'buildDependencyTrigger',
+          properties: {
+            dependsOn: 'dep-1',
+          } as DependencyTriggerProperties,
+        })
+      ).rejects.toBeInstanceOf(ValidationError);
+
+      http.get.mockRejectedValueOnce(
+        new ValidationError('bad input', { cause: 'ignore' } as Record<string, unknown>)
+      );
+      http.post.mockRejectedValueOnce(
+        new CircularDependencyError('cycle', { cause: 'cycle' } as Record<string, unknown>)
+      );
+      await expect(
+        manager.createTrigger({
+          configId: 'cfg',
+          type: 'buildDependencyTrigger',
+          properties: {
+            dependsOn: 'dep-1',
+          } as DependencyTriggerProperties,
+        })
+      ).rejects.toBeInstanceOf(CircularDependencyError);
+    });
+
+    it('wraps generic createTrigger errors via handleApiError', async () => {
+      http.post.mockRejectedValueOnce({
+        response: { status: 500, data: { message: 'server boom' } },
+      });
+      await expect(
+        manager.createTrigger({
+          configId: 'cfg',
+          type: 'vcsTrigger',
+          properties: {} as VcsTriggerProperties,
+        })
+      ).rejects.toBeInstanceOf(TeamCityAPIError);
+    });
+
+    it('surfaces raw Error when no response payload is attached', async () => {
+      http.post.mockRejectedValueOnce(new Error('network gone'));
+      await expect(
+        manager.createTrigger({
+          configId: 'cfg',
+          type: 'vcsTrigger',
+          properties: {} as VcsTriggerProperties,
+        })
+      ).rejects.toThrow('network gone');
+    });
+
+    it('stringifies non-Error rejection values', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      http.post.mockRejectedValueOnce('plain string failure' as any);
+      await expect(
+        manager.createTrigger({
+          configId: 'cfg',
+          type: 'vcsTrigger',
+          properties: {} as VcsTriggerProperties,
+        })
+      ).rejects.toThrow('plain string failure');
+    });
+  });
+
+  describe('validateDependencyChain', () => {
+    it('detects a direct circular dependency (target depends on source)', async () => {
+      http.get.mockResolvedValueOnce({
+        data: {
+          trigger: [
+            {
+              id: 't1',
+              type: 'buildDependencyTrigger',
+              properties: { property: [{ name: 'dependsOn', value: 'source' }] },
+            },
+          ],
+        },
+      });
+      const result = await manager.validateDependencyChain('source', 'target');
+      expect(result.hasCircularDependency).toBe(true);
+      expect(result.chain).toEqual(['source', 'target', 'source']);
+    });
+
+    it('reports no cycle and returns the base chain when nothing matches', async () => {
+      http.get.mockResolvedValueOnce({ data: { trigger: [] } });
+      const result = await manager.validateDependencyChain('a', 'b');
+      expect(result.hasCircularDependency).toBe(false);
+      expect(result.chain).toEqual(['a', 'b']);
+    });
+
+    it('continues traversal and short-circuits already-visited nodes', async () => {
+      http.get.mockImplementation(async (url: string) => {
+        if (url.endsWith('/target/triggers')) {
+          return {
+            data: {
+              trigger: [
+                {
+                  id: 't1',
+                  type: 'buildDependencyTrigger',
+                  properties: { property: [{ name: 'dependsOn', value: 'other' }] },
+                },
+              ],
+            },
+          };
+        }
+        // 'other' depends on 'target' → would create cycle through 'other', but
+        // visited cache should prevent infinite recursion.
+        return {
+          data: {
+            trigger: [
+              {
+                id: 't2',
+                type: 'buildDependencyTrigger',
+                properties: { property: [{ name: 'dependsOn', value: 'target' }] },
+              },
+            ],
+          },
+        };
+      });
+      const result = await manager.validateDependencyChain('missing-source', 'target');
+      expect(result.hasCircularDependency).toBe(false);
+    });
+
+    it('swallows errors while fetching dependencies', async () => {
+      http.get.mockRejectedValueOnce(new Error('boom'));
+      const result = await manager.validateDependencyChain('source', 'target');
+      expect(result.hasCircularDependency).toBe(false);
+    });
+  });
 });

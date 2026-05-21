@@ -628,7 +628,7 @@ export class TestProblemReporter {
     try {
       const locator = `buildType:(id:${buildTypeId}),count:${count}`;
       const response = await this.client.modules.builds.getAllBuilds(locator, 'build(id)');
-      const builds = response.data as { build?: Array<{ id: string }> };
+      const builds = response.data as unknown as { build?: Array<{ id: string }> };
 
       if (builds.build == null || !Array.isArray(builds.build)) {
         return [];
@@ -661,7 +661,7 @@ export class TestProblemReporter {
     try {
       const locator = `buildType:(id:${buildTypeId}),status:FAILURE,count:${count}`;
       const response = await this.client.modules.builds.getAllBuilds(locator, 'build(id)');
-      const builds = response.data as { build?: Array<{ id: string }> };
+      const builds = response.data as unknown as { build?: Array<{ id: string }> };
 
       if (builds.build == null || !Array.isArray(builds.build)) {
         return {};

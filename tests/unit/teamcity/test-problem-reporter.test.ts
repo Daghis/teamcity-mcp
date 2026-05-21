@@ -632,4 +632,197 @@ describe('TestProblemReporter', () => {
       expect(failedTests).toEqual([]);
     });
   });
+
+  describe('payload validation branches', () => {
+    it('throws when test occurrences is not a record', async () => {
+      http.get.mockResolvedValue({ data: { testOccurrences: 'not-an-object' } });
+      await expect(reporter.getTestStatistics('b1')).rejects.toThrow(
+        /malformed test occurrences payload/
+      );
+    });
+
+    it('coerces numeric-string count fields but throws on non-numeric strings', async () => {
+      http.get.mockResolvedValueOnce({
+        data: {
+          testOccurrences: {
+            count: '12',
+            passed: '10',
+            failed: 2,
+            ignored: 0,
+            muted: 0,
+            newFailed: 1,
+          },
+        },
+      });
+      const stats = await reporter.getTestStatistics('build-numeric-string');
+      expect(stats.totalTests).toBe(12);
+      expect(stats.passedTests).toBe(10);
+
+      http.get.mockResolvedValueOnce({
+        data: {
+          testOccurrences: {
+            count: 'not-a-number',
+            passed: 0,
+            failed: 0,
+            ignored: 0,
+            muted: 0,
+            newFailed: 0,
+          },
+        },
+      });
+      await expect(reporter.getTestStatistics('build-bad-string')).rejects.toThrow(
+        /statistics field is not numeric/
+      );
+    });
+
+    it('throws when a count field is neither number nor string', async () => {
+      http.get.mockResolvedValue({
+        data: {
+          testOccurrences: {
+            count: { nested: true },
+            passed: 0,
+            failed: 0,
+            ignored: 0,
+            muted: 0,
+            newFailed: 0,
+          },
+        },
+      });
+      await expect(reporter.getTestStatistics('bad-type')).rejects.toThrow(
+        /statistics field is not numeric/
+      );
+    });
+
+    it('defaults to zeroes when testOccurrences is null', async () => {
+      http.get.mockResolvedValue({ data: { testOccurrences: null } });
+      const stats = await reporter.getTestStatistics('no-stats');
+      expect(stats).toEqual({
+        totalTests: 0,
+        passedTests: 0,
+        failedTests: 0,
+        ignoredTests: 0,
+        mutedTests: 0,
+        newFailedTests: 0,
+        successRate: 100,
+      });
+    });
+
+    it('logs and returns empty when failed tests payload has a non-record entry', async () => {
+      http.get.mockResolvedValue({
+        data: { testOccurrence: ['not-a-record'] },
+      });
+      const res = await reporter.getFailedTests('b1');
+      expect(res).toEqual([]);
+      expect(logError).toHaveBeenCalled();
+    });
+
+    it('returns empty for problems when data is not a record', async () => {
+      http.get.mockResolvedValue({ data: null });
+      const res = (await reporter.getBuildProblems('b1')) as BuildProblem[];
+      expect(res).toEqual([]);
+      expect(logError).toHaveBeenCalled();
+    });
+
+    it('returns categorized empty when problems payload missing', async () => {
+      http.get.mockResolvedValue({ data: null });
+      const res = (await reporter.getBuildProblems('b1', true)) as CategorizedProblems;
+      expect(res).toEqual({ all: [], categorized: {} });
+    });
+
+    it('validates required fields on problem occurrences entry', async () => {
+      http.get.mockResolvedValue({
+        data: {
+          problemOccurrence: [{ id: 'p1', type: 'GENERIC' }],
+        },
+      });
+      const res = await reporter.getBuildProblems('b1');
+      expect(res).toEqual([]);
+      expect(logError).toHaveBeenCalledWith(
+        'Failed to get build problems',
+        expect.any(Error),
+        expect.any(Object)
+      );
+    });
+
+    it('rejects invalid additionalData types on a problem entry', async () => {
+      http.get.mockResolvedValue({
+        data: {
+          problemOccurrence: [
+            {
+              id: 'p1',
+              type: 'GENERIC',
+              identity: 'ident',
+              details: 'boom',
+              additionalData: 42,
+            },
+          ],
+        },
+      });
+      const res = await reporter.getBuildProblems('b1');
+      expect(res).toEqual([]);
+    });
+
+    it('rejects non-array problemOccurrence payloads', async () => {
+      http.get.mockResolvedValue({ data: { problemOccurrence: 'oops' } });
+      const res = await reporter.getBuildProblems('b1');
+      expect(res).toEqual([]);
+      expect(logError).toHaveBeenCalled();
+    });
+  });
+
+  describe('getTestTrend / getFailurePatterns', () => {
+    it('returns empty trend when builds response has no list', async () => {
+      http.get.mockResolvedValue({ data: { something: 'else' } });
+      const trend = await reporter.getTestTrend('bt-missing');
+      expect(trend).toEqual([]);
+    });
+
+    it('returns empty patterns when builds list is missing', async () => {
+      http.get.mockResolvedValue({ data: {} });
+      const patterns = await reporter.getFailurePatterns('bt-empty');
+      expect(patterns).toEqual({});
+    });
+
+    it('swallows errors from getTestTrend and returns empty', async () => {
+      http.get.mockRejectedValue(new Error('api boom'));
+      const trend = await reporter.getTestTrend('bt');
+      expect(trend).toEqual([]);
+      expect(logError).toHaveBeenCalled();
+    });
+
+    it('swallows errors from getFailurePatterns and returns empty', async () => {
+      http.get.mockRejectedValue(new Error('api boom'));
+      const patterns = await reporter.getFailurePatterns('bt');
+      expect(patterns).toEqual({});
+      expect(logError).toHaveBeenCalled();
+    });
+  });
+
+  describe('hasIssues + summary branches', () => {
+    it('returns false when no failures and no problems', async () => {
+      http.get.mockImplementation(async (url: string) => {
+        if (url.includes('/problemOccurrences')) {
+          return { data: { problemOccurrence: [] } };
+        }
+        return { data: { testOccurrences: { count: 0, passed: 0, failed: 0 } } };
+      });
+      await expect(reporter.hasIssues('b1')).resolves.toBe(false);
+    });
+
+    it('short-circuits to true on a failed test', async () => {
+      http.get.mockResolvedValueOnce({
+        data: { testOccurrences: { count: 1, passed: 0, failed: 1 } },
+      });
+      await expect(reporter.hasIssues('b1')).resolves.toBe(true);
+    });
+
+    it('returns default reason when no failures surface', async () => {
+      http.get.mockResolvedValueOnce({
+        data: { testOccurrences: { count: 0, passed: 0, failed: 0 } },
+      });
+      http.get.mockResolvedValueOnce({ data: { problemOccurrence: [] } });
+      const reason = await reporter.formatFailureReason('b1');
+      expect(reason).toBe('Build failed for unknown reasons');
+    });
+  });
 });
