@@ -72,7 +72,7 @@ jobs:
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && github.actor != 'dependabot[bot]' }}
         continue-on-error: true
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/junit-${{ matrix.shard }}.xml
@@ -80,7 +80,7 @@ jobs:
       - name: Upload coverage to Codecov
         if: ${{ success() && github.actor != 'dependabot[bot]' }}
         continue-on-error: true
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: ./coverage/lcov.info
           flags: unittests
