@@ -140,9 +140,55 @@ export function logResponse(response: AxiosResponse): AxiosResponse {
 }
 
 /**
+ * Detect an (unconsumed) Node readable stream, e.g. an Axios response body from
+ * `responseType: 'stream'`.
+ */
+const isReadableStream = (value: unknown): value is NodeJS.ReadableStream =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as { pipe?: unknown }).pipe === 'function' &&
+  typeof (value as { on?: unknown }).on === 'function';
+
+/**
+ * Drain a readable stream to a bounded UTF-8 string. Used to turn a streamed
+ * error-response body (a socket) into a small, usable error message without
+ * buffering an arbitrarily large payload.
+ */
+const streamToString = async (
+  stream: NodeJS.ReadableStream,
+  maxBytes = 64 * 1024
+): Promise<string> => {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of stream) {
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string);
+    if (total < maxBytes) {
+      chunks.push(buf);
+      total += buf.length;
+    }
+  }
+  return Buffer.concat(chunks).toString('utf8').slice(0, maxBytes);
+};
+
+/**
  * Log error with request ID and transform
  */
-export function logAndTransformError(error: AxiosError): Promise<never> {
+export async function logAndTransformError(error: AxiosError): Promise<never> {
+  // When the request used responseType 'stream', error.response.data is an
+  // unconsumed Node stream (a socket with circular references). Drain it to a
+  // small text snapshot so the error message is usable and the raw socket is
+  // never stored or serialized downstream.
+  const response = error.response;
+  if (response && isReadableStream(response.data)) {
+    let snapshot: string | undefined;
+    try {
+      snapshot = await streamToString(response.data);
+    } catch {
+      snapshot = undefined;
+    }
+    response.data = snapshot;
+  }
+
   // Build a rich TeamCityAPIError instance so downstream handlers
   // see an Error subclass (not a plain object)
   const requestId = (error.config as AxiosRequestConfig & { requestId?: string })?.requestId;

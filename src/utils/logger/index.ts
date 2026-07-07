@@ -6,6 +6,7 @@
  * patterns throughout the application.
  */
 import { existsSync, mkdirSync } from 'node:fs';
+import { inspect } from 'node:util';
 
 import winston, { type Logger } from 'winston';
 
@@ -13,6 +14,31 @@ import winston, { type Logger } from 'winston';
  * Log levels supported by the logger
  */
 export type LogLevel = 'error' | 'warn' | 'info' | 'verbose' | 'debug' | 'silly';
+
+/**
+ * Serialize arbitrary log metadata to a compact, single-line string that never
+ * throws. Log metadata occasionally carries objects with cyclic structure
+ * (e.g. an Axios streaming response whose body is a Node socket with
+ * `_httpMessage -> ClientRequest -> Agent` back-references). A plain
+ * `JSON.stringify` throws a `TypeError` in that case, and because logging runs
+ * synchronously inside Axios interceptors, that error would otherwise propagate
+ * and abort the request being logged.
+ *
+ * `util.inspect` is used instead of a hand-rolled circular-safe stringifier: it
+ * resolves real cycles correctly (`[Circular *1]` reference anchors, as opposed
+ * to a global "seen" set that also flags non-cyclic shared references), and it
+ * bounds depth / array / string length so a huge object graph (like a socket)
+ * never turns into a multi-kilobyte log line.
+ */
+function safeStringify(value: unknown): string {
+  return inspect(value, {
+    depth: 4,
+    maxArrayLength: 50,
+    maxStringLength: 1000,
+    breakLength: Infinity,
+    compact: true,
+  });
+}
 
 /**
  * Context information for logging
@@ -214,7 +240,7 @@ export class TeamCityLogger implements ILogger {
     if (duration !== undefined) contextParts.push(`${duration}ms`);
 
     const contextString = contextParts.length > 0 ? ` [${contextParts.join(' ')}]` : '';
-    const metaString = Object.keys(otherMeta).length > 0 ? ` ${JSON.stringify(otherMeta)}` : '';
+    const metaString = Object.keys(otherMeta).length > 0 ? ` ${safeStringify(otherMeta)}` : '';
 
     return `${baseLog}${contextString}${metaString}`;
   }
