@@ -3,19 +3,7 @@
  */
 import type { AxiosError } from 'axios';
 
-/**
- * Detect an (unconsumed) Node readable stream, e.g. an Axios response body
- * obtained with `responseType: 'stream'`. Such a value is a socket with
- * circular references and must never be stored as error details or serialized.
- */
-function isNodeReadableStream(value: unknown): boolean {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { pipe?: unknown }).pipe === 'function' &&
-    typeof (value as { on?: unknown }).on === 'function'
-  );
-}
+import { isReadableStream } from './utils/stream';
 
 /**
  * Base error class for all TeamCity API errors
@@ -58,7 +46,7 @@ export class TeamCityAPIError extends Error {
       // If the request used responseType 'stream', response.data is an
       // unconsumed socket stream with circular references — never keep it as
       // `details`, or any later serialization (logging, toJSON) would throw.
-      const data = (isNodeReadableStream(error.response.data) ? undefined : error.response.data) as
+      const data = (isReadableStream(error.response.data) ? undefined : error.response.data) as
         | Record<string, unknown>
         | undefined;
       return new TeamCityAPIError(

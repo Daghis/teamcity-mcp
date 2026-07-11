@@ -10,6 +10,7 @@ import type {
 import { randomUUID } from 'crypto';
 
 import { TeamCityAPIError } from '@/teamcity/errors';
+import { isReadableStream } from '@/teamcity/utils/stream';
 import { info, error as logError } from '@/utils/logger';
 
 interface TimingMetaContainer {
@@ -138,16 +139,6 @@ export function logResponse(response: AxiosResponse): AxiosResponse {
 
   return response;
 }
-
-/**
- * Detect an (unconsumed) Node readable stream, e.g. an Axios response body from
- * `responseType: 'stream'`.
- */
-const isReadableStream = (value: unknown): value is NodeJS.ReadableStream =>
-  typeof value === 'object' &&
-  value !== null &&
-  typeof (value as { pipe?: unknown }).pipe === 'function' &&
-  typeof (value as { on?: unknown }).on === 'function';
 
 /**
  * Drain a readable stream to a bounded UTF-8 string. Used to turn a streamed
