@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.1...teamcity-mcp-v2.12.2) (2026-08-31)
+
+
+### Bug Fixes
+
+* **deps:** resolve all Dependabot alerts; cap axios at ~1.18.0 ([#527](https://github.com/Daghis/teamcity-mcp/issues/527)) ([74c7b66](https://github.com/Daghis/teamcity-mcp/commit/74c7b66d954a8c8bb55f5ded35b4981eef76b512))
+
 ## [2.12.1](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.0...teamcity-mcp-v2.12.1) (2026-05-12)
 
 
