@@ -77,6 +77,41 @@ describe('TeamCityAPI unified surface', () => {
     expect(response).toBe(mockResponse);
   });
 
+  it('downloads the build log from the documented .html endpoint', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const getSpy = jest
+      .spyOn(api.http, 'get')
+      .mockResolvedValue(createAxiosResponse<string>('log contents'));
+
+    const response = await api.downloadBuildLog('123', { responseType: 'stream' });
+
+    expect(getSpy).toHaveBeenCalledTimes(1);
+    const [url, config] = getSpy.mock.calls[0] as [string, { params?: Record<string, unknown> }];
+    expect(url).toBe('/downloadBuildLog.html');
+    expect(config?.params).toMatchObject({ buildId: '123' });
+    expect(response.data).toBe('log contents');
+  });
+
+  it('falls back to the REST log endpoint when .html fails', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const getSpy = jest
+      .spyOn(api.http, 'get')
+      .mockRejectedValueOnce(new Error('404'))
+      .mockResolvedValueOnce(createAxiosResponse<string>('fallback log'));
+
+    const response = await api.downloadBuildLog('123');
+
+    expect(getSpy).toHaveBeenCalledTimes(2);
+    expect(getSpy.mock.calls[0]?.[0]).toBe('/downloadBuildLog.html');
+    const [fallbackUrl, fallbackConfig] = getSpy.mock.calls[1] as [
+      string,
+      { params?: Record<string, unknown> },
+    ];
+    expect(fallbackUrl).toBe('/app/rest/builds/id:123/log');
+    expect(fallbackConfig?.params).toMatchObject({ plain: true });
+    expect(response.data).toBe('fallback log');
+  });
+
   it('routes listSnapshotDependencies through the generated BuildApi and unwraps payload', async () => {
     const api = TeamCityAPI.getInstance(baseConfig);
     const dependencies = { build: [] };

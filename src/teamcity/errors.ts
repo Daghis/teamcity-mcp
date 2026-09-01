@@ -3,6 +3,8 @@
  */
 import type { AxiosError } from 'axios';
 
+import { isReadableStream } from './utils/stream';
+
 /**
  * Base error class for all TeamCity API errors
  */
@@ -40,8 +42,13 @@ export class TeamCityAPIError extends Error {
    */
   static fromAxiosError(error: AxiosError, requestId?: string): TeamCityAPIError {
     if (error.response) {
-      // Server responded with error status
-      const data = error.response.data as Record<string, unknown>;
+      // Server responded with error status.
+      // If the request used responseType 'stream', response.data is an
+      // unconsumed socket stream with circular references — never keep it as
+      // `details`, or any later serialization (logging, toJSON) would throw.
+      const data = (isReadableStream(error.response.data) ? undefined : error.response.data) as
+        | Record<string, unknown>
+        | undefined;
       return new TeamCityAPIError(
         (typeof data?.['message'] === 'string' ? data['message'] : null) ?? error.message,
         (typeof data?.['code'] === 'string' ? data['code'] : null) ??

@@ -478,30 +478,42 @@ export class TeamCityAPI {
     buildId: string,
     options?: RawAxiosRequestConfig<T>
   ): Promise<AxiosResponse<T>> {
-    const rawParams = (options?.params ?? undefined) as Record<string, unknown> | undefined;
-    const params = rawParams ? { ...rawParams } : {};
-    if (!Object.prototype.hasOwnProperty.call(params, 'plain')) {
-      params['plain'] = true;
-    }
-
+    const responseType = (options?.responseType ?? 'text') as RawAxiosRequestConfig['responseType'];
     const rawHeaders = (options?.headers ?? undefined) as Record<string, unknown> | undefined;
-    const headers = rawHeaders ? { ...rawHeaders } : {};
+    const headers = { Accept: 'text/plain', ...(rawHeaders ?? {}) };
+    const transformResponse = options?.transformResponse ?? [(data: unknown) => data];
+    const rawParams = (options?.params ?? undefined) as Record<string, unknown> | undefined;
 
-    const requestOptions: RawAxiosRequestConfig<T> = {
-      ...options,
-      params,
-      headers: {
-        Accept: 'text/plain',
-        ...headers,
-      },
-      responseType: (options?.responseType ?? 'text') as RawAxiosRequestConfig['responseType'],
-      transformResponse: options?.transformResponse ?? [(data) => data],
-    };
-
-    return this.axiosInstance.get<T>(
-      `/app/rest/builds/${toBuildLocator(buildId)}/log`,
-      requestOptions
-    );
+    // Primary: the officially documented build-log download endpoint. It takes
+    // the build id as a query parameter and returns the full log as plain text,
+    // and works with responseType 'stream' too. This is the only endpoint
+    // JetBrains documents for log download; the REST `/builds/{id}/log` path is
+    // undocumented and returns 404 on many server versions (it reports
+    // "Field 'log' is not supported"). Any line-range params (start/count) are
+    // forwarded but only honored by the REST fallback below.
+    try {
+      return await this.axiosInstance.get<T>(`/downloadBuildLog.html`, {
+        ...options,
+        params: { ...(rawParams ?? {}), buildId },
+        headers,
+        responseType,
+        transformResponse,
+      });
+    } catch {
+      // Fallback: the undocumented REST log endpoint, present on some server
+      // configurations. Uses plain=true and a build locator in the path.
+      const params = rawParams ? { ...rawParams } : {};
+      if (!Object.prototype.hasOwnProperty.call(params, 'plain')) {
+        params['plain'] = true;
+      }
+      return this.axiosInstance.get<T>(`/app/rest/builds/${toBuildLocator(buildId)}/log`, {
+        ...options,
+        params,
+        headers,
+        responseType,
+        transformResponse,
+      });
+    }
   }
 
   async getBuildStatistics(buildId: string, fields?: string): Promise<AxiosResponse<unknown>> {
