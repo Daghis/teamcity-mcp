@@ -29,7 +29,7 @@ import {
   type TeamCityClientAdapter,
   createAdapterFromTeamCityAPI,
 } from '@/teamcity/client-adapter';
-import { TeamCityAPIError, TeamCityNotFoundError, isRetryableError } from '@/teamcity/errors';
+import { TeamCityAPIError, TeamCityNotFoundError } from '@/teamcity/errors';
 import { createPaginatedFetcher, fetchAllPages } from '@/teamcity/pagination';
 import { sleep } from '@/utils/async';
 import {
@@ -1806,29 +1806,13 @@ const DEV_TOOLS: ToolDefinition[] = [
             throw new Error('Failed to resolve buildId from inputs');
           }
 
+          // The API client's axios-retry already retries 503s and network failures, so
+          // only a log that isn't available yet (404) is worth another attempt here
           const shouldRetry = (error: unknown): boolean => {
             if (error instanceof TeamCityAPIError) {
-              if (error.code === 'HTTP_404') {
-                return true;
-              }
-              return isRetryableError(error);
+              return error.code === 'HTTP_404';
             }
-
-            if (isAxiosError(error)) {
-              const status = error.response?.status;
-              if (status === 404) {
-                return true;
-              }
-              if (status != null && status >= 500 && status < 600) {
-                return true;
-              }
-              if (!status) {
-                // Network-level failure (timeout, connection reset, etc.)
-                return true;
-              }
-            }
-
-            return false;
+            return isAxiosError(error) && error.response?.status === 404;
           };
 
           const normalizeError = (error: unknown): Error => {
