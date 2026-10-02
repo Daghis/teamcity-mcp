@@ -15,13 +15,12 @@ describe('stream utils', () => {
     expect(isReadableStream(null)).toBe(false);
   });
 
-  it('drains a readable stream body', async () => {
-    const body = Readable.from(['chunk-1', 'chunk-2']);
-    const ended = new Promise<void>((resolve) => body.once('end', resolve));
+  it('destroys a streamed response body instead of waiting for it to finish', () => {
+    const body = new Readable({ read: () => undefined });
 
     discardStreamBody(body);
 
-    await expect(ended).resolves.toBeUndefined();
+    expect(body.destroyed).toBe(true);
   });
 
   it('ignores non-stream bodies', () => {
@@ -29,22 +28,17 @@ describe('stream utils', () => {
     expect(() => discardStreamBody(undefined)).not.toThrow();
   });
 
-  it('swallows errors emitted while draining', () => {
-    const body = new Readable({ read: () => undefined });
-
-    discardStreamBody(body);
-
-    expect(() => body.destroy(new Error('socket hang up'))).not.toThrow();
-    expect(body.listenerCount('error')).toBeGreaterThan(0);
-  });
-
-  it('destroys a stream and swallows errors raised while tearing it down', () => {
-    const body = new Readable({ read: () => undefined });
+  it('destroys a stream and swallows errors raised while tearing it down', async () => {
+    const body = new Readable({
+      read: () => undefined,
+      destroy: (_error, callback) => callback(new Error('socket hang up')),
+    });
 
     destroyStream(body);
+    // The teardown error is emitted on the next tick; unhandled, it would fail the test.
+    await new Promise<void>((resolve) => setImmediate(resolve));
 
     expect(body.destroyed).toBe(true);
-    expect(body.listenerCount('error')).toBeGreaterThan(0);
   });
 
   it('drains a stream that cannot be destroyed', () => {

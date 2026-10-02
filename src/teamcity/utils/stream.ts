@@ -11,14 +11,6 @@ export const isReadableStream = (value: unknown): value is NodeJS.ReadableStream
   typeof (value as { pipe?: unknown }).pipe === 'function' &&
   typeof (value as { on?: unknown }).on === 'function';
 
-export const discardStreamBody = (value: unknown): void => {
-  if (isReadableStream(value)) {
-    // Without a listener, an error while draining would be unhandled and crash the process.
-    value.on('error', () => undefined);
-    value.resume();
-  }
-};
-
 /**
  * Release a response body that will not be read any further. Destroying it
  * closes the underlying socket; a stream without `destroy()` is drained instead.
@@ -31,6 +23,16 @@ export const destroyStream = (stream: NodeJS.ReadableStream): void => {
     destroyable.destroy();
   } else {
     stream.resume();
+  }
+};
+
+/**
+ * Release the streamed body of a failed response before its request is retried,
+ * without waiting for the server to finish sending a body nobody will read.
+ */
+export const discardStreamBody = (value: unknown): void => {
+  if (isReadableStream(value)) {
+    destroyStream(value);
   }
 };
 

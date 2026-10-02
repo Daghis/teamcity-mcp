@@ -181,6 +181,22 @@ describe('TeamCityAPI unified surface', () => {
     await expect(api.downloadBuildLog('123')).rejects.toBe(primaryError);
   });
 
+  it.each([401, 403, 429, 503])(
+    'does not fall back after HTTP %i from the .html endpoint',
+    async (status) => {
+      const api = TeamCityAPI.getInstance(baseConfig);
+      const primaryError = new TeamCityAPIError(
+        `Request failed with status code ${status}`,
+        `HTTP_${status}`,
+        status
+      );
+      const getSpy = jest.spyOn(api.http, 'get').mockRejectedValue(primaryError);
+
+      await expect(api.downloadBuildLog('123')).rejects.toBe(primaryError);
+      expect(getSpy).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it('does not fall back when the .html request gets no HTTP response', async () => {
     const api = TeamCityAPI.getInstance(baseConfig);
     const networkError = new TeamCityNetworkError('connect ECONNREFUSED');

@@ -140,8 +140,11 @@ export function logResponse(response: AxiosResponse): AxiosResponse {
   return response;
 }
 
-/** Upper bound for reading a streamed error body when the request sets no timeout. */
-const STREAM_BODY_TIMEOUT_MS = 30000;
+/**
+ * Most time spent reading a streamed error body. The snapshot only adds detail
+ * to the error, so it must not hold up error handling or a fallback for long.
+ */
+const STREAM_BODY_TIMEOUT_MS = 5000;
 
 /**
  * Drain a readable stream to a bounded UTF-8 string. Used to turn a streamed
@@ -196,14 +199,14 @@ const snapshotStreamBody = async (
 export async function logAndTransformError(error: AxiosError): Promise<never> {
   // When the request used responseType 'stream', error.response.data is an
   // unconsumed Node stream (a socket with circular references). Drain it to a
-  // small text snapshot, within the request's timeout, so the error message is
+  // small text snapshot, bounded in size and time, so the error message is
   // usable and the raw socket is never stored or serialized downstream.
   const response = error.response;
   if (response && isReadableStream(response.data)) {
-    const timeout = error.config?.timeout;
+    const requestTimeout = error.config?.timeout ?? 0;
     response.data = await snapshotStreamBody(
       response.data,
-      timeout !== undefined && timeout > 0 ? timeout : STREAM_BODY_TIMEOUT_MS
+      requestTimeout > 0 ? Math.min(requestTimeout, STREAM_BODY_TIMEOUT_MS) : STREAM_BODY_TIMEOUT_MS
     );
   }
 

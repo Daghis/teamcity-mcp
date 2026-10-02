@@ -529,10 +529,12 @@ export class TeamCityAPI {
       }
       return { ...response, data: sliceLogData(response.data, startLine ?? 0, lineCount) as T };
     } catch (primaryError) {
-      // Only an HTTP error from TeamCity (e.g. a 404 where the download page is
-      // unavailable) warrants trying another endpoint; after a transport failure
-      // the REST endpoint on the same server would just fail again.
-      if (!(primaryError instanceof TeamCityAPIError) || primaryError.statusCode === undefined) {
+      // Fall back only when the failure is specific to this endpoint (e.g. a 404
+      // where the download page is unavailable). 401/403 come from the caller's
+      // credentials, 429/503 from server load, and a missing status from the
+      // network: the REST endpoint would fail the same way.
+      const status = primaryError instanceof TeamCityAPIError ? primaryError.statusCode : undefined;
+      if (status === undefined || [401, 403, 429, 503].includes(status)) {
         throw primaryError;
       }
       // Fallback: the undocumented REST log endpoint, present on some server

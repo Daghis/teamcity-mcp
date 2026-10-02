@@ -362,32 +362,35 @@ describe('TeamCity Authentication Utilities', () => {
       expect(body.destroyed).toBe(true);
     });
 
-    it('bounds streamed error body draining by 30 seconds when the request has no timeout', async () => {
-      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
-      try {
-        const body = new Readable({ read: () => undefined });
-        const axiosError = {
-          config: { requestId: 'test-no-timeout' },
-          response: { status: 404, data: body },
-          message: 'Request failed with status code 404',
-        } as unknown as AxiosError;
-        let settled = false;
-        const rejection = logAndTransformError(axiosError).catch((e: unknown) => {
-          settled = true;
-          return e;
-        });
+    it.each([{ timeout: undefined }, { timeout: 30000 }])(
+      'caps streamed error body draining at 5 seconds (request timeout: $timeout)',
+      async ({ timeout }) => {
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+        try {
+          const body = new Readable({ read: () => undefined });
+          const axiosError = {
+            config: { requestId: 'test-capped', timeout },
+            response: { status: 404, data: body },
+            message: 'Request failed with status code 404',
+          } as unknown as AxiosError;
+          let settled = false;
+          const rejection = logAndTransformError(axiosError).catch((e: unknown) => {
+            settled = true;
+            return e;
+          });
 
-        await jest.advanceTimersByTimeAsync(29999);
-        expect(settled).toBe(false);
+          await jest.advanceTimersByTimeAsync(4999);
+          expect(settled).toBe(false);
 
-        await jest.advanceTimersByTimeAsync(1);
-        await expect(rejection).resolves.toEqual(
-          expect.objectContaining({ requestId: 'test-no-timeout', details: undefined })
-        );
-        expect(body.destroyed).toBe(true);
-      } finally {
-        jest.useRealTimers();
+          await jest.advanceTimersByTimeAsync(1);
+          await expect(rejection).resolves.toEqual(
+            expect.objectContaining({ requestId: 'test-capped', details: undefined })
+          );
+          expect(body.destroyed).toBe(true);
+        } finally {
+          jest.useRealTimers();
+        }
       }
-    });
+    );
   });
 });
