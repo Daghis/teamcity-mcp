@@ -19,6 +19,29 @@ export const discardStreamBody = (value: unknown): void => {
   }
 };
 
+/**
+ * Release a response body that will not be read any further. Destroying it
+ * closes the underlying socket; a stream without `destroy()` is drained instead.
+ */
+export const destroyStream = (stream: NodeJS.ReadableStream): void => {
+  // Without a listener, an error during teardown would be unhandled and crash the process.
+  stream.on('error', () => undefined);
+  const destroyable = stream as NodeJS.ReadableStream & { destroy?: () => unknown };
+  if (typeof destroyable.destroy === 'function') {
+    destroyable.destroy();
+  } else {
+    stream.resume();
+  }
+};
+
+/** Normalize a stream chunk to a Buffer, keeping the bytes of binary chunks intact. */
+export const toBuffer = (chunk: unknown): Buffer => {
+  if (Buffer.isBuffer(chunk)) {
+    return chunk;
+  }
+  return chunk instanceof Uint8Array ? Buffer.from(chunk) : Buffer.from(String(chunk));
+};
+
 async function* sliceLines(
   source: NodeJS.ReadableStream,
   startLine: number,
@@ -29,7 +52,7 @@ async function* sliceLines(
   }
   let line = 0;
   for await (const raw of source) {
-    const chunk = Buffer.isBuffer(raw) ? raw : Buffer.from(String(raw));
+    const chunk = toBuffer(raw);
     let pos = 0;
     while (pos < chunk.length) {
       const newline = chunk.indexOf(0x0a, pos);
@@ -51,14 +74,23 @@ async function* sliceLines(
 
 /**
  * Restrict a line-oriented byte stream to `lineCount` lines from the zero-based
- * `startLine`. Leaving the range early destroys the source, aborting the download.
+ * `startLine`. The source is destroyed once the range is complete or the returned
+ * stream is destroyed, aborting the rest of the download.
  */
 export const sliceStreamLines = (
   source: NodeJS.ReadableStream,
   startLine: number,
   lineCount?: number
-): Readable =>
-  Readable.from(
-    sliceLines(source, startLine, lineCount === undefined ? undefined : startLine + lineCount),
-    { objectMode: false }
-  );
+): Readable => {
+  const endLine = lineCount === undefined ? undefined : startLine + lineCount;
+  const slice = Readable.from(sliceLines(source, startLine, endLine), { objectMode: false });
+  // The generator only releases `source` from inside its loop, which never runs
+  // for an empty range or a slice destroyed before its first read, and which Node
+  // does not interrupt while it waits for data. Release the source directly.
+  const destroySlice = slice._destroy.bind(slice);
+  slice._destroy = (error, callback) => {
+    destroyStream(source);
+    destroySlice(error, callback);
+  };
+  return slice;
+};

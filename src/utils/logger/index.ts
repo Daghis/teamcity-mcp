@@ -244,7 +244,11 @@ export class TeamCityLogger implements ILogger {
     if (duration !== undefined) contextParts.push(`${duration}ms`);
 
     const contextString = contextParts.length > 0 ? ` [${contextParts.join(' ')}]` : '';
-    const metaString = Object.keys(otherMeta).length > 0 ? ` ${safeStringify(otherMeta)}` : '';
+    // Object rest also copies winston's internal symbol keys (level, splat), which
+    // util.inspect would print, repeating the metadata; keep string keys only.
+    const metaEntries = Object.entries(otherMeta);
+    const metaString =
+      metaEntries.length > 0 ? ` ${safeStringify(Object.fromEntries(metaEntries))}` : '';
 
     return `${baseLog}${contextString}${metaString}`;
   }

@@ -528,20 +528,32 @@ export class TeamCityAPI {
         return response;
       }
       return { ...response, data: sliceLogData(response.data, startLine ?? 0, lineCount) as T };
-    } catch {
+    } catch (primaryError) {
+      // Only an HTTP error from TeamCity (e.g. a 404 where the download page is
+      // unavailable) warrants trying another endpoint; after a transport failure
+      // the REST endpoint on the same server would just fail again.
+      if (!(primaryError instanceof TeamCityAPIError) || primaryError.statusCode === undefined) {
+        throw primaryError;
+      }
       // Fallback: the undocumented REST log endpoint, present on some server
       // configurations. Uses plain=true and a build locator in the path.
       const params = rawParams ? { ...rawParams } : {};
       if (!Object.prototype.hasOwnProperty.call(params, 'plain')) {
         params['plain'] = true;
       }
-      return this.axiosInstance.get<T>(`/app/rest/builds/${toBuildLocator(buildId)}/log`, {
-        ...options,
-        params,
-        headers,
-        responseType,
-        transformResponse,
-      });
+      try {
+        return await this.axiosInstance.get<T>(`/app/rest/builds/${toBuildLocator(buildId)}/log`, {
+          ...options,
+          params,
+          headers,
+          responseType,
+          transformResponse,
+        });
+      } catch {
+        // Report the documented endpoint's failure; the response interceptor has
+        // already logged the fallback's.
+        throw primaryError;
+      }
     }
   }
 

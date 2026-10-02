@@ -4,6 +4,7 @@ import { Readable } from 'stream';
 import { TeamCityAPI, TeamCityAPIClientConfig } from '@/api-client';
 import type { Build } from '@/teamcity-client/models/build';
 import type { Changes } from '@/teamcity-client/models/changes';
+import { TeamCityAPIError, TeamCityNetworkError } from '@/teamcity/errors';
 
 const baseConfig: TeamCityAPIClientConfig = {
   baseUrl: 'https://teamcity.example.com',
@@ -18,6 +19,10 @@ const createAxiosResponse = <T>(data: T): AxiosResponse<T> => ({
   headers: {},
   config: { headers: {} } as InternalAxiosRequestConfig,
 });
+
+// The response interceptor turns HTTP failures into TeamCityAPIErrors carrying the status.
+const notFound = (message = 'Request failed with status code 404'): TeamCityAPIError =>
+  new TeamCityAPIError(message, 'HTTP_404', 404);
 
 describe('TeamCityAPI unified surface', () => {
   beforeEach(() => {
@@ -132,7 +137,7 @@ describe('TeamCityAPI unified surface', () => {
     const api = TeamCityAPI.getInstance(baseConfig);
     const getSpy = jest
       .spyOn(api.http, 'get')
-      .mockRejectedValueOnce(new Error('404'))
+      .mockRejectedValueOnce(notFound())
       .mockResolvedValueOnce(createAxiosResponse<string>('l1\nl2'));
 
     const response = await api.downloadBuildLog('123', { params: { start: 1, count: 2 } });
@@ -149,7 +154,7 @@ describe('TeamCityAPI unified surface', () => {
     const api = TeamCityAPI.getInstance(baseConfig);
     const getSpy = jest
       .spyOn(api.http, 'get')
-      .mockRejectedValueOnce(new Error('404'))
+      .mockRejectedValueOnce(notFound())
       .mockResolvedValueOnce(createAxiosResponse<string>('fallback log'));
 
     const response = await api.downloadBuildLog('123');
@@ -163,6 +168,26 @@ describe('TeamCityAPI unified surface', () => {
     expect(fallbackUrl).toBe('/app/rest/builds/id:123/log');
     expect(fallbackConfig?.params).toMatchObject({ plain: true });
     expect(response.data).toBe('fallback log');
+  });
+
+  it('reports the .html failure when the REST fallback fails too', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const primaryError = notFound('Build with id 123 does not exist');
+    jest
+      .spyOn(api.http, 'get')
+      .mockRejectedValueOnce(primaryError)
+      .mockRejectedValueOnce(notFound("Field 'log' is not supported"));
+
+    await expect(api.downloadBuildLog('123')).rejects.toBe(primaryError);
+  });
+
+  it('does not fall back when the .html request gets no HTTP response', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const networkError = new TeamCityNetworkError('connect ECONNREFUSED');
+    const getSpy = jest.spyOn(api.http, 'get').mockRejectedValue(networkError);
+
+    await expect(api.downloadBuildLog('123')).rejects.toBe(networkError);
+    expect(getSpy).toHaveBeenCalledTimes(1);
   });
 
   it('routes listSnapshotDependencies through the generated BuildApi and unwraps payload', async () => {

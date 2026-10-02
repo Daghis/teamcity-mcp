@@ -323,5 +323,71 @@ describe('TeamCity Authentication Utilities', () => {
         expect.objectContaining({ requestId: 'test-broken', statusCode: 502, details: undefined })
       );
     });
+
+    it('stops reading a streamed error body once 64 KB are captured', async () => {
+      const totalChunks = 64;
+      let served = 0;
+      const body = new Readable({
+        read() {
+          served += 1;
+          this.push(served <= totalChunks ? Buffer.alloc(16 * 1024, 'b') : null);
+        },
+      });
+      const axiosError = {
+        config: { requestId: 'test-large-body' },
+        response: { status: 500, data: body },
+        message: 'Request failed with status code 500',
+      } as unknown as AxiosError;
+
+      const rejected = (await logAndTransformError(axiosError).catch((e: unknown) => e)) as {
+        details?: string;
+      };
+
+      expect(rejected.details).toHaveLength(64 * 1024);
+      expect(served).toBeLessThan(totalChunks);
+    });
+
+    it('gives up on a streamed error body that outlasts the request timeout', async () => {
+      const body = new Readable({ read: () => undefined });
+      body.push('Build not fo');
+      const axiosError = {
+        config: { requestId: 'test-slow', timeout: 50 },
+        response: { status: 404, data: body },
+        message: 'Request failed with status code 404',
+      } as unknown as AxiosError;
+
+      await expect(logAndTransformError(axiosError)).rejects.toEqual(
+        expect.objectContaining({ requestId: 'test-slow', statusCode: 404, details: undefined })
+      );
+      expect(body.destroyed).toBe(true);
+    });
+
+    it('bounds streamed error body draining by 30 seconds when the request has no timeout', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+      try {
+        const body = new Readable({ read: () => undefined });
+        const axiosError = {
+          config: { requestId: 'test-no-timeout' },
+          response: { status: 404, data: body },
+          message: 'Request failed with status code 404',
+        } as unknown as AxiosError;
+        let settled = false;
+        const rejection = logAndTransformError(axiosError).catch((e: unknown) => {
+          settled = true;
+          return e;
+        });
+
+        await jest.advanceTimersByTimeAsync(29999);
+        expect(settled).toBe(false);
+
+        await jest.advanceTimersByTimeAsync(1);
+        await expect(rejection).resolves.toEqual(
+          expect.objectContaining({ requestId: 'test-no-timeout', details: undefined })
+        );
+        expect(body.destroyed).toBe(true);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 });

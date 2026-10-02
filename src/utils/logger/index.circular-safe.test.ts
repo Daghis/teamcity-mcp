@@ -1,7 +1,7 @@
 import { inspect } from 'util';
-import type { Logger } from 'winston';
+import type { Logform, Logger } from 'winston';
 
-import { createLogger, safeStringify } from './index';
+import { type TeamCityLogger, createLogger, safeStringify } from './index';
 
 /**
  * Regression test: log metadata can contain values with circular references
@@ -15,6 +15,12 @@ describe('TeamCityLogger circular-safe metadata', () => {
     const circular: Record<string, unknown> = { host: 'ci.example.com' };
     circular['self'] = circular;
     return circular;
+  };
+
+  const formatForConsole = (logger: TeamCityLogger, info: Logform.TransformableInfo): string => {
+    const [consoleTransport] = (logger as unknown as { winston: Logger }).winston.transports;
+    const formatted = consoleTransport?.format?.transform(info);
+    return typeof formatted === 'object' ? String(formatted[Symbol.for('message')]) : '';
   };
 
   it('serializes circular metadata without throwing', () => {
@@ -43,28 +49,37 @@ describe('TeamCityLogger circular-safe metadata', () => {
 
   it('formats circular metadata through the console transport', () => {
     const logger = createLogger({ enableConsole: true, enableFile: false, level: 'info' });
-    const [consoleTransport] = (logger as unknown as { winston: Logger }).winston.transports;
-    const info = {
+
+    expect(() =>
+      logger.info('streaming response completed', { socket: createCircular() })
+    ).not.toThrow();
+    const output = formatForConsole(logger, {
       level: 'info',
       message: 'streaming response completed',
       service: 'teamcity-mcp',
       socket: createCircular(),
       [Symbol.for('level')]: 'info',
-    };
-
-    expect(() =>
-      logger.info('streaming response completed', { socket: createCircular() })
-    ).not.toThrow();
-    const formatted = consoleTransport?.format?.transform(info) as
-      | Record<symbol, unknown>
-      | false
-      | undefined;
-    const output =
-      formatted !== false && formatted !== undefined
-        ? String(formatted[Symbol.for('message')])
-        : '';
+    });
 
     expect(output).toContain('streaming response completed');
     expect(output).toContain('[Circular *1]');
+  });
+
+  it('leaves winston internal symbol keys out of the formatted metadata', () => {
+    const logger = createLogger({ enableConsole: true, enableFile: false, level: 'info' });
+    const meta = { method: 'GET', url: '/downloadBuildLog.html' };
+
+    // The shape winston builds for logger.info(message, meta).
+    const output = formatForConsole(logger, {
+      ...meta,
+      level: 'info',
+      message: 'Starting TeamCity API request',
+      service: 'teamcity-mcp',
+      [Symbol.for('level')]: 'info',
+      [Symbol.for('splat')]: [meta],
+    });
+
+    expect(output).toContain("url: '/downloadBuildLog.html'");
+    expect(output).not.toContain('Symbol(');
   });
 });
