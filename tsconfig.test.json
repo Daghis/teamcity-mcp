@@ -15,7 +15,6 @@
     "noUnusedParameters": false,
     "noImplicitReturns": false,
     "noUncheckedIndexedAccess": false,
-    "noImplicitOverride": false,
-    "types": ["jest", "node"]
+    "noImplicitOverride": false
   }
 }
