@@ -1810,7 +1810,7 @@ const DEV_TOOLS: ToolDefinition[] = [
           // only a log that isn't available yet (404) is worth another attempt here
           const shouldRetry = (error: unknown): boolean => {
             if (error instanceof TeamCityAPIError) {
-              return error.code === 'HTTP_404';
+              return error.statusCode === 404;
             }
             return isAxiosError(error) && error.response?.status === 404;
           };
