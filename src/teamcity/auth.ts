@@ -142,7 +142,13 @@ export function logResponse(response: AxiosResponse): AxiosResponse {
 /**
  * Log error with request ID and transform
  */
-export function logAndTransformError(error: AxiosError): Promise<never> {
+export function logAndTransformError(error: AxiosError | TeamCityAPIError): Promise<never> {
+  // A request retried by axios-retry runs through this interceptor on its own, so
+  // the outer request receives an error that was already transformed and logged
+  if (error instanceof TeamCityAPIError) {
+    return Promise.reject(error);
+  }
+
   // Build a rich TeamCityAPIError instance so downstream handlers
   // see an Error subclass (not a plain object)
   const requestId = (error.config as AxiosRequestConfig & { requestId?: string })?.requestId;
