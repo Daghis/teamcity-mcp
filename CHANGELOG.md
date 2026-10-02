@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.3](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.2...teamcity-mcp-v2.12.3) (2026-10-02)
+
+
+### Bug Fixes
+
+* **api-client:** keep the original error when retries are exhausted ([#529](https://github.com/Daghis/teamcity-mcp/issues/529)) ([3a417ef](https://github.com/Daghis/teamcity-mcp/commit/3a417ef17260b2991885e2943e04a22e9c754aa8))
+
 ## [2.12.2](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.1...teamcity-mcp-v2.12.2) (2026-08-31)
 
 
