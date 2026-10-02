@@ -53,7 +53,7 @@ export class MCPTestClient {
     this.client = new Client(
       { name: 'mcp-e2e-client', version: '0.1.0' },
       {
-        capabilities: { tools: {} },
+        capabilities: {},
       }
     );
   }

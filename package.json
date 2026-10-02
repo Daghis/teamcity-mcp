@@ -29,7 +29,7 @@
     "lint:check": "node ./node_modules/eslint/bin/eslint.js 'src/**/*.{ts,tsx}' 'tests/**/*.test.{ts,tsx,js}' --no-error-on-unmatched-pattern",
     "format": "node ./node_modules/prettier/bin/prettier.cjs --write 'src/**/*.{ts,tsx,json,md}' 'tests/**/*.{ts,tsx,js,json,md}'",
     "format:check": "node ./node_modules/prettier/bin/prettier.cjs --check 'src/**/*.{ts,tsx,json,md}' 'tests/**/*.{ts,tsx,js,json,md}'",
-    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.build.json",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.build.json && npm run typecheck:all",
     "typecheck:all": "node ./node_modules/typescript/bin/tsc --noEmit",
     "check": "npm run typecheck && npm run lint:check && npm run format:check",
     "clean": "rm -rf dist coverage",
