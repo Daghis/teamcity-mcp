@@ -33,6 +33,8 @@ interface JsonRpcRequest {
 interface JsonRpcMessage {
   jsonrpc: '2.0';
   id?: unknown;
+  result?: unknown;
+  error?: unknown;
 }
 
 function isJsonRpcMessage(value: unknown): value is JsonRpcMessage {
@@ -52,9 +54,10 @@ function parseJsonRpcLine(line: string): JsonRpcMessage | null {
 }
 
 /**
- * Writes `request` to the server's stdin and resolves once the response with the same id
- * appears on stdout. Rejects if the server exits first or no response arrives within
- * `timeoutMs`, so a slow boot fails with a message naming the missing response.
+ * Writes `request` to the server's stdin and resolves once a successful response (one with a
+ * `result`) to it appears on stdout. Rejects if that response is an error, the server exits
+ * first, or nothing arrives within `timeoutMs`, so a slow boot fails with a message naming
+ * the missing response.
  */
 function sendRequest(
   server: ChildProcessWithoutNullStreams,
@@ -77,7 +80,17 @@ function sendRequest(
     const onData = (chunk: Buffer): void => {
       const lines = `${partialLine}${chunk.toString()}`.split('\n');
       partialLine = lines.pop() ?? '';
-      if (lines.some((line) => parseJsonRpcLine(line)?.id === request.id)) {
+      const response = lines
+        .map((line) => parseJsonRpcLine(line))
+        .find((message) => message?.id === request.id);
+      if (!response) {
+        return;
+      }
+      // A result is the only proof the request was handled; an error or malformed reply would
+      // let the test pass without exercising the code path it checks
+      if (response.result === undefined || response.error !== undefined) {
+        settle(new Error(`Unsuccessful response to ${label}: ${JSON.stringify(response)}`));
+      } else {
         settle();
       }
     };
