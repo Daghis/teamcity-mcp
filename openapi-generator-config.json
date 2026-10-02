@@ -2,6 +2,7 @@
   "generatorName": "typescript-axios",
   "outputDir": "./src/teamcity-client",
   "inputSpec": "./.cache/teamcity-swagger.json",
+  "templateDir": "./openapi-templates/typescript-axios",
   "additionalProperties": {
     "npmName": "@teamcity/client",
     "npmVersion": "1.0.0",

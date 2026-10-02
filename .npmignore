@@ -21,6 +21,7 @@ tsconfig.build.json
 tsconfig.lint.json
 openapi-generator-config.json
 openapitools.json
+openapi-templates/
 
 # Release automation (CI-only)
 .release-please-config.json
