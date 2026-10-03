@@ -76,6 +76,28 @@ jobs:
         if: steps.exists.outputs.exists == 'false' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_to_registry == 'true')
         run: ./mcp-publisher login github-oidc
 
+      # npm can take a couple of minutes to serve a freshly published version, and
+      # the MCP Registry rejects a package version it cannot see yet. Retry only that
+      # rejection; any other failure is fatal. Registry tokens expire after five
+      # minutes, so log in again before each retry.
       - name: Publish to MCP Registry
         if: steps.exists.outputs.exists == 'false' || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_to_registry == 'true')
-        run: ./mcp-publisher publish
+        run: |
+          MAX_ATTEMPTS=20
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            if [ "$attempt" -gt 1 ]; then
+              sleep 30
+              ./mcp-publisher login github-oidc
+            fi
+            if output=$(./mcp-publisher publish 2>&1); then
+              echo "$output"
+              exit 0
+            fi
+            echo "$output"
+            if ! grep -q "was not found" <<< "$output"; then
+              exit 1
+            fi
+            echo "npm is not serving this version yet (attempt ${attempt}/${MAX_ATTEMPTS})"
+          done
+          echo "::error::npm still was not serving the new version after ${MAX_ATTEMPTS} attempts"
+          exit 1
