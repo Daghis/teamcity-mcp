@@ -179,15 +179,42 @@ describe('TeamCityAPI unified surface', () => {
     expect(response.data).toBe('fallback log');
   });
 
-  it('reports the .html failure when the REST fallback fails too', async () => {
+  it.each([404, 405])('reports the .html failure when REST is unavailable (%i)', async (status) => {
     const api = TeamCityAPI.getInstance(baseConfig);
     const primaryError = notFound('Build with id 123 does not exist');
     jest
       .spyOn(api.http, 'get')
       .mockRejectedValueOnce(primaryError)
-      .mockRejectedValueOnce(notFound("Field 'log' is not supported"));
+      .mockRejectedValueOnce(
+        new TeamCityAPIError('REST log endpoint unavailable', `HTTP_${status}`, status)
+      );
 
     await expect(api.downloadBuildLog('123')).rejects.toBe(primaryError);
+  });
+
+  it.each([400, 401, 403, 408, 429, 500, 502, 503, 504])(
+    'preserves HTTP %i from the REST fallback instead of reporting a retryable 404',
+    async (status) => {
+      const api = TeamCityAPI.getInstance(baseConfig);
+      const fallbackError = new TeamCityAPIError('REST request failed', `HTTP_${status}`, status);
+      jest
+        .spyOn(api.http, 'get')
+        .mockRejectedValueOnce(notFound())
+        .mockRejectedValueOnce(fallbackError);
+
+      await expect(api.downloadBuildLog('123')).rejects.toBe(fallbackError);
+    }
+  );
+
+  it('preserves network failures from the REST fallback', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const fallbackError = new TeamCityNetworkError('connect ECONNREFUSED');
+    jest
+      .spyOn(api.http, 'get')
+      .mockRejectedValueOnce(notFound())
+      .mockRejectedValueOnce(fallbackError);
+
+    await expect(api.downloadBuildLog('123')).rejects.toBe(fallbackError);
   });
 
   it.each([401, 403, 429, 503])(

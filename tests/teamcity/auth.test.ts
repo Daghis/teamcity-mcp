@@ -323,6 +323,56 @@ describe('TeamCity Authentication Utilities', () => {
       expect(details).toHaveLength(64 * 1024);
     });
 
+    it('caps multibyte snapshots in bytes even when the last chunk exceeds the limit', async () => {
+      const bytes = Buffer.from('界'.repeat(30000));
+      const chunks = Array.from({ length: Math.ceil(bytes.length / (20 * 1024)) }, (_, index) =>
+        bytes.subarray(index * 20 * 1024, (index + 1) * 20 * 1024)
+      );
+      const axiosError = {
+        config: { requestId: 'test-utf8' },
+        response: { status: 404, data: Readable.from(chunks) },
+        message: 'Not found',
+      } as unknown as AxiosError;
+
+      const rejected = (await logAndTransformError(axiosError).catch((e: unknown) => e)) as {
+        details: string;
+      };
+
+      expect(rejected.details).toBe('界'.repeat(Math.floor((64 * 1024) / 3)));
+      expect(Buffer.byteLength(rejected.details)).toBeLessThanOrEqual(64 * 1024);
+    });
+
+    it('omits an incomplete UTF-8 character at the snapshot boundary', async () => {
+      const prefix = 'a'.repeat(64 * 1024 - 1);
+      const axiosError = {
+        config: { requestId: 'test-utf8-boundary' },
+        response: { status: 404, data: Readable.from([Buffer.from(`${prefix}界`)]) },
+        message: 'Not found',
+      } as unknown as AxiosError;
+
+      const rejected = (await logAndTransformError(axiosError).catch((e: unknown) => e)) as {
+        details: string;
+      };
+
+      expect(rejected.details).toBe(prefix);
+      expect(Buffer.byteLength(rejected.details)).toBeLessThanOrEqual(64 * 1024);
+    });
+
+    it('keeps invalid UTF-8 replacement characters within the byte limit', async () => {
+      const axiosError = {
+        config: { requestId: 'test-invalid-utf8' },
+        response: { status: 404, data: Readable.from([Buffer.alloc(80 * 1024, 0xff)]) },
+        message: 'Not found',
+      } as unknown as AxiosError;
+
+      const rejected = (await logAndTransformError(axiosError).catch((e: unknown) => e)) as {
+        details: string;
+      };
+
+      expect(rejected.details).toBe('\ufffd'.repeat(Math.floor((64 * 1024) / 3)));
+      expect(Buffer.byteLength(rejected.details)).toBeLessThanOrEqual(64 * 1024);
+    });
+
     it('drops a streamed error body that fails while draining', async () => {
       const body = new Readable({
         read() {

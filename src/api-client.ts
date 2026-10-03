@@ -551,10 +551,15 @@ export class TeamCityAPI {
           responseType,
           transformResponse,
         });
-      } catch {
-        // Report the documented endpoint's failure; the response interceptor has
-        // already logged the fallback's.
-        throw primaryError;
+      } catch (fallbackError) {
+        // Keep the documented endpoint's error only when REST is also unavailable.
+        // Preserve auth, throttling and network failures so callers classify them correctly.
+        const fallbackStatus =
+          fallbackError instanceof TeamCityAPIError ? fallbackError.statusCode : undefined;
+        if (fallbackStatus === 404 || fallbackStatus === 405) {
+          throw primaryError;
+        }
+        throw fallbackError;
       }
     }
   }

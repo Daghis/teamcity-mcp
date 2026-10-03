@@ -1,6 +1,8 @@
 /**
  * Authentication utilities for TeamCity API
  */
+import { StringDecoder } from 'node:string_decoder';
+
 import type {
   AxiosError,
   AxiosRequestConfig,
@@ -158,15 +160,25 @@ const streamToString = async (
 ): Promise<string> => {
   const chunks: Buffer[] = [];
   let total = 0;
+  let truncated = false;
   for await (const chunk of stream) {
     const buf = toBuffer(chunk);
-    chunks.push(buf);
-    total += buf.length;
+    const retained = buf.subarray(0, maxBytes - total);
+    chunks.push(retained);
+    total += retained.length;
     if (total >= maxBytes) {
+      truncated = true;
       break;
     }
   }
-  return Buffer.concat(chunks).toString('utf8').slice(0, maxBytes);
+  const decoder = new StringDecoder('utf8');
+  // Leave a partial character at the byte boundary buffered instead of replacing it.
+  const text = decoder.write(Buffer.concat(chunks, total)) + (truncated ? '' : decoder.end());
+  if (Buffer.byteLength(text) <= maxBytes) {
+    return text;
+  }
+  // Invalid UTF-8 can expand to larger replacement characters during decoding.
+  return new StringDecoder('utf8').write(Buffer.from(text).subarray(0, maxBytes));
 };
 
 /**
