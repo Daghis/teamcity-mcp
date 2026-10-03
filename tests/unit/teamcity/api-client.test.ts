@@ -232,6 +232,8 @@ describe('TeamCityAPI unified surface', () => {
 describe('TeamCityAPI when retries are exhausted', () => {
   // X-Request-ID of every attempt the server received (initial request + retries)
   const seenRequestIds: Array<string | string[] | undefined> = [];
+  // URL of every attempt, to tell the build-log endpoints apart
+  const seenUrls: Array<string | undefined> = [];
   let server: Server;
   let baseUrl: string;
   let logError: jest.SpiedFunction<typeof logger.error>;
@@ -239,6 +241,7 @@ describe('TeamCityAPI when retries are exhausted', () => {
   beforeAll(async () => {
     server = createServer((req, res) => {
       seenRequestIds.push(req.headers['x-request-id']);
+      seenUrls.push(req.url);
       res.writeHead(503, { 'Content-Type': 'application/json', Connection: 'close' });
       res.end(JSON.stringify({ message: 'Service Unavailable' }));
     });
@@ -260,6 +263,7 @@ describe('TeamCityAPI when retries are exhausted', () => {
 
   beforeEach(() => {
     seenRequestIds.length = 0;
+    seenUrls.length = 0;
     TeamCityAPI.reset();
     jest.spyOn(logger, 'info').mockImplementation(() => undefined);
     logError = jest.spyOn(logger, 'error').mockImplementation(() => undefined);
@@ -312,5 +316,21 @@ describe('TeamCityAPI when retries are exhausted', () => {
       undefined,
       expect.objectContaining({ code: 'HTTP_503', statusCode: 503 })
     );
+  });
+
+  it('ends a streamed build-log download on the 503 without falling back to REST', async () => {
+    const api = TeamCityAPI.getInstance({ baseUrl, token: 'test-token' });
+
+    const error = await api
+      .downloadBuildLog('42', { ...skipBackoff, responseType: 'stream' })
+      .catch((e: unknown) => e);
+
+    expect(seenUrls).toEqual(Array<string>(4).fill('/downloadBuildLog.html?buildId=42'));
+    expect(error).toMatchObject({
+      code: 'HTTP_503',
+      statusCode: 503,
+      details: JSON.stringify({ message: 'Service Unavailable' }),
+    });
+    expect(logError).toHaveBeenCalledTimes(1);
   });
 });
