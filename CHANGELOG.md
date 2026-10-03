@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.7](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.6...teamcity-mcp-v2.12.7) (2026-10-03)
+
+
+### Bug Fixes
+
+* **build-log:** protect errors and bound stream snapshots ([#538](https://github.com/Daghis/teamcity-mcp/issues/538)) ([36a300c](https://github.com/Daghis/teamcity-mcp/commit/36a300c932fadeea6136effde9c93d82ad716780))
+
 ## [2.12.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.5...teamcity-mcp-v2.12.6) (2026-10-03)
 
 
