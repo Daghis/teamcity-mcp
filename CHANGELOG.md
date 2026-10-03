@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.5](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.4...teamcity-mcp-v2.12.5) (2026-10-03)
+
+
+### Bug Fixes
+
+* **publish:** use Node 24 and pin npm for trusted publishing ([#536](https://github.com/Daghis/teamcity-mcp/issues/536)) ([533814b](https://github.com/Daghis/teamcity-mcp/commit/533814bbe8d25fb7f7bb89f14a92e9a261d4ebbb))
+
 ## [2.12.4](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.3...teamcity-mcp-v2.12.4) (2026-10-02)
 
 
