@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.6](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.5...teamcity-mcp-v2.12.6) (2026-10-03)
+
+
+### Bug Fixes
+
+* **build-log:** repair streamed downloads and error logging ([#526](https://github.com/Daghis/teamcity-mcp/issues/526)) ([aca2eea](https://github.com/Daghis/teamcity-mcp/commit/aca2eea6b996668e75ed69318c8846cdfeee624d))
+
 ## [2.12.5](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.4...teamcity-mcp-v2.12.5) (2026-10-03)
 
 
