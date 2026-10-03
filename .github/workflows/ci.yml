@@ -1,10 +1,11 @@
 name: CI
 
 on:
+  # Release PRs are covered by pull_request (release-please opens them with a PAT).
+  # Don't add a push trigger for release-please--* branches: the duplicate required
+  # check races auto-merge, and GitHub disables auto-merge when it loses.
   push:
-    branches:
-      - main
-      - 'release-please--*'
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
