@@ -1,6 +1,6 @@
 {
   "name": "@daghis/teamcity-mcp",
-  "version": "2.12.2",
+  "version": "2.12.4",
   "description": "Model Control Protocol server for TeamCity CI/CD integration with AI coding assistants",
   "mcpName": "io.github.Daghis/teamcity",
   "main": "dist/index.js",
@@ -29,7 +29,7 @@
     "lint:check": "node ./node_modules/eslint/bin/eslint.js 'src/**/*.{ts,tsx}' 'tests/**/*.test.{ts,tsx,js}' --no-error-on-unmatched-pattern",
     "format": "node ./node_modules/prettier/bin/prettier.cjs --write 'src/**/*.{ts,tsx,json,md}' 'tests/**/*.{ts,tsx,js,json,md}'",
     "format:check": "node ./node_modules/prettier/bin/prettier.cjs --check 'src/**/*.{ts,tsx,json,md}' 'tests/**/*.{ts,tsx,js,json,md}'",
-    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.build.json",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.build.json && npm run typecheck:all",
     "typecheck:all": "node ./node_modules/typescript/bin/tsc --noEmit",
     "check": "npm run typecheck && npm run lint:check && npm run format:check",
     "clean": "rm -rf dist coverage",
@@ -65,7 +65,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "axios": "~1.18.0",
+    "axios": "^1.20.0",
     "axios-retry": "^4.5.0",
     "dotenv": "17.4.2",
     "tslib": "^2.8.1",
@@ -100,7 +100,7 @@
   },
   "overrides": {
     "@hono/node-server": "^1.19.13",
-    "axios": "~1.18.0",
+    "axios": "^1.20.0",
     "body-parser": "^2.2.1",
     "follow-redirects": "^1.16.0",
     "glob@>=10.2.0 <10.5.0": "^10.5.0",

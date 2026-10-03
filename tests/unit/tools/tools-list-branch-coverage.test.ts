@@ -426,7 +426,7 @@ describe('tools: fetch_build_log retry/error handling branches', () => {
     expect((getBuildLogChunk as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('retries on 500 axios errors and reports status text', async () => {
+  it('does not retry 503 axios errors', async () => {
     const getBuildLogChunk = jest.fn(async () => {
       const err = new Error('boom') as Error & {
         isAxiosError: boolean;
@@ -438,9 +438,10 @@ describe('tools: fetch_build_log retry/error handling branches', () => {
     });
     const payload = await runFetch({ buildId: 'b-503', lineCount: 10 }, { getBuildLogChunk });
     expect(payload['error']).toBeDefined();
+    expect((getBuildLogChunk as jest.Mock).mock.calls.length).toBe(1);
   });
 
-  it('retries on network errors with no HTTP status', async () => {
+  it('does not retry network errors with no HTTP status', async () => {
     const getBuildLogChunk = jest.fn(async () => {
       const err = new Error('ECONNRESET') as Error & {
         isAxiosError: boolean;
@@ -450,6 +451,7 @@ describe('tools: fetch_build_log retry/error handling branches', () => {
     });
     const payload = await runFetch({ buildId: 'b-network', lineCount: 10 }, { getBuildLogChunk });
     expect(payload['error']).toBeDefined();
+    expect((getBuildLogChunk as jest.Mock).mock.calls.length).toBe(1);
   });
 
   it('does not retry on non-retryable axios errors (401)', async () => {

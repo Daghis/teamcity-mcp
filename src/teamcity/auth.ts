@@ -196,7 +196,13 @@ const snapshotStreamBody = async (
 /**
  * Log error with request ID and transform
  */
-export async function logAndTransformError(error: AxiosError): Promise<never> {
+export async function logAndTransformError(error: AxiosError | TeamCityAPIError): Promise<never> {
+  // A request retried by axios-retry runs through this interceptor on its own, so
+  // the outer request receives an error that was already transformed and logged
+  if (error instanceof TeamCityAPIError) {
+    return Promise.reject(error);
+  }
+
   // When the request used responseType 'stream', error.response.data is an
   // unconsumed Node stream (a socket with circular references). Drain it to a
   // small text snapshot, bounded in size and time, so the error message is

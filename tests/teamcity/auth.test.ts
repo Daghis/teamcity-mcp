@@ -19,6 +19,7 @@ import {
   validateServerUrl,
   validateToken,
 } from '@/teamcity/auth';
+import { TeamCityAPIError } from '@/teamcity/errors';
 import * as logger from '@/utils/logger';
 
 // Mock the logger
@@ -272,6 +273,21 @@ describe('TeamCity Authentication Utilities', () => {
           statusCode: 500,
         })
       );
+    });
+
+    it('should pass an already transformed TeamCityAPIError through without logging it again', async () => {
+      const { error } = logger;
+      const tcError = new TeamCityAPIError(
+        'Service Unavailable',
+        'HTTP_503',
+        503,
+        { message: 'Service Unavailable' },
+        'test-789'
+      );
+
+      await expect(logAndTransformError(tcError)).rejects.toBe(tcError);
+
+      expect(error).not.toHaveBeenCalled();
     });
 
     it('drains a streamed error body into a bounded text snapshot', async () => {
