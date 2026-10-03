@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.8](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.7...teamcity-mcp-v2.12.8) (2026-10-03)
+
+
+### Bug Fixes
+
+* **publish:** retry MCP Registry publish until npm serves the version ([#541](https://github.com/Daghis/teamcity-mcp/issues/541)) ([bd64526](https://github.com/Daghis/teamcity-mcp/commit/bd645269ead77d801553c8019534bbfa448921cf))
+
 ## [2.12.7](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.6...teamcity-mcp-v2.12.7) (2026-10-03)
 
 
