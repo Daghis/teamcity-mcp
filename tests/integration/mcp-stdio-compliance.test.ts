@@ -16,11 +16,6 @@ import { join } from 'path';
 
 import packageJson from '../../package.json';
 
-/** Type for MCP initialize response */
-interface InitializeResponse {
-  result?: { serverInfo?: { name: string; version: string }; protocolVersion?: string };
-}
-
 /** JSON-RPC request written to the server's stdin */
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -33,13 +28,33 @@ interface JsonRpcRequest {
 interface JsonRpcMessage {
   jsonrpc: '2.0';
   id?: unknown;
+  method?: unknown;
   result?: unknown;
   error?: unknown;
+}
+
+/**
+ * The part of an MCP initialize result these tests check. Values stay `unknown` so that the
+ * assertions, not the type guard, report unexpected ones.
+ */
+interface InitializeResult {
+  protocolVersion?: unknown;
+  serverInfo: { name?: unknown; version?: unknown };
 }
 
 function isJsonRpcMessage(value: unknown): value is JsonRpcMessage {
   return (
     typeof value === 'object' && value !== null && 'jsonrpc' in value && value.jsonrpc === '2.0'
+  );
+}
+
+function isInitializeResult(value: unknown): value is InitializeResult {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'serverInfo' in value &&
+    typeof value.serverInfo === 'object' &&
+    value.serverInfo !== null
   );
 }
 
@@ -53,17 +68,25 @@ function parseJsonRpcLine(line: string): JsonRpcMessage | null {
   }
 }
 
+/** Returns an initialize response's result, failing with the whole response if it lacks serverInfo */
+function readInitializeResult(response: JsonRpcMessage): InitializeResult {
+  if (!isInitializeResult(response.result)) {
+    throw new Error(`Malformed initialize response: ${JSON.stringify(response)}`);
+  }
+  return response.result;
+}
+
 /**
- * Writes `request` to the server's stdin and resolves once a successful response (one with a
- * `result`) to it appears on stdout. Rejects if that response is an error, the server exits
- * first, or nothing arrives within `timeoutMs`, so a slow boot fails with a message naming
- * the missing response.
+ * Writes `request` to the server's stdin and resolves with the successful response (one with a
+ * `result`) to it once that appears on stdout. Rejects if that response is an error, the server
+ * exits first, or nothing arrives within `timeoutMs`, so a slow boot fails with a message
+ * naming the missing response.
  */
 function sendRequest(
   server: ChildProcessWithoutNullStreams,
   request: JsonRpcRequest,
   timeoutMs: number
-): Promise<void> {
+): Promise<JsonRpcMessage> {
   const label = `${request.method} (id ${request.id})`;
   const exitError = (code: number | null, signal: NodeJS.Signals | null): Error =>
     new Error(
@@ -74,7 +97,7 @@ function sendRequest(
     return Promise.reject(exitError(server.exitCode, server.signalCode));
   }
 
-  return new Promise<void>((resolve, reject) => {
+  return new Promise<JsonRpcMessage>((resolve, reject) => {
     let partialLine = '';
 
     const onData = (chunk: Buffer): void => {
@@ -91,7 +114,7 @@ function sendRequest(
       if (response.result === undefined || response.error !== undefined) {
         settle(new Error(`Unsuccessful response to ${label}: ${JSON.stringify(response)}`));
       } else {
-        settle();
+        settle(response);
       }
     };
     // 'close' fires only after stdout is drained, so a response sent just before exit still counts
@@ -102,14 +125,14 @@ function sendRequest(
       settle(new Error(`No response to ${label} within ${timeoutMs}ms`));
     }, timeoutMs);
 
-    function settle(error?: Error): void {
+    function settle(outcome: JsonRpcMessage | Error): void {
       clearTimeout(timer);
       server.stdout.off('data', onData);
       server.off('close', onClose);
-      if (error) {
-        reject(error);
+      if (outcome instanceof Error) {
+        reject(outcome);
       } else {
-        resolve();
+        resolve(outcome);
       }
     }
 
@@ -122,7 +145,9 @@ function sendRequest(
 describe('MCP stdio transport compliance', () => {
   const tsxPath = join(__dirname, '../../node_modules/tsx/dist/cli.mjs');
   const serverPath = join(__dirname, '../../src/index.ts');
-  const timeout = 10000;
+  // Booting the server through tsx takes about a second when warm, but can take several seconds
+  // on a cold first run (e.g. the first `npm test` after `npm ci`)
+  const timeout = 20000;
   // Stop waiting on the server a second before the test times out, leaving time to kill it
   // and fail with an error naming the missing response
   const responseTimeout = timeout - 1000;
@@ -140,79 +165,64 @@ describe('MCP stdio transport compliance', () => {
         },
       });
 
-      let stdoutData = '';
-      let stderrData = '';
-      let initResponse: InitializeResponse | null = null;
-
-      const stdoutPromise = new Promise<void>((resolve, reject) => {
-        server.stdout.on('data', (data) => {
-          stdoutData += data.toString();
-
-          // Try to parse each line as JSON-RPC
-          const lines = stdoutData.split('\n');
-          for (const line of lines) {
-            if (!line.trim()) continue;
-
-            try {
-              const parsed = JSON.parse(line);
-
-              // Verify it's a valid JSON-RPC message
-              expect(parsed).toHaveProperty('jsonrpc');
-              expect(parsed.jsonrpc).toBe('2.0');
-
-              // Should have either id (response) or method (notification/request)
-              expect(parsed.id !== undefined || parsed.method !== undefined).toBe(true);
-
-              if (parsed.result?.serverInfo !== undefined) {
-                initResponse = parsed;
-                resolve();
-              }
-            } catch (e) {
-              reject(new Error(`Invalid JSON on stdout: ${line}\nError: ${String(e)}`));
-            }
-          }
-        });
+      // Created up front so cleanup can't miss a 'close' that fires before it runs
+      const closed = new Promise<void>((resolve) => {
+        server.once('close', () => resolve());
       });
 
-      server.stderr.on('data', (data) => {
+      let stdoutData = '';
+      let stderrData = '';
+
+      server.stdout.on('data', (data: Buffer) => {
+        stdoutData += data.toString();
+      });
+
+      server.stderr.on('data', (data: Buffer) => {
         stderrData += data.toString();
       });
 
-      // Send initialize request
-      const initRequest = {
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'initialize',
-        params: {
-          protocolVersion: '2024-11-05',
-          capabilities: {},
-          clientInfo: {
-            name: 'test-client',
-            version: '1.0.0',
+      let initResponse: JsonRpcMessage;
+      try {
+        // Send initialize request
+        initResponse = await sendRequest(
+          server,
+          {
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'initialize',
+            params: {
+              protocolVersion: '2024-11-05',
+              capabilities: {},
+              clientInfo: {
+                name: 'test-client',
+                version: '1.0.0',
+              },
+            },
           },
-        },
-      };
+          responseTimeout
+        );
+      } finally {
+        // tsx relays SIGTERM to the server process, escalating to SIGKILL if it goes unanswered
+        server.kill();
+        await closed;
+      }
 
-      server.stdin.write(`${JSON.stringify(initRequest)}\n`);
-
-      await Promise.race([
-        stdoutPromise,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout waiting for initialize response')), timeout)
-        ),
-      ]);
+      // Verify every stdout line, including any written after the response, is a JSON-RPC 2.0
+      // message with an id (response) or a method (notification/request), listing offenders
+      const invalidLines = stdoutData
+        .split('\n')
+        .filter((line) => line.trim() !== '')
+        .filter((line) => {
+          const message = parseJsonRpcLine(line);
+          return message === null || (message.id === undefined && message.method === undefined);
+        });
+      expect(invalidLines).toEqual([]);
 
       // Verify we got a valid initialize response
-      expect(initResponse).not.toBeNull();
-      if (initResponse === null) {
-        throw new Error('initResponse should not be null');
-      }
-      // TypeScript doesn't track mutations inside async callbacks, so we need to help it
-      const response = initResponse as InitializeResponse;
-      expect(response.result).toHaveProperty('serverInfo');
-      expect(response.result?.serverInfo?.name).toBe('teamcity-mcp');
-      expect(response.result?.serverInfo?.version).toMatch(/^\d+\.\d+\.\d+/);
-      expect(response.result?.protocolVersion).toBe('2024-11-05');
+      const { serverInfo, protocolVersion } = readInitializeResult(initResponse);
+      expect(serverInfo.name).toBe('teamcity-mcp');
+      expect(serverInfo.version).toMatch(/^\d+\.\d+\.\d+/);
+      expect(protocolVersion).toBe('2024-11-05');
 
       // Verify stderr contains logging (not stdout)
       expect(stderrData).toContain('TeamCity MCP Server');
@@ -220,10 +230,6 @@ describe('MCP stdio transport compliance', () => {
       // Verify NO dotenv messages on stdout
       expect(stdoutData).not.toContain('dotenv');
       expect(stdoutData).not.toContain('[dotenv');
-
-      // Clean up
-      server.kill();
-      await new Promise((resolve) => server.on('close', resolve));
     },
     timeout
   );
@@ -306,8 +312,8 @@ describe('MCP stdio transport compliance', () => {
       // Verify NO winston log format indicators on stdout
       expect(stdoutBuffer).not.toMatch(/\[teamcity-mcp\]/);
       expect(stdoutBuffer).not.toMatch(/\d{2}:\d{2}:\d{2}/); // timestamp format
-      expect(stdoutBuffer).not.toContain('[32minfo[39m'); // colored info
-      expect(stdoutBuffer).not.toContain('[33mwarn[39m'); // colored warn
+      expect(stdoutBuffer).not.toContain('\u001b[32minfo\u001b[39m'); // colored info
+      expect(stdoutBuffer).not.toContain('\u001b[33mwarn\u001b[39m'); // colored warn
     },
     timeout
   );
@@ -325,51 +331,36 @@ describe('MCP stdio transport compliance', () => {
         },
       });
 
-      let version: string | null = null;
-
-      const versionPromise = new Promise<void>((resolve) => {
-        server.stdout.on('data', (data) => {
-          const lines = data.toString().split('\n');
-          for (const line of lines) {
-            if (line.trim() === '') continue;
-
-            try {
-              const parsed = JSON.parse(line);
-              if (parsed.result?.serverInfo?.version !== undefined) {
-                version = parsed.result.serverInfo.version;
-                resolve();
-              }
-            } catch {
-              // Ignore parse errors
-            }
-          }
-        });
+      // Created up front so cleanup can't miss a 'close' that fires before it runs
+      const closed = new Promise<void>((resolve) => {
+        server.once('close', () => resolve());
       });
 
-      server.stdin.write(
-        `${JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'initialize',
-          params: {
-            protocolVersion: '2024-11-05',
-            capabilities: {},
-            clientInfo: { name: 'test', version: '1.0.0' },
+      let initResponse: JsonRpcMessage;
+      try {
+        initResponse = await sendRequest(
+          server,
+          {
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'initialize',
+            params: {
+              protocolVersion: '2024-11-05',
+              capabilities: {},
+              clientInfo: { name: 'test', version: '1.0.0' },
+            },
           },
-        })}\n`
-      );
-
-      await Promise.race([
-        versionPromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout)),
-      ]);
+          responseTimeout
+        );
+      } finally {
+        server.kill();
+        await closed;
+      }
 
       // Read the actual version from package.json
-      expect(version).toBe(packageJson.version);
-      expect(version).not.toBe('0.1.0'); // Ensure not hardcoded
-
-      server.kill();
-      await new Promise((resolve) => server.on('close', resolve));
+      const { serverInfo } = readInitializeResult(initResponse);
+      expect(serverInfo.version).toBe(packageJson.version);
+      expect(serverInfo.version).not.toBe('0.1.0'); // Ensure not hardcoded
     },
     timeout
   );
