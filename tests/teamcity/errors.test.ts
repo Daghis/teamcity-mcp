@@ -84,6 +84,32 @@ describe('TeamCity Error Classes', () => {
       expect(error.requestId).toBe('req-000');
     });
 
+    it('should not keep a streamed response body as details (avoids circular structure)', () => {
+      // A responseType 'stream' request yields a Node stream (socket) as
+      // response.data. It has circular references and must never be stored as
+      // details, or later serialization (logging / toJSON) throws.
+      const streamLikeBody = {
+        pipe: () => undefined,
+        on: () => undefined,
+        read: () => undefined,
+      };
+      const axiosError = {
+        response: {
+          status: 404,
+          data: streamLikeBody,
+        },
+        message: 'Request failed with status code 404',
+      } as unknown as AxiosError;
+
+      const error = TeamCityAPIError.fromAxiosError(axiosError, 'req-stream');
+
+      expect(error.details).toBeUndefined();
+      expect(error.code).toBe('HTTP_404');
+      expect(error.message).toBe('Request failed with status code 404');
+      // Serialization must not throw even though the raw body was circular.
+      expect(() => JSON.stringify(error.toJSON())).not.toThrow();
+    });
+
     it('should serialize to JSON', () => {
       const error = new TeamCityAPIError('Test', 'TEST', 500, { foo: 'bar' }, 'req-123');
       const json = error.toJSON();

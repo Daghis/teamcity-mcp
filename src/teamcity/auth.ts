@@ -10,6 +10,7 @@ import type {
 import { randomUUID } from 'crypto';
 
 import { TeamCityAPIError } from '@/teamcity/errors';
+import { destroyStream, isReadableStream, toBuffer } from '@/teamcity/utils/stream';
 import { info, error as logError } from '@/utils/logger';
 
 interface TimingMetaContainer {
@@ -140,13 +141,79 @@ export function logResponse(response: AxiosResponse): AxiosResponse {
 }
 
 /**
+ * Most time spent reading a streamed error body. The snapshot only adds detail
+ * to the error, so it must not hold up error handling or a fallback for long.
+ */
+const STREAM_BODY_TIMEOUT_MS = 5000;
+
+/**
+ * Drain a readable stream to a bounded UTF-8 string. Used to turn a streamed
+ * error-response body (a socket) into a small, usable error message without
+ * buffering an arbitrarily large payload. Reading stops once `maxBytes` have
+ * arrived, which destroys the stream instead of waiting for the rest of it.
+ */
+const streamToString = async (
+  stream: NodeJS.ReadableStream,
+  maxBytes = 64 * 1024
+): Promise<string> => {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of stream) {
+    const buf = toBuffer(chunk);
+    chunks.push(buf);
+    total += buf.length;
+    if (total >= maxBytes) {
+      break;
+    }
+  }
+  return Buffer.concat(chunks).toString('utf8').slice(0, maxBytes);
+};
+
+/**
+ * Snapshot a streamed error body within `timeoutMs`. A body that keeps trickling
+ * in would otherwise hold up error handling (and with it any fallback request)
+ * indefinitely. If reading fails or times out, the stream is destroyed and no
+ * snapshot is kept.
+ */
+const snapshotStreamBody = async (
+  stream: NodeJS.ReadableStream,
+  timeoutMs: number
+): Promise<string | undefined> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error('Timed out reading streamed error body')), timeoutMs);
+  });
+  try {
+    return await Promise.race([streamToString(stream), deadline]);
+  } catch {
+    destroyStream(stream);
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
  * Log error with request ID and transform
  */
-export function logAndTransformError(error: AxiosError | TeamCityAPIError): Promise<never> {
+export async function logAndTransformError(error: AxiosError | TeamCityAPIError): Promise<never> {
   // A request retried by axios-retry runs through this interceptor on its own, so
   // the outer request receives an error that was already transformed and logged
   if (error instanceof TeamCityAPIError) {
     return Promise.reject(error);
+  }
+
+  // When the request used responseType 'stream', error.response.data is an
+  // unconsumed Node stream (a socket with circular references). Drain it to a
+  // small text snapshot, bounded in size and time, so the error message is
+  // usable and the raw socket is never stored or serialized downstream.
+  const response = error.response;
+  if (response && isReadableStream(response.data)) {
+    const requestTimeout = error.config?.timeout ?? 0;
+    response.data = await snapshotStreamBody(
+      response.data,
+      requestTimeout > 0 ? Math.min(requestTimeout, STREAM_BODY_TIMEOUT_MS) : STREAM_BODY_TIMEOUT_MS
+    );
   }
 
   // Build a rich TeamCityAPIError instance so downstream handlers

@@ -15,6 +15,7 @@ import {
 import { TeamCityAPIError, isRetryableError } from '@/teamcity/errors';
 import type { TeamCityApiSurface } from '@/teamcity/types/client';
 import { toBuildLocator } from '@/teamcity/utils/build-locator';
+import { discardStreamBody, isReadableStream, sliceStreamLines } from '@/teamcity/utils/stream';
 import { info } from '@/utils/logger';
 
 import { AgentApi } from './teamcity-client/api/agent-api';
@@ -71,6 +72,26 @@ const extractRetryAfterMilliseconds = (value: unknown): number | undefined => {
   }
 
   return undefined;
+};
+
+const toOptionalLineNumber = (value: unknown): number | undefined => {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
+};
+
+const sliceLogData = (data: unknown, startLine: number, lineCount?: number): unknown => {
+  if (isReadableStream(data)) {
+    return sliceStreamLines(data, startLine, lineCount);
+  }
+  if (typeof data === 'string') {
+    const lines = data.split('\n');
+    const end = lineCount === undefined ? undefined : startLine + lineCount;
+    return lines.slice(startLine, end).join('\n');
+  }
+  return data;
 };
 
 interface NormalizedClientConfig {
@@ -151,6 +172,7 @@ export class TeamCityAPI {
     // Configure retry with exponential backoff and error classification
     axiosRetry(this.axiosInstance, {
       retries: 3,
+      onRetry: (_retryCount, error) => discardStreamBody(error.response?.data),
       retryDelay: (retryCount, error) => {
         const reqId = (error?.config as { requestId?: string } | undefined)?.requestId;
         const tcError = TeamCityAPIError.fromAxiosError(error, reqId);
@@ -478,30 +500,63 @@ export class TeamCityAPI {
     buildId: string,
     options?: RawAxiosRequestConfig<T>
   ): Promise<AxiosResponse<T>> {
-    const rawParams = (options?.params ?? undefined) as Record<string, unknown> | undefined;
-    const params = rawParams ? { ...rawParams } : {};
-    if (!Object.prototype.hasOwnProperty.call(params, 'plain')) {
-      params['plain'] = true;
-    }
-
+    const responseType = (options?.responseType ?? 'text') as RawAxiosRequestConfig['responseType'];
     const rawHeaders = (options?.headers ?? undefined) as Record<string, unknown> | undefined;
-    const headers = rawHeaders ? { ...rawHeaders } : {};
+    const headers = { Accept: 'text/plain', ...(rawHeaders ?? {}) };
+    const transformResponse = options?.transformResponse ?? [(data: unknown) => data];
+    const rawParams = (options?.params ?? undefined) as Record<string, unknown> | undefined;
 
-    const requestOptions: RawAxiosRequestConfig<T> = {
-      ...options,
-      params,
-      headers: {
-        Accept: 'text/plain',
-        ...headers,
-      },
-      responseType: (options?.responseType ?? 'text') as RawAxiosRequestConfig['responseType'],
-      transformResponse: options?.transformResponse ?? [(data) => data],
-    };
-
-    return this.axiosInstance.get<T>(
-      `/app/rest/builds/${toBuildLocator(buildId)}/log`,
-      requestOptions
-    );
+    // Primary: the officially documented build-log download endpoint. It takes
+    // the build id as a query parameter and returns the full log as plain text,
+    // and works with responseType 'stream' too. This is the only endpoint
+    // JetBrains documents for log download; the REST `/builds/{id}/log` path is
+    // undocumented and returns 404 on many server versions (it reports
+    // "Field 'log' is not supported"). It ignores line ranges, so start/count
+    // are applied locally to its response.
+    const { start, count, ...primaryParams } = rawParams ?? {};
+    const startLine = toOptionalLineNumber(start);
+    const lineCount = toOptionalLineNumber(count);
+    try {
+      const response = await this.axiosInstance.get<T>(`/downloadBuildLog.html`, {
+        ...options,
+        params: { ...primaryParams, buildId },
+        headers,
+        responseType,
+        transformResponse,
+      });
+      if (startLine === undefined && lineCount === undefined) {
+        return response;
+      }
+      return { ...response, data: sliceLogData(response.data, startLine ?? 0, lineCount) as T };
+    } catch (primaryError) {
+      // Fall back only when the failure is specific to this endpoint (e.g. a 404
+      // where the download page is unavailable). 401/403 come from the caller's
+      // credentials, 429/503 from server load, and a missing status from the
+      // network: the REST endpoint would fail the same way.
+      const status = primaryError instanceof TeamCityAPIError ? primaryError.statusCode : undefined;
+      if (status === undefined || [401, 403, 429, 503].includes(status)) {
+        throw primaryError;
+      }
+      // Fallback: the undocumented REST log endpoint, present on some server
+      // configurations. Uses plain=true and a build locator in the path.
+      const params = rawParams ? { ...rawParams } : {};
+      if (!Object.prototype.hasOwnProperty.call(params, 'plain')) {
+        params['plain'] = true;
+      }
+      try {
+        return await this.axiosInstance.get<T>(`/app/rest/builds/${toBuildLocator(buildId)}/log`, {
+          ...options,
+          params,
+          headers,
+          responseType,
+          transformResponse,
+        });
+      } catch {
+        // Report the documented endpoint's failure; the response interceptor has
+        // already logged the fallback's.
+        throw primaryError;
+      }
+    }
   }
 
   async getBuildStatistics(buildId: string, fields?: string): Promise<AxiosResponse<unknown>> {

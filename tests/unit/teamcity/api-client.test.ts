@@ -7,11 +7,12 @@ import {
   type InternalAxiosRequestConfig,
 } from 'axios';
 import type { IAxiosRetryConfig } from 'axios-retry';
+import { Readable } from 'stream';
 
 import { TeamCityAPI, TeamCityAPIClientConfig } from '@/api-client';
 import type { Build } from '@/teamcity-client/models/build';
 import type { Changes } from '@/teamcity-client/models/changes';
-import { TeamCityAPIError } from '@/teamcity/errors';
+import { TeamCityAPIError, TeamCityNetworkError } from '@/teamcity/errors';
 import * as logger from '@/utils/logger';
 
 const baseConfig: TeamCityAPIClientConfig = {
@@ -27,6 +28,10 @@ const createAxiosResponse = <T>(data: T): AxiosResponse<T> => ({
   headers: {},
   config: { headers: {} } as InternalAxiosRequestConfig,
 });
+
+// The response interceptor turns HTTP failures into TeamCityAPIErrors carrying the status.
+const notFound = (message = 'Request failed with status code 404'): TeamCityAPIError =>
+  new TeamCityAPIError(message, 'HTTP_404', 404);
 
 describe('TeamCityAPI unified surface', () => {
   beforeEach(() => {
@@ -87,6 +92,129 @@ describe('TeamCityAPI unified surface', () => {
     expect(response).toBe(mockResponse);
   });
 
+  it('downloads the build log from the documented .html endpoint', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const getSpy = jest
+      .spyOn(api.http, 'get')
+      .mockResolvedValue(createAxiosResponse<string>('log contents'));
+
+    const response = await api.downloadBuildLog('123', { responseType: 'stream' });
+
+    expect(getSpy).toHaveBeenCalledTimes(1);
+    const [url, config] = getSpy.mock.calls[0] as [
+      string,
+      { params?: Record<string, unknown>; responseType?: string },
+    ];
+    expect(url).toBe('/downloadBuildLog.html');
+    expect(config?.params).toMatchObject({ buildId: '123' });
+    expect(config?.responseType).toBe('stream');
+    expect(response.data).toBe('log contents');
+  });
+
+  it('applies start/count locally to the .html endpoint response', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const getSpy = jest
+      .spyOn(api.http, 'get')
+      .mockResolvedValue(createAxiosResponse<string>('l0\nl1\nl2\nl3\n'));
+
+    const response = await api.downloadBuildLog('123', { params: { start: 1, count: 2 } });
+
+    const [, config] = getSpy.mock.calls[0] as [string, { params?: Record<string, unknown> }];
+    expect(config?.params).toEqual({ buildId: '123' });
+    expect(response.data).toBe('l1\nl2');
+  });
+
+  it('streams only the requested line range from the .html endpoint', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    jest
+      .spyOn(api.http, 'get')
+      .mockResolvedValue(createAxiosResponse<Readable>(Readable.from(['l0\nl1', '\nl2\nl3\n'])));
+
+    const response = await api.downloadBuildLog<Readable>('123', {
+      params: { start: 1, count: 2 },
+      responseType: 'stream',
+    });
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of response.data) {
+      chunks.push(Buffer.from(chunk as Buffer));
+    }
+    expect(Buffer.concat(chunks).toString()).toBe('l1\nl2\n');
+  });
+
+  it('forwards start/count to the REST fallback', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const getSpy = jest
+      .spyOn(api.http, 'get')
+      .mockRejectedValueOnce(notFound())
+      .mockResolvedValueOnce(createAxiosResponse<string>('l1\nl2'));
+
+    const response = await api.downloadBuildLog('123', { params: { start: 1, count: 2 } });
+
+    const [, fallbackConfig] = getSpy.mock.calls[1] as [
+      string,
+      { params?: Record<string, unknown> },
+    ];
+    expect(fallbackConfig?.params).toEqual({ start: 1, count: 2, plain: true });
+    expect(response.data).toBe('l1\nl2');
+  });
+
+  it('falls back to the REST log endpoint when .html fails', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const getSpy = jest
+      .spyOn(api.http, 'get')
+      .mockRejectedValueOnce(notFound())
+      .mockResolvedValueOnce(createAxiosResponse<string>('fallback log'));
+
+    const response = await api.downloadBuildLog('123');
+
+    expect(getSpy).toHaveBeenCalledTimes(2);
+    expect(getSpy.mock.calls[0]?.[0]).toBe('/downloadBuildLog.html');
+    const [fallbackUrl, fallbackConfig] = getSpy.mock.calls[1] as [
+      string,
+      { params?: Record<string, unknown> },
+    ];
+    expect(fallbackUrl).toBe('/app/rest/builds/id:123/log');
+    expect(fallbackConfig?.params).toMatchObject({ plain: true });
+    expect(response.data).toBe('fallback log');
+  });
+
+  it('reports the .html failure when the REST fallback fails too', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const primaryError = notFound('Build with id 123 does not exist');
+    jest
+      .spyOn(api.http, 'get')
+      .mockRejectedValueOnce(primaryError)
+      .mockRejectedValueOnce(notFound("Field 'log' is not supported"));
+
+    await expect(api.downloadBuildLog('123')).rejects.toBe(primaryError);
+  });
+
+  it.each([401, 403, 429, 503])(
+    'does not fall back after HTTP %i from the .html endpoint',
+    async (status) => {
+      const api = TeamCityAPI.getInstance(baseConfig);
+      const primaryError = new TeamCityAPIError(
+        `Request failed with status code ${status}`,
+        `HTTP_${status}`,
+        status
+      );
+      const getSpy = jest.spyOn(api.http, 'get').mockRejectedValue(primaryError);
+
+      await expect(api.downloadBuildLog('123')).rejects.toBe(primaryError);
+      expect(getSpy).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('does not fall back when the .html request gets no HTTP response', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const networkError = new TeamCityNetworkError('connect ECONNREFUSED');
+    const getSpy = jest.spyOn(api.http, 'get').mockRejectedValue(networkError);
+
+    await expect(api.downloadBuildLog('123')).rejects.toBe(networkError);
+    expect(getSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('routes listSnapshotDependencies through the generated BuildApi and unwraps payload', async () => {
     const api = TeamCityAPI.getInstance(baseConfig);
     const dependencies = { build: [] };
@@ -104,6 +232,8 @@ describe('TeamCityAPI unified surface', () => {
 describe('TeamCityAPI when retries are exhausted', () => {
   // X-Request-ID of every attempt the server received (initial request + retries)
   const seenRequestIds: Array<string | string[] | undefined> = [];
+  // URL of every attempt, to tell the build-log endpoints apart
+  const seenUrls: Array<string | undefined> = [];
   let server: Server;
   let baseUrl: string;
   let logError: jest.SpiedFunction<typeof logger.error>;
@@ -111,6 +241,7 @@ describe('TeamCityAPI when retries are exhausted', () => {
   beforeAll(async () => {
     server = createServer((req, res) => {
       seenRequestIds.push(req.headers['x-request-id']);
+      seenUrls.push(req.url);
       res.writeHead(503, { 'Content-Type': 'application/json', Connection: 'close' });
       res.end(JSON.stringify({ message: 'Service Unavailable' }));
     });
@@ -132,6 +263,7 @@ describe('TeamCityAPI when retries are exhausted', () => {
 
   beforeEach(() => {
     seenRequestIds.length = 0;
+    seenUrls.length = 0;
     TeamCityAPI.reset();
     jest.spyOn(logger, 'info').mockImplementation(() => undefined);
     logError = jest.spyOn(logger, 'error').mockImplementation(() => undefined);
@@ -184,5 +316,21 @@ describe('TeamCityAPI when retries are exhausted', () => {
       undefined,
       expect.objectContaining({ code: 'HTTP_503', statusCode: 503 })
     );
+  });
+
+  it('ends a streamed build-log download on the 503 without falling back to REST', async () => {
+    const api = TeamCityAPI.getInstance({ baseUrl, token: 'test-token' });
+
+    const error = await api
+      .downloadBuildLog('42', { ...skipBackoff, responseType: 'stream' })
+      .catch((e: unknown) => e);
+
+    expect(seenUrls).toEqual(Array<string>(4).fill('/downloadBuildLog.html?buildId=42'));
+    expect(error).toMatchObject({
+      code: 'HTTP_503',
+      statusCode: 503,
+      details: JSON.stringify({ message: 'Service Unavailable' }),
+    });
+    expect(logError).toHaveBeenCalledTimes(1);
   });
 });
