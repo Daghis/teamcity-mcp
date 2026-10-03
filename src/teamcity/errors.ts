@@ -1,6 +1,8 @@
 /**
  * Custom error classes for TeamCity API operations
  */
+import { inspect } from 'node:util';
+
 import type { AxiosError } from 'axios';
 
 import { isReadableStream } from './utils/stream';
@@ -77,6 +79,11 @@ export class TeamCityAPIError extends Error {
       requestId: this.requestId,
       stack: this.stack,
     };
+  }
+
+  [inspect.custom](): Record<string, unknown> {
+    // Match JSON logging: the retained Axios error contains request credentials.
+    return this.toJSON();
   }
 }
 

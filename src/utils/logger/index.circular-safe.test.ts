@@ -1,5 +1,8 @@
+import { AxiosError, AxiosHeaders } from 'axios';
 import { inspect } from 'util';
 import type { Logform, Logger } from 'winston';
+
+import { TeamCityAPIError, TeamCityAuthenticationError } from '@/teamcity/errors';
 
 import { type TeamCityLogger, createLogger, safeStringify } from './index';
 
@@ -16,6 +19,24 @@ describe('TeamCityLogger circular-safe metadata', () => {
     circular['self'] = circular;
     return circular;
   };
+
+  const createOriginalError = (): AxiosError => {
+    const original = new AxiosError('Request failed', 'ERR_BAD_RESPONSE', {
+      headers: new AxiosHeaders({ authorization: 'Bearer SAMPLE_HEADER_SECRET' }),
+    });
+    original.request = { _header: 'Authorization: Bearer SAMPLE_REQUEST_SECRET' };
+    return original;
+  };
+
+  const createApiError = (): TeamCityAPIError =>
+    new TeamCityAPIError(
+      'Not found',
+      'HTTP_404',
+      404,
+      { buildId: '123' },
+      'safe-request',
+      createOriginalError()
+    );
 
   const formatForConsole = (logger: TeamCityLogger, info: Logform.TransformableInfo): string => {
     const [consoleTransport] = (logger as unknown as { winston: Logger }).winston.transports;
@@ -35,6 +56,75 @@ describe('TeamCityLogger circular-safe metadata', () => {
 
     expect(output.length).toBeLessThan(1200);
     expect(output).toContain('more characters');
+  });
+
+  const errorContainers: Array<[string, (error: TeamCityAPIError) => unknown]> = [
+    ['root', (error) => error],
+    ['nested object', (error) => ({ result: { error } })],
+    ['array', (error) => [error]],
+    ['Map', (error) => new Map([[error, error]])],
+    ['Set', (error) => new Set([error])],
+    ['shared references', (error) => ({ first: error, second: error })],
+  ];
+
+  it.each(errorContainers)('keeps request credentials out of %s error metadata', (_name, wrap) => {
+    const output = safeStringify(wrap(createApiError()));
+
+    expect(output).toContain('HTTP_404');
+    expect(output).toContain('safe-request');
+    expect(output).not.toContain('originalError');
+    expect(output).not.toContain('SAMPLE_HEADER_SECRET');
+    expect(output).not.toContain('SAMPLE_REQUEST_SECRET');
+  });
+
+  it('uses the safe error representation for subclasses and circular details', () => {
+    const error = new TeamCityAuthenticationError(
+      'Unauthorized',
+      'safe-request',
+      createOriginalError()
+    );
+    const output = safeStringify({ error, other: createCircular() });
+
+    expect(output).toContain('TeamCityAuthenticationError');
+    expect(output).toContain('AUTHENTICATION_ERROR');
+    expect(output).toContain('[Circular *1]');
+    expect(output).not.toContain('SAMPLE_HEADER_SECRET');
+    expect(output).not.toContain('SAMPLE_REQUEST_SECRET');
+
+    const circularError = new TeamCityAPIError(
+      'Failed',
+      'HTTP_500',
+      500,
+      createCircular(),
+      undefined,
+      createOriginalError()
+    );
+    expect(safeStringify({ error: circularError })).toContain('[Circular *1]');
+    expect(safeStringify({ error: circularError })).not.toContain('SAMPLE_HEADER_SECRET');
+  });
+
+  it('preserves ordinary shared references without marking them as circular', () => {
+    const shared = { buildId: '123' };
+    const output = safeStringify({ first: shared, second: shared });
+
+    expect(output.match(/buildId: '123'/g)).toHaveLength(2);
+    expect(output).not.toContain('[Circular');
+  });
+
+  it('keeps request credentials out of the development console formatter', () => {
+    const logger = createLogger({ enableConsole: true, enableFile: false, level: 'error' });
+    const output = formatForConsole(logger, {
+      level: 'error',
+      message: 'API request failed',
+      service: 'teamcity-mcp',
+      error: createApiError(),
+      [Symbol.for('level')]: 'error',
+    });
+
+    expect(output).toContain('HTTP_404');
+    expect(output).toContain('safe-request');
+    expect(output).not.toContain('SAMPLE_HEADER_SECRET');
+    expect(output).not.toContain('SAMPLE_REQUEST_SECRET');
   });
 
   it('falls back when a custom inspect hook throws', () => {
