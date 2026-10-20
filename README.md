@@ -12,9 +12,9 @@ A Model Control Protocol (MCP) server that bridges AI coding assistants with Jet
 </a>
 
 > [!NOTE]
-> **Project status (June 2026): stable, low-key maintenance.** This does what it set out to do and is no longer under active development. It still works and stays installable; issues and PRs may get slow or no response, and security fixes are best-effort.
+> **Project status (October 2026): stable, low-key maintenance.** This does what it set out to do and is no longer under active development. It still works and stays installable; issues and PRs may get slow or no response, and security fixes are best-effort.
 >
-> JetBrains now ships official AI integration for TeamCity — a built-in MCP and the [TeamCity CLI](https://github.com/JetBrains/teamcity-cli) with an installable agent skill — which is the better default for most workflows. See [_How this compares to JetBrains' official tooling_](#how-this-compares-to-jetbrains-official-tooling) below before adopting.
+> JetBrains now ships official AI integration for TeamCity — an MCP server built into TeamCity 2026.1+ and the [TeamCity CLI](https://github.com/JetBrains/teamcity-cli) with an installable agent skill — which is the better default for most workflows. See [_How this compares to JetBrains' official tooling_](#how-this-compares-to-jetbrains-official-tooling) below before adopting.
 
 ## Overview
 
@@ -54,13 +54,22 @@ See the [Tools Mode Matrix](docs/mcp-tools-mode-matrix.md) for the complete list
 
 ## How this compares to JetBrains' official tooling
 
-**As of June 2026,** JetBrains ships first-party AI integration for TeamCity: a built-in MCP endpoint and the [TeamCity CLI](https://github.com/JetBrains/teamcity-cli), which includes an installable agent skill. Together these are JetBrains' recommended path and cover the common AI workflows — reading logs, diagnosing failures, and rerunning builds — with no install and official support.
+**As of October 2026** (TeamCity 2026.2, TeamCity CLI 1.6), JetBrains ships two first-party paths for AI agents, both generally available and officially supported:
 
-teamcity-mcp predates that tooling and overlaps with it. Broadly, the official tooling is the better default today; teamcity-mcp's remaining edge is a broader set of write and management operations exposed as an MCP server. That gap is real but narrowing, and JetBrains' tooling is evolving quickly — so rather than pin down a feature-by-feature comparison here (it would go stale fast), check the current docs and pick what fits:
+- **Built-in MCP server** — every TeamCity 2026.1+ server (Cloud and On-Premises) exposes an MCP endpoint at `<server-url>/app/mcp`, so there's nothing to install. It's a deliberately small toolset: build logs, generic REST API `GET`/`POST` passthrough tools, and (since 2026.2) pipeline tools. By default it runs in a safe mode where the agent can read and queue personal builds; an opt-in "brave mode" lets it send arbitrary REST `POST` requests and edit or delete pipelines. Since 2026.2 you can also sign in with OAuth instead of pasting an access token.
+- **[TeamCity CLI](https://github.com/JetBrains/teamcity-cli)** — an open-source `teamcity` command (TeamCity 2020.1+) with an installable agent skill (`teamcity skill install`) for Claude Code, Cursor, and other agents. It covers runs, logs, tests, the queue, agents, pools, projects, VCS roots, parameters, and pipelines, falls back to raw REST access via `teamcity api`, and has a read-only mode (`TEAMCITY_RO=1`). JetBrains' own docs describe it as the broader of the two options.
 
-- [TeamCity 2026.1 announcement](https://blog.jetbrains.com/teamcity/2026/05/teamcity-20261/) — overview of the official AI integration
-- [AI agent integration docs](https://www.jetbrains.com/help/teamcity/ai-agent-integration.html) — the built-in MCP
-- [TeamCity CLI](https://github.com/JetBrains/teamcity-cli) — the terminal + agent-skill path
+teamcity-mcp predates that tooling and overlaps with it heavily. The official tooling is the better default today. What teamcity-mcp still offers is narrower than it used to be:
+
+- **An MCP server for servers older than 2026.1.** If your client speaks only MCP and your TeamCity server predates the built-in endpoint, this still works (TeamCity 2020.1+).
+- **Purpose-built MCP tools instead of a REST passthrough.** It exposes 87 typed tools (gated by Dev/Full mode), so the agent doesn't need to know REST paths and locators — and it covers operations backed by `PUT`/`DELETE` (such as enabling agents or deleting parameters), which the built-in MCP's generic `GET`/`POST` tools don't reach.
+
+JetBrains' tooling is evolving quickly, so rather than pin down a feature-by-feature comparison here (it would go stale fast), check the current docs and pick what fits:
+
+- [TeamCity 2026.2 announcement](https://blog.jetbrains.com/teamcity/2026/09/teamcity-20262/) — pipeline tools, brave mode, and OAuth for the built-in MCP
+- [TeamCity 2026.1 announcement](https://blog.jetbrains.com/teamcity/2026/05/teamcity-20261/) — where the official AI integration debuted
+- [AI agent integration docs](https://www.jetbrains.com/help/teamcity/ai-agent-integration.html) — the built-in MCP, its tools, and safe vs. brave mode
+- [TeamCity CLI docs](https://www.jetbrains.com/help/teamcity/teamcity-cli.html) and [agent skill](https://www.jetbrains.com/help/teamcity/teamcity-cli-ai-agent-integration.html) — the terminal + agent-skill path
 
 If you're comfortable with JetBrains' CLI, you may not need this project at all. It stays MIT-licensed and installable for whatever the built-ins don't yet reach — fork it if you want to take it further yourself.
 
