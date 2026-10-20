@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.9](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.8...teamcity-mcp-v2.12.9) (2026-10-20)
+
+
+### Bug Fixes
+
+* **security:** address open dependabot and npm audit alerts ([#545](https://github.com/Daghis/teamcity-mcp/issues/545)) ([2012e6b](https://github.com/Daghis/teamcity-mcp/commit/2012e6b6367bb0eb60958531a2548db86098ade4))
+
 ## [2.12.8](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.7...teamcity-mcp-v2.12.8) (2026-10-03)
 
 
