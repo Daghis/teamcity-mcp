@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.10](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.9...teamcity-mcp-v2.12.10) (2026-10-21)
+
+
+### Bug Fixes
+
+* **security:** bump follow-redirects to 1.16.1 ([#547](https://github.com/Daghis/teamcity-mcp/issues/547)) ([cc52893](https://github.com/Daghis/teamcity-mcp/commit/cc5289336b3db586d054bbbbace74e4fcee9988d))
+
 ## [2.12.9](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.8...teamcity-mcp-v2.12.9) (2026-10-20)
 
 
