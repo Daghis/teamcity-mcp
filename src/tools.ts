@@ -1901,12 +1901,14 @@ const DEV_TOOLS: ToolDefinition[] = [
               typeof typed.startLine === 'number'
                 ? typed.startLine
                 : ((typed.page ?? 1) - 1) * effectivePageSize;
+            const ranged =
+              typed.startLine !== undefined ||
+              typed.page !== undefined ||
+              typed.lineCount !== undefined ||
+              typed.pageSize !== undefined;
 
             const response = await adapter.downloadBuildLogContent<Readable>(effectiveBuildId, {
-              params: {
-                start: startLine,
-                count: effectivePageSize,
-              },
+              params: ranged ? { start: startLine, count: effectivePageSize } : undefined,
               responseType: 'stream',
             });
 
@@ -1933,8 +1935,8 @@ const DEV_TOOLS: ToolDefinition[] = [
                 buildNumber:
                   typeof typed.buildNumber !== 'undefined' ? String(typed.buildNumber) : undefined,
                 buildTypeId: typed.buildTypeId,
-                page,
-                pageSize: effectivePageSize,
+                page: ranged ? page : undefined,
+                pageSize: ranged ? effectivePageSize : undefined,
                 startLine,
               },
             });
