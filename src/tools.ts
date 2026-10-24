@@ -1838,12 +1838,11 @@ const DEV_TOOLS: ToolDefinition[] = [
           const attemptBuffered = async () => {
             if (typed.tail) {
               const count = typed.lineCount ?? typed.pageSize ?? 500;
-              const full = await adapter.getBuildLog(effectiveBuildId);
-              const allLines = full.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-              if (allLines.length > 0 && allLines[allLines.length - 1] === '') allLines.pop();
-              const total = allLines.length;
-              const start = Math.max(0, total - count);
-              const lines = allLines.slice(start);
+              const { lines, totalLines: total } = await adapter.getBuildLogTail(
+                effectiveBuildId,
+                count
+              );
+              const start = total - lines.length;
 
               return json({
                 lines,
@@ -1902,12 +1901,14 @@ const DEV_TOOLS: ToolDefinition[] = [
               typeof typed.startLine === 'number'
                 ? typed.startLine
                 : ((typed.page ?? 1) - 1) * effectivePageSize;
+            const ranged =
+              typed.startLine !== undefined ||
+              typed.page !== undefined ||
+              typed.lineCount !== undefined ||
+              typed.pageSize !== undefined;
 
             const response = await adapter.downloadBuildLogContent<Readable>(effectiveBuildId, {
-              params: {
-                start: startLine,
-                count: effectivePageSize,
-              },
+              params: ranged ? { start: startLine, count: effectivePageSize } : undefined,
               responseType: 'stream',
             });
 
@@ -1934,8 +1935,8 @@ const DEV_TOOLS: ToolDefinition[] = [
                 buildNumber:
                   typeof typed.buildNumber !== 'undefined' ? String(typed.buildNumber) : undefined,
                 buildTypeId: typed.buildTypeId,
-                page,
-                pageSize: effectivePageSize,
+                page: ranged ? page : undefined,
+                pageSize: ranged ? effectivePageSize : undefined,
                 startLine,
               },
             });

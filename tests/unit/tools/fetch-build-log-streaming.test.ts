@@ -106,6 +106,49 @@ describe('tools: fetch_build_log streaming', () => {
     }
   });
 
+  it('streams the whole log when no line range is requested', async () => {
+    const chunks = ['line 1\n', 'line 2\n'];
+    const downloadBuildLogContent = jest.fn().mockResolvedValue({ data: Readable.from(chunks) });
+    const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue({ downloadBuildLogContent });
+    const getInstance = jest.fn().mockReturnValue({});
+
+    jest.doMock('@/teamcity/client-adapter', () => ({ createAdapterFromTeamCityAPI }));
+    jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance } }));
+
+    let handler:
+      | ((args: unknown) => Promise<{ content?: Array<{ text?: string }>; success?: boolean }>)
+      | undefined;
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { getRequiredTool } = require('@/tools');
+      handler = getRequiredTool('fetch_build_log').handler;
+    });
+
+    if (!handler) {
+      throw new Error('fetch_build_log handler not found');
+    }
+
+    const targetPath = join(tmpdir(), `fetch-log-full-${Date.now()}.log`);
+
+    try {
+      const response = await handler({
+        buildId: '123',
+        encoding: 'stream',
+        outputPath: targetPath,
+      });
+
+      const payload = JSON.parse(response.content?.[0]?.text ?? '{}');
+      expect(payload.meta).toMatchObject({ buildId: '123', startLine: 0 });
+      expect(payload.meta.pageSize).toBeUndefined();
+      const [, options] = downloadBuildLogContent.mock.calls[0] ?? [];
+      expect(options).toMatchObject({ responseType: 'stream' });
+      expect(options.params).toBeUndefined();
+      await expect(fs.readFile(targetPath, 'utf8')).resolves.toBe(chunks.join(''));
+    } finally {
+      await fs.rm(targetPath, { force: true });
+    }
+  });
+
   it('rejects streaming mode with tail queries', async () => {
     const getInstance = jest.fn().mockReturnValue({});
     jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance } }));
