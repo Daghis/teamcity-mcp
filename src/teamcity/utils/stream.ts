@@ -1,4 +1,5 @@
 import { Readable } from 'stream';
+import { StringDecoder } from 'string_decoder';
 
 /**
  * Detect an (unconsumed) Node readable stream, e.g. an Axios response body
@@ -95,4 +96,84 @@ export const sliceStreamLines = (
     destroySlice(error, callback);
   };
   return slice;
+};
+
+const LINE_BREAK = /\r\n|\r|\n/;
+
+async function* readLines(source: NodeJS.ReadableStream): AsyncGenerator<string> {
+  const decoder = new StringDecoder('utf8');
+  let pending = '';
+  for await (const raw of source) {
+    let text = pending + decoder.write(toBuffer(raw));
+    const heldBack = text.endsWith('\r') ? '\r' : '';
+    if (heldBack) {
+      text = text.slice(0, -1);
+    }
+    const lines = text.split(LINE_BREAK);
+    pending = (lines.pop() ?? '') + heldBack;
+    yield* lines;
+  }
+  const rest = pending + decoder.end();
+  if (rest) {
+    const lines = rest.split(LINE_BREAK);
+    if (lines[lines.length - 1] === '') {
+      lines.pop();
+    }
+    yield* lines;
+  }
+}
+
+export interface StreamedLineRange {
+  lines: string[];
+  startLine: number;
+  nextStartLine?: number;
+  totalLines?: number;
+}
+
+/** The source is closed right after the range, so `totalLines` is only known when the range reaches the end. */
+export const readLineRange = async (
+  source: NodeJS.ReadableStream,
+  startLine: number,
+  lineCount: number
+): Promise<StreamedLineRange> => {
+  const endLine = startLine + lineCount;
+  const lines: string[] = [];
+  let index = 0;
+  try {
+    for await (const line of readLines(source)) {
+      if (index >= endLine) {
+        return { lines, startLine, nextStartLine: endLine };
+      }
+      if (index >= startLine) {
+        lines.push(line);
+      }
+      index += 1;
+    }
+  } finally {
+    destroyStream(source);
+  }
+  return { lines, startLine: Math.min(startLine, index), totalLines: index };
+};
+
+export const readLastLines = async (
+  source: NodeJS.ReadableStream,
+  lineCount: number
+): Promise<{ lines: string[]; totalLines: number }> => {
+  const window: string[] = [];
+  let totalLines = 0;
+  try {
+    for await (const line of readLines(source)) {
+      if (lineCount > 0) {
+        window[totalLines % lineCount] = line;
+      }
+      totalLines += 1;
+    }
+  } finally {
+    destroyStream(source);
+  }
+  if (totalLines <= lineCount) {
+    return { lines: window, totalLines };
+  }
+  const oldest = totalLines % lineCount;
+  return { lines: [...window.slice(oldest), ...window.slice(0, oldest)], totalLines };
 };

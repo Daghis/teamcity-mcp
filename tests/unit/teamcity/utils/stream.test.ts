@@ -4,6 +4,8 @@ import {
   destroyStream,
   discardStreamBody,
   isReadableStream,
+  readLastLines,
+  readLineRange,
   sliceStreamLines,
   toBuffer,
 } from '@/teamcity/utils/stream';
@@ -136,5 +138,123 @@ describe('sliceStreamLines', () => {
     slice.destroy();
 
     expect(source.destroyed).toBe(true);
+  });
+});
+
+const endlessLog = (): Readable & { served: () => number } => {
+  let served = 0;
+  const source = new Readable({
+    read() {
+      served += 1;
+      this.push(`line-${served - 1}\n`);
+    },
+  });
+  return Object.assign(source, { served: () => served });
+};
+
+describe('readLineRange', () => {
+  it('returns the requested lines across chunk boundaries and CRLF splits', async () => {
+    const source = Readable.from([
+      Buffer.from('l0\r'),
+      Buffer.from('\nl1\rl'),
+      Buffer.from('2\nl3'),
+    ]);
+
+    await expect(readLineRange(source, 1, 2)).resolves.toEqual({
+      lines: ['l1', 'l2'],
+      startLine: 1,
+      nextStartLine: 3,
+    });
+  });
+
+  it('reports the total when the range reaches the end of the log', async () => {
+    const source = Readable.from([Buffer.from('l0\nl1\nl2\n')]);
+
+    await expect(readLineRange(source, 1, 5)).resolves.toEqual({
+      lines: ['l1', 'l2'],
+      startLine: 1,
+      totalLines: 3,
+    });
+  });
+
+  it('clamps a start beyond the end of the log', async () => {
+    const source = Readable.from([Buffer.from('l0\nl1')]);
+
+    await expect(readLineRange(source, 10, 5)).resolves.toEqual({
+      lines: [],
+      startLine: 2,
+      totalLines: 2,
+    });
+  });
+
+  it('decodes multi-byte characters split across chunks', async () => {
+    const bytes = Buffer.from('größe\n');
+    const source = Readable.from([bytes.subarray(0, 3), bytes.subarray(3)]);
+
+    await expect(readLineRange(source, 0, 1)).resolves.toMatchObject({ lines: ['größe'] });
+  });
+
+  it('stops reading the source once the line after the range has arrived', async () => {
+    const source = endlessLog();
+
+    await expect(readLineRange(source, 2, 3)).resolves.toEqual({
+      lines: ['line-2', 'line-3', 'line-4'],
+      startLine: 2,
+      nextStartLine: 5,
+    });
+    expect(source.destroyed).toBe(true);
+    expect(source.served()).toBeLessThan(50);
+  });
+
+  it('destroys the source when reading fails', async () => {
+    const source = new Readable({
+      read() {
+        this.destroy(new Error('socket hang up'));
+      },
+    });
+
+    await expect(readLineRange(source, 0, 5)).rejects.toThrow('socket hang up');
+    expect(source.destroyed).toBe(true);
+  });
+});
+
+describe('readLastLines', () => {
+  it('keeps only the trailing window of the log', async () => {
+    const source = Readable.from([Buffer.from('l0\nl1\nl2\nl3\nl4\n')]);
+
+    await expect(readLastLines(source, 2)).resolves.toEqual({
+      lines: ['l3', 'l4'],
+      totalLines: 5,
+    });
+  });
+
+  it('returns the whole log when it is shorter than the window', async () => {
+    const source = Readable.from([Buffer.from('l0\nl1')]);
+
+    await expect(readLastLines(source, 5)).resolves.toEqual({
+      lines: ['l0', 'l1'],
+      totalLines: 2,
+    });
+  });
+
+  it('counts the lines of a log without returning any for a zero window', async () => {
+    const source = Readable.from([Buffer.from('l0\nl1\n')]);
+
+    await expect(readLastLines(source, 0)).resolves.toEqual({ lines: [], totalLines: 2 });
+  });
+
+  it('returns the last lines of a long log in order', async () => {
+    let served = 0;
+    const source = new Readable({
+      read() {
+        served += 1;
+        this.push(served > 10_000 ? null : `line-${served - 1}\n`);
+      },
+    });
+
+    await expect(readLastLines(source, 3)).resolves.toEqual({
+      lines: ['line-9997', 'line-9998', 'line-9999'],
+      totalLines: 10_000,
+    });
   });
 });
