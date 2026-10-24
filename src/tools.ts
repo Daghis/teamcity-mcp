@@ -1838,12 +1838,11 @@ const DEV_TOOLS: ToolDefinition[] = [
           const attemptBuffered = async () => {
             if (typed.tail) {
               const count = typed.lineCount ?? typed.pageSize ?? 500;
-              const full = await adapter.getBuildLog(effectiveBuildId);
-              const allLines = full.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-              if (allLines.length > 0 && allLines[allLines.length - 1] === '') allLines.pop();
-              const total = allLines.length;
-              const start = Math.max(0, total - count);
-              const lines = allLines.slice(start);
+              const { lines, totalLines: total } = await adapter.getBuildLogTail(
+                effectiveBuildId,
+                count
+              );
+              const start = total - lines.length;
 
               return json({
                 lines,

@@ -4,6 +4,7 @@
  */
 import axios, { type AxiosInstance, type AxiosResponse, type RawAxiosRequestConfig } from 'axios';
 import axiosRetry from 'axios-retry';
+import { Readable } from 'stream';
 
 import { getTeamCityExtraHeaders, getTeamCityToken, getTeamCityUrl } from '@/config';
 import {
@@ -15,7 +16,13 @@ import {
 import { TeamCityAPIError, isRetryableError } from '@/teamcity/errors';
 import type { TeamCityApiSurface } from '@/teamcity/types/client';
 import { toBuildLocator } from '@/teamcity/utils/build-locator';
-import { discardStreamBody, isReadableStream, sliceStreamLines } from '@/teamcity/utils/stream';
+import {
+  discardStreamBody,
+  isReadableStream,
+  readLastLines,
+  readLineRange,
+  sliceStreamLines,
+} from '@/teamcity/utils/stream';
 import { info } from '@/utils/logger';
 
 import { AgentApi } from './teamcity-client/api/agent-api';
@@ -421,20 +428,22 @@ export class TeamCityAPI {
         nextStartLine: lines.length === lineCount ? startLine + lines.length : undefined,
       };
     } catch {
-      // Fallback: fetch full log then slice locally
-      const full = await this.getBuildLog(buildId);
-      const allLines = full.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-      if (allLines.length > 0 && allLines[allLines.length - 1] === '') allLines.pop();
-      const start = Math.max(0, Math.min(startLine, allLines.length));
-      const end = Math.min(allLines.length, start + lineCount);
-      const slice = allLines.slice(start, end);
-      return {
-        lines: slice,
-        startLine: start,
-        nextStartLine: end < allLines.length ? end : undefined,
-        totalLines: allLines.length,
-      };
+      // Fallback: stream the full log and keep only the requested lines
+      return readLineRange(await this.streamBuildLog(buildId), startLine, lineCount);
     }
+  }
+
+  async getBuildLogTail(
+    buildId: string,
+    lineCount: number
+  ): Promise<{ lines: string[]; totalLines: number }> {
+    return readLastLines(await this.streamBuildLog(buildId), lineCount);
+  }
+
+  private async streamBuildLog(buildId: string): Promise<NodeJS.ReadableStream> {
+    const response = await this.downloadBuildLog<unknown>(buildId, { responseType: 'stream' });
+    const data = response.data;
+    return isReadableStream(data) ? data : Readable.from([String(data ?? '')]);
   }
 
   async listBuildTypes(projectId?: string) {
