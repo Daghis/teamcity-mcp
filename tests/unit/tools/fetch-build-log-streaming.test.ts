@@ -149,6 +149,103 @@ describe('tools: fetch_build_log streaming', () => {
     }
   });
 
+  it('refuses a log that would not fit on the target disk', async () => {
+    const GiB = 1024 ** 3;
+    const stream = Readable.from(['line 1\n']);
+    const downloadBuildLogContent = jest.fn().mockResolvedValue({
+      data: stream,
+      headers: { 'content-length': String(3 * GiB) },
+    });
+    const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue({ downloadBuildLogContent });
+    const getInstance = jest.fn().mockReturnValue({});
+    const statfs = jest
+      .spyOn(fs, 'statfs')
+      .mockResolvedValue({ bavail: 2 * GiB, bsize: 1 } as Awaited<ReturnType<typeof fs.statfs>>);
+
+    jest.doMock('@/teamcity/client-adapter', () => ({ createAdapterFromTeamCityAPI }));
+    jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance } }));
+
+    let handler:
+      | ((args: unknown) => Promise<{ content?: Array<{ text?: string }>; success?: boolean }>)
+      | undefined;
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { getRequiredTool } = require('@/tools');
+      handler = getRequiredTool('fetch_build_log').handler;
+    });
+
+    if (!handler) {
+      throw new Error('fetch_build_log handler not found');
+    }
+
+    const targetPath = join(tmpdir(), `fetch-log-too-large-${Date.now()}.log`);
+
+    try {
+      const response = await handler({
+        buildId: '123',
+        encoding: 'stream',
+        outputPath: targetPath,
+      });
+
+      const payload = JSON.parse(response.content?.[0]?.text ?? '{}');
+      expect(payload.success).toBe(false);
+      expect(payload.error?.message).toContain('Not enough disk space');
+      expect(payload.error?.message).toContain('3.00 GiB needed, 2.00 GiB free');
+      await expect(fs.access(targetPath)).rejects.toThrow();
+      expect(stream.destroyed).toBe(true);
+    } finally {
+      statfs.mockRestore();
+      await fs.rm(targetPath, { force: true });
+    }
+  });
+
+  it('lets minFreeDiskMb lower the reserve that blocks a download', async () => {
+    const GiB = 1024 ** 3;
+    const downloadBuildLogContent = jest.fn().mockResolvedValue({
+      data: Readable.from(['line 1\n']),
+      headers: { 'content-length': String(1.5 * GiB) },
+    });
+    const createAdapterFromTeamCityAPI = jest.fn().mockReturnValue({ downloadBuildLogContent });
+    const getInstance = jest.fn().mockReturnValue({});
+    const statfs = jest
+      .spyOn(fs, 'statfs')
+      .mockResolvedValue({ bavail: 2 * GiB, bsize: 1 } as Awaited<ReturnType<typeof fs.statfs>>);
+
+    jest.doMock('@/teamcity/client-adapter', () => ({ createAdapterFromTeamCityAPI }));
+    jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance } }));
+
+    let handler:
+      | ((args: unknown) => Promise<{ content?: Array<{ text?: string }>; success?: boolean }>)
+      | undefined;
+    jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { getRequiredTool } = require('@/tools');
+      handler = getRequiredTool('fetch_build_log').handler;
+    });
+
+    if (!handler) {
+      throw new Error('fetch_build_log handler not found');
+    }
+
+    const targetPath = join(tmpdir(), `fetch-log-small-reserve-${Date.now()}.log`);
+
+    try {
+      const response = await handler({
+        buildId: '123',
+        encoding: 'stream',
+        outputPath: targetPath,
+        minFreeDiskMb: 100,
+      });
+
+      const payload = JSON.parse(response.content?.[0]?.text ?? '{}');
+      expect(payload.encoding).toBe('stream');
+      await expect(fs.readFile(targetPath, 'utf8')).resolves.toBe('line 1\n');
+    } finally {
+      statfs.mockRestore();
+      await fs.rm(targetPath, { force: true });
+    }
+  });
+
   it('rejects streaming mode with tail queries', async () => {
     const getInstance = jest.fn().mockReturnValue({});
     jest.doMock('@/api-client', () => ({ TeamCityAPI: { getInstance } }));
