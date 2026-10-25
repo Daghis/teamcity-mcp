@@ -49,9 +49,10 @@ serialDescribe('E2E scenario: full setup → dev reads → full teardown', () =>
       { tool: 'get_project', args: { projectId: fixture.projectId } },
     ]);
 
+    const { projectId } = fixture;
     const list = results[0]?.result as ListResult<ProjectRef> | undefined;
     expect(Array.isArray(list?.items)).toBe(true);
-    const foundProj = (list?.items ?? []).find((p) => p.id === fixture!.projectId);
+    const foundProj = (list?.items ?? []).find((p) => p.id === projectId);
     expect(Boolean(foundProj)).toBe(true);
 
     const proj = results[1]?.result as ProjectRef | undefined;
@@ -66,9 +67,10 @@ serialDescribe('E2E scenario: full setup → dev reads → full teardown', () =>
       { tool: 'get_build_config', args: { buildTypeId: fixture.buildTypeId } },
     ]);
 
+    const { buildTypeId } = fixture;
     const list = results[0]?.result as ListResult<BuildTypeSummary> | undefined;
     expect(Array.isArray(list?.items)).toBe(true);
-    const hasBt = (list?.items ?? []).some((b) => b.id === fixture!.buildTypeId);
+    const hasBt = (list?.items ?? []).some((b) => b.id === buildTypeId);
     expect(hasBt).toBe(true);
 
     const cfg = results[1]?.result as BuildTypeSummary | undefined;
