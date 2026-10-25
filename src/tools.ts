@@ -1642,6 +1642,7 @@ const DEV_TOOLS: ToolDefinition[] = [
 
           while (true) {
             pollCount++;
+            // eslint-disable-next-line no-await-in-loop -- each poll must finish before deciding whether to continue
             const result = await statusManager.getBuildStatus({
               buildId: typed.buildId,
               buildNumber: typed.buildNumber,
@@ -1664,6 +1665,7 @@ const DEV_TOOLS: ToolDefinition[] = [
               return json({ ...result, timedOut: true, pollCount, waitSeconds });
             }
 
+            // eslint-disable-next-line no-await-in-loop -- intentional delay between sequential polls
             await sleep(typed.pollInterval * 1000);
           }
         },

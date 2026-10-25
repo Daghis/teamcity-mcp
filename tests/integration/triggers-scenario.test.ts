@@ -48,7 +48,8 @@ describe('Build triggers: add and delete (full) with dev verification', () => {
       projectId: fixture.projectId,
       fields: 'buildType(id,triggers(trigger(id,type)))',
     });
-    const entry = (cfgs.items ?? []).find((b) => b.id === fixture!.buildTypeId);
+    const { buildTypeId } = fixture;
+    const entry = (cfgs.items ?? []).find((b) => b.id === buildTypeId);
     if (!entry?.triggers?.trigger?.length) return expect(true).toBe(true);
     const triggerId = entry.triggers.trigger[0]?.id as string | undefined;
     expect(typeof triggerId).toBe('string');
