@@ -110,7 +110,7 @@ async function* readLines(source: NodeJS.ReadableStream): AsyncGenerator<string>
       text = text.slice(0, -1);
     }
     const lines = text.split(LINE_BREAK);
-    pending = (lines.pop() ?? '') + heldBack;
+    pending = lines.splice(-1).join('') + heldBack;
     yield* lines;
   }
   const rest = pending + decoder.end();

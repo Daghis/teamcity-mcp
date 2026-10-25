@@ -177,6 +177,16 @@ describe('readLineRange', () => {
     });
   });
 
+  it('treats a carriage return at the very end as a line break', async () => {
+    const source = Readable.from([Buffer.from('l0\r\nl1\r')]);
+
+    await expect(readLineRange(source, 0, 5)).resolves.toEqual({
+      lines: ['l0', 'l1'],
+      startLine: 0,
+      totalLines: 2,
+    });
+  });
+
   it('clamps a start beyond the end of the log', async () => {
     const source = Readable.from([Buffer.from('l0\nl1')]);
 
