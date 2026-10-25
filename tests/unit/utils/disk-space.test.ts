@@ -13,7 +13,7 @@ const GiB = 1024 ** 3;
 const MiB = 1024 ** 2;
 
 const mockFreeBytes = (...freeBytes: number[]) => {
-  const spy = jest.spyOn(fs, 'statfs');
+  const spy = jest.spyOn(fs, 'statfs').mockRejectedValue(new Error('unexpected statfs call'));
   freeBytes.forEach((bytes) =>
     spy.mockResolvedValueOnce({ bavail: bytes, bsize: 1 } as Awaited<ReturnType<typeof fs.statfs>>)
   );
@@ -85,7 +85,7 @@ describe('createDiskSpaceGuard', () => {
   });
 
   it('passes data through while enough space stays free', async () => {
-    mockFreeBytes(5 * GiB, 5 * GiB);
+    mockFreeBytes(5 * GiB, 5 * GiB, 5 * GiB);
     const { sink, written } = collect();
 
     await pipeline(

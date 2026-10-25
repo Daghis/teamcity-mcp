@@ -1936,7 +1936,6 @@ const DEV_TOOLS: ToolDefinition[] = [
             const defaultFileName = `build-log-${safeBuildId}-${startLine}-${randomUUID()}.log`;
             const targetPath = typed.outputPath ?? join(tmpdir(), defaultFileName);
             const targetDir = dirname(targetPath);
-            await fs.mkdir(targetDir, { recursive: true });
             const contentLength = Number(response.headers?.['content-length']);
             const minFreeBytes =
               typed.minFreeDiskMb === undefined
@@ -1944,6 +1943,7 @@ const DEV_TOOLS: ToolDefinition[] = [
                 : typed.minFreeDiskMb * 1024 ** 2;
             let freeBytes: number;
             try {
+              await fs.mkdir(targetDir, { recursive: true });
               freeBytes = await assertDiskSpace(
                 targetDir,
                 !ranged && Number.isFinite(contentLength) ? contentLength : 0,
