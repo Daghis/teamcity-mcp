@@ -1,6 +1,8 @@
 /**
  * Configuration management for TeamCity MCP Server
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import { z } from 'zod';
 
 import type { ApplicationConfig } from '@/types/config';
@@ -162,6 +164,10 @@ let serverInstance: import('@modelcontextprotocol/sdk/server/index.js').Server |
  * Checks runtime override first, then falls back to environment variable
  */
 export function getMCPMode(): 'dev' | 'full' {
+  const session = sessionContext.getStore();
+  if (session?.mode) {
+    return session.mode;
+  }
   if (runtimeMCPMode !== null) {
     return runtimeMCPMode;
   }
@@ -172,7 +178,30 @@ export function getMCPMode(): 'dev' | 'full' {
  * Set MCP mode at runtime
  */
 export function setMCPMode(mode: 'dev' | 'full'): void {
+  const session = sessionContext.getStore();
+  if (session) {
+    session.mode = mode;
+    return;
+  }
   runtimeMCPMode = mode;
+}
+
+/**
+ * Per-client state of one HTTP session. Several MCP sessions share the process in HTTP mode,
+ * so a runtime mode switch must only affect the session that asked for it.
+ */
+export interface SessionState {
+  mode: 'dev' | 'full' | null;
+  server: import('@modelcontextprotocol/sdk/server/index.js').Server;
+}
+
+const sessionContext = new AsyncLocalStorage<SessionState>();
+
+/**
+ * Run `fn` with `state` as the current session, so mode and server lookups resolve to it
+ */
+export function runInSession<T>(state: SessionState, fn: () => T): T {
+  return sessionContext.run(state, fn);
 }
 
 /**
@@ -190,7 +219,7 @@ export function setServerInstance(
 export function getServerInstance():
   | import('@modelcontextprotocol/sdk/server/index.js').Server
   | null {
-  return serverInstance;
+  return sessionContext.getStore()?.server ?? serverInstance;
 }
 
 /**

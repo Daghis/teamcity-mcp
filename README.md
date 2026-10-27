@@ -162,6 +162,20 @@ Or use a config file for better security (token not visible in process list):
 }
 ```
 
+### One shared server over HTTP
+
+With stdio, every MCP client session starts its own server process. If you run many sessions at once (several Claude Code windows, agents), start one server over Streamable HTTP instead and point all clients at it:
+
+```bash
+teamcity-mcp --config ~/.config/teamcity-mcp/teamcity.env --http --port 3000
+claude mcp add --transport http -s user teamcity http://127.0.0.1:3000/mcp
+```
+
+- Endpoint `/mcp`; options `--http`, `--host` (default `127.0.0.1`) and `--port` (default `3000`), or `MCP_TRANSPORT=http`, `MCP_HTTP_HOST` and `MCP_HTTP_PORT`.
+- Each client gets its own MCP session; a runtime switch with `set_mcp_mode` only affects the session that made it.
+- The server has no authentication of its own and uses one TeamCity token for all sessions. Keep it on loopback: it rejects requests whose `Host` or browser `Origin` is not a loopback name or the bind address.
+- After a server restart, clients get `404` for their old session and re-initialize on their own.
+
 ## Configuration
 
 Environment is validated centrally with Zod. Supported variables and defaults:

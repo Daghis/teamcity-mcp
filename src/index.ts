@@ -7,6 +7,12 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import * as dotenv from 'dotenv';
 
 import { getTeamCityToken, getTeamCityUrl, setServerInstance } from '@/config';
+import {
+  DEFAULT_HTTP_HOST,
+  DEFAULT_HTTP_PORT,
+  type RunningHttpServer,
+  startHttpServer,
+} from '@/http-server';
 import { startServerLifecycle } from '@/server-runner';
 import { getHelpText, getVersion, parseCliArgs } from '@/utils/cli-args';
 import { loadEnvFile } from '@/utils/env-file';
@@ -62,7 +68,12 @@ if (cliArgs.mode) {
 
 let activeServer: Server | null = null;
 let lifecyclePromise: Promise<void> | null = null;
+let httpServer: RunningHttpServer | null = null;
 let shuttingDown = false;
+
+const useHttp = cliArgs.http === true || process.env['MCP_TRANSPORT'] === 'http';
+const httpHost = cliArgs.host ?? process.env['MCP_HTTP_HOST'] ?? DEFAULT_HTTP_HOST;
+const httpPort = cliArgs.port ?? (Number(process.env['MCP_HTTP_PORT']) || DEFAULT_HTTP_PORT);
 
 const clearServerState = () => {
   activeServer = null;
@@ -81,6 +92,7 @@ async function shutdown(exitCode: number): Promise<never> {
     const serverToClose = activeServer;
     const lifecycleToAwait = lifecyclePromise;
 
+    await httpServer?.close();
     await serverToClose?.close();
     await lifecycleToAwait;
   } catch (error) {
@@ -115,6 +127,18 @@ async function main() {
 
     process.stderr.write('Starting TeamCity MCP Server\n');
     process.stderr.write(`TeamCity URL: ${hasUrl}\n`);
+
+    if (useHttp) {
+      httpServer = await startHttpServer({
+        host: httpHost,
+        port: httpPort,
+        createServer: createSimpleServer,
+      });
+      process.stderr.write(
+        `TeamCity MCP Server is listening on http://${httpHost}:${httpServer.port}/mcp\n`
+      );
+      return;
+    }
 
     // Create and start server
     const server = createSimpleServer();
