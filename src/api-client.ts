@@ -5,7 +5,12 @@
 import axios, { type AxiosInstance, type AxiosResponse, type RawAxiosRequestConfig } from 'axios';
 import axiosRetry from 'axios-retry';
 
-import { getTeamCityExtraHeaders, getTeamCityToken, getTeamCityUrl } from '@/config';
+import {
+  getSessionState,
+  getTeamCityExtraHeaders,
+  getTeamCityToken,
+  getTeamCityUrl,
+} from '@/config';
 import {
   addRequestId,
   logAndTransformError,
@@ -104,6 +109,7 @@ interface NormalizedClientConfig {
 export class TeamCityAPI {
   private static instance: TeamCityAPI | undefined;
   private static instanceConfig: NormalizedClientConfig | undefined;
+  private static sessionInstances = new Map<string, TeamCityAPI>();
   private readonly axiosInstance: AxiosInstance;
   private readonly config: Configuration;
   private readonly baseUrl: string;
@@ -287,6 +293,22 @@ export class TeamCityAPI {
       this.instance = new TeamCityAPI(requestedConfig);
       this.instanceConfig = requestedConfig;
       return this.instance;
+    }
+
+    const sessionToken = getSessionState()?.teamcityToken;
+    if (sessionToken) {
+      let sessionInstance = this.sessionInstances.get(sessionToken);
+      if (sessionInstance == null) {
+        sessionInstance = new TeamCityAPI(
+          this.normalizeConfig({
+            baseUrl: getTeamCityUrl(),
+            token: sessionToken,
+            extraHeaders: getTeamCityExtraHeaders(),
+          })
+        );
+        this.sessionInstances.set(sessionToken, sessionInstance);
+      }
+      return sessionInstance;
     }
 
     if (this.instance == null) {
@@ -615,6 +637,7 @@ export class TeamCityAPI {
   static reset() {
     this.instance = undefined;
     this.instanceConfig = undefined;
+    this.sessionInstances.clear();
   }
 
   private createApi<T>(

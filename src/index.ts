@@ -109,9 +109,17 @@ async function main() {
   try {
     // Validate required environment variables via centralized config
     let hasUrl: string;
+    let hasServerToken = true;
     try {
       hasUrl = getTeamCityUrl();
-      getTeamCityToken();
+      try {
+        getTeamCityToken();
+      } catch (tokenError) {
+        if (!useHttp) {
+          throw tokenError;
+        }
+        hasServerToken = false;
+      }
     } catch (e) {
       process.stderr.write(`${(e as Error).message}\n`);
       process.stderr.write(
@@ -133,10 +141,16 @@ async function main() {
         host: httpHost,
         port: httpPort,
         createServer: createSimpleServer,
+        requireClientToken: !hasServerToken,
       });
       process.stderr.write(
         `TeamCity MCP Server is listening on http://${httpHost}:${httpServer.port}/mcp\n`
       );
+      if (!hasServerToken) {
+        process.stderr.write(
+          'No TEAMCITY_TOKEN configured: each client must send its TeamCity token as "Authorization: Bearer <token>"\n'
+        );
+      }
       return;
     }
 

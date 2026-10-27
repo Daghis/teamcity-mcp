@@ -2,7 +2,15 @@ import { request } from 'node:http';
 
 import type { Server as SdkServer } from '@modelcontextprotocol/sdk/server/index.js';
 
-import { getMCPMode, resetMCPMode, setMCPMode } from '@/config';
+import { TeamCityAPI } from '@/api-client';
+import {
+  type SessionState,
+  getMCPMode,
+  getTeamCityToken,
+  resetMCPMode,
+  runInSession,
+  setMCPMode,
+} from '@/config';
 import { type RunningHttpServer, startHttpServer } from '@/http-server';
 
 // jest.config maps the SDK's Server and types.js to stubs; this end-to-end test needs the real ones.
@@ -27,6 +35,9 @@ const createModeServer = (): SdkServer => {
     tools: [{ name: 'mode', inputSchema: { type: 'object' } }],
   }));
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    if (req.params.name === 'token') {
+      return { content: [{ type: 'text', text: getTeamCityToken() }] };
+    }
     const target = (req.params.arguments as { set?: 'dev' | 'full' } | undefined)?.set;
     if (target) {
       setMCPMode(target);
@@ -91,30 +102,42 @@ const initializeBody = JSON.stringify({
   },
 });
 
-const openSession = async (port: number): Promise<string> => {
-  const reply = await send(port, { body: initializeBody });
+const auth = (token?: string): Record<string, string> =>
+  token ? { authorization: `Bearer ${token}` } : {};
+
+const openSession = async (port: number, token?: string): Promise<string> => {
+  const reply = await send(port, { headers: auth(token), body: initializeBody });
   expect(reply.status).toBe(200);
   const sessionId = reply.headers['mcp-session-id'] as string;
   await send(port, {
-    headers: { 'mcp-session-id': sessionId },
+    headers: { 'mcp-session-id': sessionId, ...auth(token) },
     body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
   });
   return sessionId;
 };
 
-const callMode = async (port: number, sessionId: string, set?: 'dev' | 'full'): Promise<string> => {
+const callTool = async (
+  port: number,
+  sessionId: string,
+  name: 'mode' | 'token',
+  args: Record<string, unknown> = {},
+  token?: string
+): Promise<string> => {
   const reply = await send(port, {
-    headers: { 'mcp-session-id': sessionId },
+    headers: { 'mcp-session-id': sessionId, ...auth(token) },
     body: JSON.stringify({
       jsonrpc: '2.0',
       id: 2,
       method: 'tools/call',
-      params: { name: 'mode', arguments: set ? { set } : {} },
+      params: { name, arguments: args },
     }),
   });
   const { result } = rpcResult(reply) as { result: { content: Array<{ text: string }> } };
   return result.content[0]?.text as string;
 };
+
+const callMode = (port: number, sessionId: string, set?: 'dev' | 'full'): Promise<string> =>
+  callTool(port, sessionId, 'mode', set ? { set } : {});
 
 describe('startHttpServer', () => {
   let running: RunningHttpServer;
@@ -241,5 +264,80 @@ describe('startHttpServer', () => {
       createServer: createModeServer,
       log: () => undefined,
     });
+  });
+
+  it('falls back to the server token when a client sends none', async () => {
+    const sessionId = await openSession(running.port);
+
+    expect(await callTool(running.port, sessionId, 'token')).toBe('test-token');
+  });
+});
+
+describe('startHttpServer with client tokens', () => {
+  let running: RunningHttpServer;
+
+  beforeEach(async () => {
+    running = await startHttpServer({
+      host: '127.0.0.1',
+      port: 0,
+      createServer: createModeServer,
+      requireClientToken: true,
+      log: () => undefined,
+    });
+  });
+
+  afterEach(async () => {
+    await running.close();
+  });
+
+  it('refuses an initialize without a bearer token', async () => {
+    const reply = await send(running.port, { body: initializeBody });
+
+    expect(reply.status).toBe(401);
+    expect(reply.headers['www-authenticate']).toBe('Bearer');
+    expect(running.sessionCount()).toBe(0);
+  });
+
+  it('uses each session its own TeamCity token', async () => {
+    const alice = await openSession(running.port, 'tc-alice');
+    const bob = await openSession(running.port, 'tc-bob');
+
+    expect(await callTool(running.port, alice, 'token', {}, 'tc-alice')).toBe('tc-alice');
+    expect(await callTool(running.port, bob, 'token', {}, 'tc-bob')).toBe('tc-bob');
+  });
+
+  it('refuses a request whose token does not match its session', async () => {
+    const alice = await openSession(running.port, 'tc-alice');
+    const body = JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/list' });
+
+    const wrong = await send(running.port, {
+      headers: { 'mcp-session-id': alice, ...auth('tc-mallory') },
+      body,
+    });
+    const missing = await send(running.port, { headers: { 'mcp-session-id': alice }, body });
+
+    expect(wrong.status).toBe(401);
+    expect(missing.status).toBe(401);
+  });
+});
+
+describe('TeamCityAPI.getInstance within a session', () => {
+  afterEach(() => {
+    TeamCityAPI.reset();
+  });
+
+  const inSession = <T>(teamcityToken: string | undefined, fn: () => T): T =>
+    runInSession({ mode: null, server: {} as SessionState['server'], teamcityToken }, fn);
+
+  it('gives each client token its own client and keeps the shared one outside sessions', () => {
+    const shared = TeamCityAPI.getInstance();
+    const alice = inSession('tc-alice', () => TeamCityAPI.getInstance());
+    const aliceAgain = inSession('tc-alice', () => TeamCityAPI.getInstance());
+    const bob = inSession('tc-bob', () => TeamCityAPI.getInstance());
+
+    expect(alice).toBe(aliceAgain);
+    expect(alice).not.toBe(bob);
+    expect(alice).not.toBe(shared);
+    expect(inSession(undefined, () => TeamCityAPI.getInstance())).toBe(shared);
   });
 });

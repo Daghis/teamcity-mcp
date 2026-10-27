@@ -193,7 +193,9 @@ OPTIONS:
   --mode <dev|full>   Tool exposure mode: dev (limited) or full (all tools)
   --config <path>     Path to .env format configuration file
   --http              Serve MCP over Streamable HTTP at /mcp instead of stdio
-                      (env: MCP_TRANSPORT=http); one process serves many clients
+                      (env: MCP_TRANSPORT=http); one process serves many clients.
+                      Clients may send their own TeamCity token as
+                      "Authorization: Bearer <token>"; without --token it is required
   --host <address>    HTTP bind address (env: MCP_HTTP_HOST, default 127.0.0.1)
   --port <number>     HTTP port (env: MCP_HTTP_PORT, default 3000)
 

@@ -193,9 +193,14 @@ export function setMCPMode(mode: 'dev' | 'full'): void {
 export interface SessionState {
   mode: 'dev' | 'full' | null;
   server: import('@modelcontextprotocol/sdk/server/index.js').Server;
+  teamcityToken?: string;
 }
 
 const sessionContext = new AsyncLocalStorage<SessionState>();
+
+export function getSessionState(): SessionState | undefined {
+  return sessionContext.getStore();
+}
 
 /**
  * Run `fn` with `state` as the current session, so mode and server lookups resolve to it
@@ -364,6 +369,10 @@ export function getTeamCityUrl(): string {
  * Get TeamCity token from configuration
  */
 export function getTeamCityToken(): string {
+  const sessionToken = sessionContext.getStore()?.teamcityToken;
+  if (sessionToken) {
+    return sessionToken;
+  }
   const config = getConfig();
   if (!config.teamcity?.token || config.teamcity.token.length === 0) {
     // In test mode, provide a stable dummy token so unit tests can mock HTTP calls

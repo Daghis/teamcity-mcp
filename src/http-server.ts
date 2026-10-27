@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import {
   type IncomingMessage,
   type Server as NodeHttpServer,
@@ -22,6 +22,7 @@ export interface HttpServerOptions {
   host: string;
   port: number;
   createServer: () => Server;
+  requireClientToken?: boolean;
   log?: (message: string) => void;
 }
 
@@ -110,6 +111,20 @@ const parseJson = (raw: Buffer): unknown => {
   }
 };
 
+const bearerToken = (req: IncomingMessage): string | undefined => {
+  const match = /^Bearer\s+(\S+)\s*$/i.exec(req.headers.authorization ?? '');
+  return match?.[1];
+};
+
+const sameToken = (a: string | undefined, b: string): boolean => {
+  if (a === undefined) {
+    return false;
+  }
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+};
+
 const isInitializeRequest = (body: unknown): boolean =>
   typeof body === 'object' &&
   body !== null &&
@@ -120,7 +135,10 @@ const sendError = (res: ServerResponse, status: number, code: number, message: s
     res.end();
     return;
   }
-  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    ...(status === 401 ? { 'WWW-Authenticate': 'Bearer' } : {}),
+  });
   res.end(JSON.stringify({ jsonrpc: '2.0', error: { code, message }, id: null }));
 };
 
@@ -129,9 +147,9 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
   const allowed = allowedHostnames(options.host);
   const sessions = new Map<string, Session>();
 
-  const openSession = async (): Promise<Session> => {
+  const openSession = async (teamcityToken: string | undefined): Promise<Session> => {
     const server = options.createServer();
-    const state: SessionState = { mode: null, server };
+    const state: SessionState = { mode: null, server, teamcityToken };
     const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (sessionId) => {
@@ -163,6 +181,7 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
 
     const header = req.headers['mcp-session-id'];
     const sessionId = Array.isArray(header) ? header[0] : header;
+    const token = bearerToken(req);
 
     let session: Session;
     if (sessionId) {
@@ -170,9 +189,20 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
       if (!existing) {
         throw new HttpError(404, -32001, 'Session not found');
       }
+      const bound = existing.state.teamcityToken;
+      if (bound !== undefined && !sameToken(token, bound)) {
+        throw new HttpError(401, -32000, 'Unauthorized: token does not match this session');
+      }
       session = existing;
     } else if (req.method === 'POST' && isInitializeRequest(body)) {
-      session = await openSession();
+      if (token === undefined && options.requireClientToken === true) {
+        throw new HttpError(
+          401,
+          -32000,
+          'Unauthorized: send the TeamCity token as "Authorization: Bearer <token>"'
+        );
+      }
+      session = await openSession(token);
     } else {
       throw new HttpError(
         400,
