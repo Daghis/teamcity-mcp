@@ -92,11 +92,11 @@ export function loadConfig(): ApplicationConfig {
   // to avoid exposing them in auto-generated documentation while maintaining backwards compatibility
   const tcUrl = env.TEAMCITY_URL ?? process.env['TEAMCITY_SERVER_URL'];
   const tcToken = env.TEAMCITY_TOKEN ?? process.env['TEAMCITY_API_TOKEN'];
-  // Add TeamCity configuration if credentials are provided
-  if (tcUrl !== undefined && tcToken !== undefined) {
+  // Add TeamCity configuration once a URL is set; the token may come per HTTP session instead
+  if (tcUrl !== undefined) {
     config.teamcity = {
       url: tcUrl,
-      token: tcToken,
+      token: tcToken ?? '',
       apiVersion: 'latest',
       timeout: 30000,
       retryConfig: {

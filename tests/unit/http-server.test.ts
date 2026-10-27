@@ -7,6 +7,8 @@ import {
   type SessionState,
   getMCPMode,
   getTeamCityToken,
+  getTeamCityUrl,
+  resetConfigCache,
   resetMCPMode,
   runInSession,
   setMCPMode,
@@ -318,6 +320,32 @@ describe('startHttpServer with client tokens', () => {
 
     expect(wrong.status).toBe(401);
     expect(missing.status).toBe(401);
+  });
+});
+
+describe('configuration without a server token', () => {
+  const saved = { url: process.env['TEAMCITY_URL'], token: process.env['TEAMCITY_TOKEN'] };
+
+  afterEach(() => {
+    process.env['TEAMCITY_URL'] = saved.url;
+    process.env['TEAMCITY_TOKEN'] = saved.token;
+    if (saved.url === undefined) delete process.env['TEAMCITY_URL'];
+    if (saved.token === undefined) delete process.env['TEAMCITY_TOKEN'];
+    resetConfigCache();
+  });
+
+  it('keeps the URL, so HTTP clients can bring their own token', () => {
+    process.env['TEAMCITY_URL'] = 'https://tc.example.com';
+    delete process.env['TEAMCITY_TOKEN'];
+    resetConfigCache();
+
+    expect(getTeamCityUrl()).toBe('https://tc.example.com');
+    expect(
+      runInSession(
+        { mode: null, server: {} as SessionState['server'], teamcityToken: 'tc-alice' },
+        getTeamCityToken
+      )
+    ).toBe('tc-alice');
   });
 });
 
