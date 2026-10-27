@@ -177,6 +177,23 @@ describe('readLineRange', () => {
     });
   });
 
+  it('joins a line spread over chunks without line breaks', async () => {
+    const source = Readable.from([
+      Buffer.from('l0\r'),
+      Buffer.from('l1'),
+      Buffer.from('-'),
+      Buffer.from('end\r'),
+      Buffer.from('\nl2'),
+      Buffer.from('-tail'),
+    ]);
+
+    await expect(readLineRange(source, 0, 5)).resolves.toEqual({
+      lines: ['l0', 'l1-end', 'l2-tail'],
+      startLine: 0,
+      totalLines: 3,
+    });
+  });
+
   it('treats a carriage return at the very end as a line break', async () => {
     const source = Readable.from([Buffer.from('l0\r\nl1\r')]);
 

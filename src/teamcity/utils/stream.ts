@@ -102,18 +102,24 @@ const LINE_BREAK = /\r\n|\r|\n/;
 
 async function* readLines(source: NodeJS.ReadableStream): AsyncGenerator<string> {
   const decoder = new StringDecoder('utf8');
-  let pending = '';
+  // The unfinished last line, kept in pieces so a very long line is joined once, not on every chunk
+  let pending: string[] = [];
   for await (const raw of source) {
-    let text = pending + decoder.write(toBuffer(raw));
+    const decoded = decoder.write(toBuffer(raw));
+    if (!LINE_BREAK.test(decoded)) {
+      pending.push(decoded);
+      continue;
+    }
+    let text = pending.join('') + decoded;
     const heldBack = text.endsWith('\r') ? '\r' : '';
     if (heldBack) {
       text = text.slice(0, -1);
     }
     const lines = text.split(LINE_BREAK);
-    pending = lines.splice(-1).join('') + heldBack;
+    pending = [lines.splice(-1).join('') + heldBack];
     yield* lines;
   }
-  const rest = pending + decoder.end();
+  const rest = pending.join('') + decoder.end();
   if (rest) {
     const lines = rest.split(LINE_BREAK);
     if (lines[lines.length - 1] === '') {
