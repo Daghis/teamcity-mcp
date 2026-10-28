@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.12](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.11...teamcity-mcp-v2.12.12) (2026-10-28)
+
+
+### Bug Fixes
+
+* **security:** bump zod, body-parser, fast-uri, ip-address and qs ([#554](https://github.com/Daghis/teamcity-mcp/issues/554)) ([5094e49](https://github.com/Daghis/teamcity-mcp/commit/5094e496f520aec345f3305cfc47bf3abab963af))
+
 ## [2.12.11](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.10...teamcity-mcp-v2.12.11) (2026-10-28)
 
 
