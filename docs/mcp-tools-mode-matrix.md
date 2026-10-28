@@ -23,6 +23,9 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Builds | `trigger_build` | Yes | Yes |
 | Builds | `cancel_queued_build` | Yes | Yes |
 | Builds | `cancel_build` | Yes | Yes |
+| Builds | `get_build_pin` | Yes | Yes |
+| Builds | `set_build_pin` | Yes | Yes |
+| Builds | `list_pinned_builds` | Yes | Yes |
 | Builds | `download_build_artifact` | Yes | Yes |
 | Builds | `download_build_artifacts` | Yes | Yes |
 | Build Configs | `list_build_configs` | Yes | Yes |
