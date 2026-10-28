@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.11](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.10...teamcity-mcp-v2.12.11) (2026-10-28)
+
+
+### Bug Fixes
+
+* **build-log:** keep memory bounded for log chunks, tails and streams ([#549](https://github.com/Daghis/teamcity-mcp/issues/549)) ([7815ab1](https://github.com/Daghis/teamcity-mcp/commit/7815ab10a2b7a395a680d665ca68ebe52a7d629e))
+
 ## [2.12.10](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.9...teamcity-mcp-v2.12.10) (2026-10-21)
 
 
