@@ -1,4 +1,5 @@
 import { Readable } from 'stream';
+import { StringDecoder } from 'string_decoder';
 
 /**
  * Detect an (unconsumed) Node readable stream, e.g. an Axios response body
@@ -95,4 +96,104 @@ export const sliceStreamLines = (
     destroySlice(error, callback);
   };
   return slice;
+};
+
+const LINE_BREAK = /\r\n|\r|\n/;
+
+async function* readLines(
+  source: NodeJS.ReadableStream,
+  keep: (index: number) => boolean = () => true
+): AsyncGenerator<string> {
+  const decoder = new StringDecoder('utf8');
+  // The unfinished last line, kept in pieces so a very long line is joined once, not on every chunk
+  let pending: string[] = [];
+  let started = false;
+  let index = 0;
+  let afterCarriageReturn = false;
+  const append = (piece: string) => {
+    if (piece) {
+      started = true;
+      if (keep(index)) {
+        pending.push(piece);
+      }
+    }
+  };
+  for await (const raw of source) {
+    let text = decoder.write(toBuffer(raw));
+    if (afterCarriageReturn && text.startsWith('\n')) {
+      text = text.slice(1);
+    }
+    afterCarriageReturn = text.endsWith('\r');
+    const segments = text.split(LINE_BREAK);
+    const unfinished = segments.splice(-1).join('');
+    for (const segment of segments) {
+      append(segment);
+      const line = pending.join('');
+      pending = [];
+      started = false;
+      index += 1;
+      yield line;
+    }
+    append(unfinished);
+  }
+  append(decoder.end());
+  if (started) {
+    yield pending.join('');
+  }
+}
+
+export interface StreamedLineRange {
+  lines: string[];
+  startLine: number;
+  nextStartLine?: number;
+  totalLines?: number;
+}
+
+/** The source is closed right after the range, so `totalLines` is only known when the range reaches the end. */
+export const readLineRange = async (
+  source: NodeJS.ReadableStream,
+  startLine: number,
+  lineCount: number
+): Promise<StreamedLineRange> => {
+  const endLine = startLine + lineCount;
+  const lines: string[] = [];
+  let index = 0;
+  try {
+    const inRange = (line: number) => line >= startLine && line < endLine;
+    for await (const line of readLines(source, inRange)) {
+      if (index >= endLine) {
+        return { lines, startLine, nextStartLine: endLine };
+      }
+      if (index >= startLine) {
+        lines.push(line);
+      }
+      index += 1;
+    }
+  } finally {
+    destroyStream(source);
+  }
+  return { lines, startLine: Math.min(startLine, index), totalLines: index };
+};
+
+export const readLastLines = async (
+  source: NodeJS.ReadableStream,
+  lineCount: number
+): Promise<{ lines: string[]; totalLines: number }> => {
+  const window: string[] = [];
+  let totalLines = 0;
+  try {
+    for await (const line of readLines(source)) {
+      if (lineCount > 0) {
+        window[totalLines % lineCount] = line;
+      }
+      totalLines += 1;
+    }
+  } finally {
+    destroyStream(source);
+  }
+  if (totalLines <= lineCount) {
+    return { lines: window, totalLines };
+  }
+  const oldest = totalLines % lineCount;
+  return { lines: [...window.slice(oldest), ...window.slice(0, oldest)], totalLines };
 };
