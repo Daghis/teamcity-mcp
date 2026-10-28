@@ -194,6 +194,33 @@ describe('parseCliArgs', () => {
       expect(result.url).toBe('https://example.com?foo=bar');
     });
   });
+
+  describe('HTTP transport', () => {
+    it('should parse --http with --host and --port in both formats', () => {
+      expect(parseCliArgs(['--http', '--host', '::1', '--port', '4100'])).toEqual<CliArgs>({
+        help: false,
+        version: false,
+        http: true,
+        host: '::1',
+        port: 4100,
+      });
+      expect(parseCliArgs(['--host=127.0.0.1', '--port=0'])).toMatchObject({
+        host: '127.0.0.1',
+        port: 0,
+      });
+    });
+
+    it('should warn and ignore an invalid port', () => {
+      const stderr = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      try {
+        expect(parseCliArgs(['--port=99999']).port).toBeUndefined();
+        expect(parseCliArgs(['--port', 'abc']).port).toBeUndefined();
+        expect(stderr).toHaveBeenCalledWith(expect.stringContaining("Invalid port '99999'"));
+      } finally {
+        stderr.mockRestore();
+      }
+    });
+  });
 });
 
 describe('getVersion', () => {
