@@ -100,32 +100,45 @@ export const sliceStreamLines = (
 
 const LINE_BREAK = /\r\n|\r|\n/;
 
-async function* readLines(source: NodeJS.ReadableStream): AsyncGenerator<string> {
+async function* readLines(
+  source: NodeJS.ReadableStream,
+  keep: (index: number) => boolean = () => true
+): AsyncGenerator<string> {
   const decoder = new StringDecoder('utf8');
   // The unfinished last line, kept in pieces so a very long line is joined once, not on every chunk
   let pending: string[] = [];
+  let started = false;
+  let index = 0;
+  let afterCarriageReturn = false;
+  const append = (piece: string) => {
+    if (piece) {
+      started = true;
+      if (keep(index)) {
+        pending.push(piece);
+      }
+    }
+  };
   for await (const raw of source) {
-    const decoded = decoder.write(toBuffer(raw));
-    if (!LINE_BREAK.test(decoded)) {
-      pending.push(decoded);
-      continue;
+    let text = decoder.write(toBuffer(raw));
+    if (afterCarriageReturn && text.startsWith('\n')) {
+      text = text.slice(1);
     }
-    let text = pending.join('') + decoded;
-    const heldBack = text.endsWith('\r') ? '\r' : '';
-    if (heldBack) {
-      text = text.slice(0, -1);
+    afterCarriageReturn = text.endsWith('\r');
+    const segments = text.split(LINE_BREAK);
+    const unfinished = segments.splice(-1).join('');
+    for (const segment of segments) {
+      append(segment);
+      const line = pending.join('');
+      pending = [];
+      started = false;
+      index += 1;
+      yield line;
     }
-    const lines = text.split(LINE_BREAK);
-    pending = [lines.splice(-1).join('') + heldBack];
-    yield* lines;
+    append(unfinished);
   }
-  const rest = pending.join('') + decoder.end();
-  if (rest) {
-    const lines = rest.split(LINE_BREAK);
-    if (lines[lines.length - 1] === '') {
-      lines.pop();
-    }
-    yield* lines;
+  append(decoder.end());
+  if (started) {
+    yield pending.join('');
   }
 }
 
@@ -146,7 +159,8 @@ export const readLineRange = async (
   const lines: string[] = [];
   let index = 0;
   try {
-    for await (const line of readLines(source)) {
+    const inRange = (line: number) => line >= startLine && line < endLine;
+    for await (const line of readLines(source, inRange)) {
       if (index >= endLine) {
         return { lines, startLine, nextStartLine: endLine };
       }

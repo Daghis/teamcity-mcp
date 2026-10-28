@@ -194,6 +194,28 @@ describe('readLineRange', () => {
     });
   });
 
+  it('counts long lines outside the range without losing track of line breaks', async () => {
+    const log = () =>
+      Readable.from([
+        Buffer.from('skipped'),
+        Buffer.from('-more\r'),
+        Buffer.from('\nl1\nlong'),
+        Buffer.from('-line\r'),
+        Buffer.from('\nl3'),
+      ]);
+
+    await expect(readLineRange(log(), 1, 1)).resolves.toEqual({
+      lines: ['l1'],
+      startLine: 1,
+      nextStartLine: 2,
+    });
+    await expect(readLineRange(log(), 3, 1)).resolves.toEqual({
+      lines: ['l3'],
+      startLine: 3,
+      totalLines: 4,
+    });
+  });
+
   it('treats a carriage return at the very end as a line break', async () => {
     const source = Readable.from([Buffer.from('l0\r\nl1\r')]);
 
