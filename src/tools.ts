@@ -6613,9 +6613,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-          await adapter.modules.buildQueue.setQueuedBuildsOrder(undefined, {
-            build: [{ id: parseInt(typed.buildId) }],
-          });
+          await adapter.modules.buildQueue.setQueuedBuildsOrder(
+            undefined,
+            {
+              build: [{ id: parseInt(typed.buildId) }],
+            },
+            // The generated client declares application/xml, but the body is JSON.
+            { headers: { 'Content-Type': 'application/json' } }
+          );
           return json({
             success: true,
             action: 'move_queued_build_to_top',
@@ -6649,9 +6654,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-          await adapter.modules.buildQueue.setQueuedBuildsOrder(undefined, {
-            build: typed.buildIds.map((id) => ({ id: parseInt(id) })),
-          });
+          await adapter.modules.buildQueue.setQueuedBuildsOrder(
+            undefined,
+            {
+              build: typed.buildIds.map((id) => ({ id: parseInt(id) })),
+            },
+            // The generated client declares application/xml, but the body is JSON.
+            { headers: { 'Content-Type': 'application/json' } }
+          );
           return json({
             success: true,
             action: 'reorder_queued_builds',
