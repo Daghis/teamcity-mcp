@@ -14,6 +14,7 @@ import {
   validateConfiguration,
 } from '@/teamcity/auth';
 import { TeamCityAPIError, isRetryableError } from '@/teamcity/errors';
+import { labelJsonBodies } from '@/teamcity/json-content-type';
 import type { TeamCityApiSurface } from '@/teamcity/types/client';
 import { toBuildLocator } from '@/teamcity/utils/build-locator';
 import {
@@ -194,8 +195,9 @@ export class TeamCityAPI {
       },
     });
 
-    // Attach interceptors: request ID, response logging, and error transform
+    // Attach interceptors: request ID, JSON Content-Type fix-up, response logging, and error transform
     this.axiosInstance.interceptors.request.use((config) => addRequestId(config));
+    this.axiosInstance.interceptors.request.use(labelJsonBodies);
     this.axiosInstance.interceptors.response.use(logResponse, logAndTransformError);
 
     this.config = new Configuration({
