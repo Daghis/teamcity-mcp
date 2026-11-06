@@ -147,6 +147,7 @@ export function createAdapterFromTeamCityAPI(
       api.triggerBuild(buildTypeId, branchName, comment),
     getBuildLog: (buildId) => api.getBuildLog(buildId),
     getBuildLogChunk: (buildId, options) => api.getBuildLogChunk(buildId, options),
+    getBuildLogTail: (buildId, lineCount) => api.getBuildLogTail(buildId, lineCount),
     listBuildTypes: (projectId) => api.listBuildTypes(projectId),
     getBuildType: (buildTypeId) => api.getBuildType(buildTypeId),
     listTestFailures: (buildId) => api.listTestFailures(buildId),

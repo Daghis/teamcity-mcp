@@ -16,6 +16,7 @@ import type {
   BuildApiLike,
   TeamCityApiSurface,
   TeamCityBuildLogChunk,
+  TeamCityBuildLogTail,
   TeamCityClientAdapter,
   TeamCityRequestContext,
   TeamCityUnifiedClient,
@@ -184,6 +185,7 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
     Promise<TeamCityBuildLogChunk>,
     [string, { startLine?: number; lineCount?: number }?]
   >;
+  public readonly getBuildLogTail: jest.Mock<Promise<TeamCityBuildLogTail>, [string, number]>;
   public readonly listBuildTypes: jest.Mock;
   public readonly getBuildType: jest.Mock;
   public readonly listTestFailures: jest.Mock;
@@ -292,6 +294,7 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
     this.triggerBuild = jest.fn();
     this.getBuildLog = jest.fn();
     this.getBuildLogChunk = jest.fn();
+    this.getBuildLogTail = jest.fn();
     this.listBuildTypes = jest.fn();
     this.getBuildType = jest.fn();
     this.listTestFailures = jest.fn();
@@ -335,6 +338,7 @@ export class MockTeamCityClient implements TeamCityClientAdapter {
       this.triggerBuild,
       this.getBuildLog,
       this.getBuildLogChunk as unknown as jest.Mock,
+      this.getBuildLogTail as unknown as jest.Mock,
       this.listBuildTypes,
       this.getBuildType,
       this.listTestFailures,
