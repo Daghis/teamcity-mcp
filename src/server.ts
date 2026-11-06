@@ -119,7 +119,15 @@ export function createSimpleServer(): Server {
       const response: {
         content: Array<{ type: string; text: string }>;
         structuredContent?: Record<string, unknown>;
+        isError?: boolean;
       } = { content };
+      // Per the MCP spec, a tool that ran but failed reports the failure in-band
+      // with `isError: true`, so clients can tell it apart from a successful
+      // result. Handlers signal failure with `success: false` (including the
+      // error envelope `runTool` builds from a thrown error).
+      if (result.success === false) {
+        response.isError = true;
+      }
       // Per the MCP spec, tools that declare `outputSchema` must return their
       // payload in `structuredContent`. Our handlers emit a single JSON text
       // block via the `json()` helper; parse it back into an object so the
