@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.13](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.12...teamcity-mcp-v2.12.13) (2026-11-06)
+
+
+### Bug Fixes
+
+* **security:** bump follow-redirects to 1.16.2 and @hono/node-server to 2.x ([#559](https://github.com/Daghis/teamcity-mcp/issues/559)) ([8c0c50b](https://github.com/Daghis/teamcity-mcp/commit/8c0c50ba142c5b7852f55287b7e7e5a8583bd9d2))
+
 ## [2.12.12](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.11...teamcity-mcp-v2.12.12) (2026-10-28)
 
 
