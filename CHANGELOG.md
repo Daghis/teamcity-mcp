@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.14](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.13...teamcity-mcp-v2.12.14) (2026-11-06)
+
+
+### Bug Fixes
+
+* send JSON content type when setting the build queue order ([#557](https://github.com/Daghis/teamcity-mcp/issues/557)) ([33b9222](https://github.com/Daghis/teamcity-mcp/commit/33b92225e5f032e41fc399766dc0e537e232c8d5))
+
 ## [2.12.13](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.12...teamcity-mcp-v2.12.13) (2026-11-06)
 
 
