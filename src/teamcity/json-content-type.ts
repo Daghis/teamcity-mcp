@@ -3,14 +3,24 @@ import type { InternalAxiosRequestConfig } from 'axios';
 const XML_MEDIA_TYPE = /^application\/xml\s*(;|$)/i;
 
 /**
- * Bodies axios serializes to JSON. Strings, binary payloads, streams and form data are sent
- * as-is, so their declared Content-Type is left alone.
+ * Whether axios's default request transform will JSON-serialize this body. It does that for any
+ * object (plain or class instance) except binary payloads, streams, blobs, form data and URL
+ * search params, which it sends as-is or encodes differently; strings are never touched.
  */
 function isJsonSerializedBody(data: unknown): boolean {
   if (data === null || typeof data !== 'object') return false;
-  if (Array.isArray(data)) return true;
-  const proto: unknown = Object.getPrototypeOf(data);
-  return proto === Object.prototype || proto === null;
+  if (
+    data instanceof ArrayBuffer ||
+    ArrayBuffer.isView(data) ||
+    data instanceof Blob ||
+    data instanceof FormData ||
+    data instanceof URLSearchParams ||
+    data instanceof ReadableStream
+  ) {
+    return false;
+  }
+  // axios treats anything with a pipe() method as a Node stream.
+  return typeof (data as { pipe?: unknown }).pipe !== 'function';
 }
 
 /**

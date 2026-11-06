@@ -1,3 +1,5 @@
+import { Readable } from 'node:stream';
+
 import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 import { TeamCityAPI, type TeamCityAPIClientConfig } from '@/api-client';
@@ -103,6 +105,30 @@ describe('TeamCityAPI request Content-Type', () => {
     );
 
     expect(captured).toEqual([{ contentType: 'application/json', data: '{"id":2}' }]);
+  });
+
+  it('relabels a class-instance body that axios serializes as JSON', async () => {
+    class PoolRef {
+      constructor(readonly id: number) {}
+    }
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const captured = captureRequests(api);
+
+    await api.agents.setAgentPool('id:1', undefined, new PoolRef(2));
+
+    expect(captured).toEqual([{ contentType: 'application/json', data: '{"id":2}' }]);
+  });
+
+  it('keeps application/xml for a stream body', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    const captured = captureRequests(api);
+    const xml = Readable.from(['<agent-requirement type="exists"/>']);
+
+    await api.http.post('/app/rest/buildTypes/id:Bt/agent-requirements', xml, {
+      headers: { 'Content-Type': 'application/xml' },
+    });
+
+    expect(captured).toEqual([{ contentType: 'application/xml', data: xml }]);
   });
 
   it('keeps application/xml for a binary body', async () => {
