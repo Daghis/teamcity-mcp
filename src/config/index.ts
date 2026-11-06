@@ -1,6 +1,8 @@
 /**
  * Configuration management for TeamCity MCP Server
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 import { z } from 'zod';
 
 import type { ApplicationConfig } from '@/types/config';
@@ -90,11 +92,11 @@ export function loadConfig(): ApplicationConfig {
   // to avoid exposing them in auto-generated documentation while maintaining backwards compatibility
   const tcUrl = env.TEAMCITY_URL ?? process.env['TEAMCITY_SERVER_URL'];
   const tcToken = env.TEAMCITY_TOKEN ?? process.env['TEAMCITY_API_TOKEN'];
-  // Add TeamCity configuration if credentials are provided
-  if (tcUrl !== undefined && tcToken !== undefined) {
+  // Add TeamCity configuration once a URL is set; the token may come per HTTP session instead
+  if (tcUrl !== undefined) {
     config.teamcity = {
       url: tcUrl,
-      token: tcToken,
+      token: tcToken ?? '',
       apiVersion: 'latest',
       timeout: 30000,
       retryConfig: {
@@ -162,6 +164,10 @@ let serverInstance: import('@modelcontextprotocol/sdk/server/index.js').Server |
  * Checks runtime override first, then falls back to environment variable
  */
 export function getMCPMode(): 'dev' | 'full' {
+  const session = sessionContext.getStore();
+  if (session?.mode) {
+    return session.mode;
+  }
   if (runtimeMCPMode !== null) {
     return runtimeMCPMode;
   }
@@ -172,7 +178,35 @@ export function getMCPMode(): 'dev' | 'full' {
  * Set MCP mode at runtime
  */
 export function setMCPMode(mode: 'dev' | 'full'): void {
+  const session = sessionContext.getStore();
+  if (session) {
+    session.mode = mode;
+    return;
+  }
   runtimeMCPMode = mode;
+}
+
+/**
+ * Per-client state of one HTTP session. Several MCP sessions share the process in HTTP mode,
+ * so a runtime mode switch must only affect the session that asked for it.
+ */
+export interface SessionState {
+  mode: 'dev' | 'full' | null;
+  server: import('@modelcontextprotocol/sdk/server/index.js').Server;
+  teamcityToken?: string;
+}
+
+const sessionContext = new AsyncLocalStorage<SessionState>();
+
+export function getSessionState(): SessionState | undefined {
+  return sessionContext.getStore();
+}
+
+/**
+ * Run `fn` with `state` as the current session, so mode and server lookups resolve to it
+ */
+export function runInSession<T>(state: SessionState, fn: () => T): T {
+  return sessionContext.run(state, fn);
 }
 
 /**
@@ -190,7 +224,7 @@ export function setServerInstance(
 export function getServerInstance():
   | import('@modelcontextprotocol/sdk/server/index.js').Server
   | null {
-  return serverInstance;
+  return sessionContext.getStore()?.server ?? serverInstance;
 }
 
 /**
@@ -335,6 +369,10 @@ export function getTeamCityUrl(): string {
  * Get TeamCity token from configuration
  */
 export function getTeamCityToken(): string {
+  const sessionToken = sessionContext.getStore()?.teamcityToken;
+  if (sessionToken) {
+    return sessionToken;
+  }
   const config = getConfig();
   if (!config.teamcity?.token || config.teamcity.token.length === 0) {
     // In test mode, provide a stable dummy token so unit tests can mock HTTP calls
