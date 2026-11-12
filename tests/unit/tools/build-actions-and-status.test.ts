@@ -90,6 +90,40 @@ describe('tools: build actions and status/basic info', () => {
     });
   });
 
+  it('trigger_build queues the build at the top when moveToTop is set', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn(async () => ({
+            data: { id: 778, state: 'queued' },
+          }));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: { buildQueue: { addBuildToQueue } },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('trigger_build').handler({
+            buildTypeId: 'bt1',
+            moveToTop: true,
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({ success: true, action: 'trigger_build', buildId: '778' });
+          expect(addBuildToQueue).toHaveBeenCalledWith(
+            true,
+            expect.objectContaining({ buildType: { id: 'bt1' } }),
+            expect.anything()
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
   it('trigger_build infers branch from teamcity.build.branch property', async () => {
     jest.resetModules();
     await new Promise<void>((resolve, reject) => {
@@ -422,7 +456,50 @@ describe('tools: trigger_build XML fallback coverage', () => {
             expect.stringContaining('<?xml version="1.0"'),
             expect.objectContaining({
               headers: { 'Content-Type': 'application/xml', Accept: 'application/json' },
+              params: { moveToTop: false },
             })
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('keeps moveToTop in the XML fallback', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn().mockRejectedValue(new Error('Force XML'));
+          const httpPost = jest.fn().mockResolvedValue({
+            data: { id: 1002, state: 'queued' },
+          });
+
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: {
+                  buildQueue: { addBuildToQueue },
+                },
+                http: createMockHttp(httpPost),
+                getBaseUrl: () => 'https://example.test',
+              }),
+            },
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('trigger_build').handler({
+            buildTypeId: 'btTop',
+            moveToTop: true,
+          });
+
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({ success: true, buildId: '1002' });
+          expect(httpPost).toHaveBeenCalledWith(
+            '/app/rest/buildQueue',
+            expect.any(String),
+            expect.objectContaining({ params: { moveToTop: true } })
           );
           resolve();
         })().catch(reject);
