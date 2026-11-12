@@ -42,6 +42,8 @@ The TeamCity MCP Server allows developers using AI-powered coding assistants (Cl
 
 **Runtime Mode Switching (v2.1.0+):** Switch between modes at runtime using the `get_mcp_mode` and `set_mcp_mode` tools—no restart required. MCP clients that support notifications will see the tool list update automatically.
 
+**Extra tools in Dev mode:** To use a few Full-mode tools without switching to Full mode, list them in `MCP_EXTRA_TOOLS` (comma-separated), e.g. `MCP_EXTRA_TOOLS=move_queued_build_to_top,reorder_queued_builds`. Unknown names are logged as a warning at startup. Full mode is not affected.
+
 See the [Tools Mode Matrix](docs/mcp-tools-mode-matrix.md) for the complete list of 87 tools and their availability by mode.
 
 ### 🎯 Key Capabilities
@@ -181,6 +183,8 @@ TEAMCITY_TOKEN=your-auth-token
 
 # MCP Mode (dev or full)
 MCP_MODE=dev
+# Full-mode tools to add in dev mode (comma-separated, optional)
+# MCP_EXTRA_TOOLS=move_queued_build_to_top,reorder_queued_builds
 
 # Optional advanced TeamCity options (defaults shown)
 # Connection
