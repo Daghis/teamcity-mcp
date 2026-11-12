@@ -162,6 +162,26 @@ Or use a config file for better security (token not visible in process list):
 }
 ```
 
+### One shared server over HTTP
+
+With stdio, every MCP client session starts its own server process. If you run many sessions at once (several Claude Code windows, agents), start one server over Streamable HTTP instead and point all clients at it:
+
+```bash
+# Server: only the URL, no token
+TEAMCITY_URL=https://teamcity.example.com teamcity-mcp --http --port 3000
+
+# Client: send your own TeamCity token as a bearer token, read from a file at connect time
+claude mcp add --transport http -s user teamcity http://127.0.0.1:3000/mcp
+# then add to the server entry in ~/.claude.json:
+#   "headersHelper": "printf '{\"Authorization\":\"Bearer %s\"}' \"$(cat ~/.claude/secrets/teamcity.token)\""
+```
+
+- Endpoint `/mcp`; options `--http`, `--host` (default `127.0.0.1`) and `--port` (default `3000`), or `MCP_TRANSPORT=http`, `MCP_HTTP_HOST` and `MCP_HTTP_PORT`.
+- **Token per client:** a client's `Authorization: Bearer <TeamCity token>` is used for that session's TeamCity calls, and the session is bound to it (other tokens get `401`). Without `TEAMCITY_TOKEN` on the server, a bearer token is required; with it, clients that send none fall back to the server's token.
+- Each client gets its own MCP session; a runtime switch with `set_mcp_mode` only affects the session that made it.
+- Keep it on loopback: it rejects requests whose `Host` or browser `Origin` is not a loopback name or the bind address.
+- After a server restart, clients get `404` for their old session and re-initialize on their own.
+
 ## Configuration
 
 Environment is validated centrally with Zod. Supported variables and defaults:
