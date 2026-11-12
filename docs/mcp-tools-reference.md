@@ -6,6 +6,7 @@ This document lists all Model Context Protocol (MCP) tools exposed by the TeamCi
 - Modes: `dev` (default) and `full` via env `MCP_MODE`
   - `dev` mode: read‑only and safe operations
   - `full` mode: includes write/modify operations in addition to all `dev` tools
+  - `MCP_EXTRA_TOOLS` (comma-separated tool names) adds single `full` tools to `dev` mode
 - Capabilities: tools only (no prompts/resources)
 
 ## Conventions
