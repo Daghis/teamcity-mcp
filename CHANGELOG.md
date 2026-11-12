@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.16](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.15...teamcity-mcp-v2.12.16) (2026-11-12)
+
+
+### Bug Fixes
+
+* **api:** send JSON Content-Type for object bodies on XML-labelled methods ([#561](https://github.com/Daghis/teamcity-mcp/issues/561)) ([c1cd2c6](https://github.com/Daghis/teamcity-mcp/commit/c1cd2c66c22650b1e38df4c81b8d1d50cb8d6de8))
+
 ## [2.12.15](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.14...teamcity-mcp-v2.12.15) (2026-11-06)
 
 
