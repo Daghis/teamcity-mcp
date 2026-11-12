@@ -107,6 +107,37 @@ export function normalizeLocatorSegments(locator?: string): string[] {
     .filter((segment) => segment.length > 0);
 }
 
+export interface LocatorPaging {
+  segments: string[];
+  count?: number;
+  start?: number;
+}
+
+const PAGING_SEGMENT = /^(count|start):\s*(\d+)$/i;
+
+/**
+ * Remove top-level `count:` and `start:` dimensions from locator segments and
+ * return their values. Callers that append their own paging dimensions use this
+ * so a locator never carries the same dimension twice (TeamCity rejects that).
+ */
+export function extractPagingSegments(segments: string[]): LocatorPaging {
+  const paging: LocatorPaging = { segments: [] };
+  for (const segment of segments) {
+    const match = PAGING_SEGMENT.exec(segment.trim());
+    if (match?.[1] && match[2]) {
+      const value = parseInt(match[2], 10);
+      if (match[1].toLowerCase() === 'count') {
+        paging.count = value;
+      } else {
+        paging.start = value;
+      }
+      continue;
+    }
+    paging.segments.push(segment);
+  }
+  return paging;
+}
+
 export function hasBranchSegment(segments: string[]): boolean {
   return segments.some((segment) => segment.toLowerCase().startsWith('branch:'));
 }

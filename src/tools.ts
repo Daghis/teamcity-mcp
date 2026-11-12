@@ -40,6 +40,7 @@ import {
 } from '@/utils/disk-space';
 import {
   buildBranchSegmentInput,
+  extractPagingSegments,
   hasBranchSegment,
   normalizeLocatorSegments,
 } from '@/utils/list-builds-locator';
@@ -1069,8 +1070,15 @@ const DEV_TOOLS: ToolDefinition[] = [
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
 
-          const locatorSegments = normalizeLocatorSegments(typed.locator);
+          // count:/start: in the caller's locator become the page size and offset;
+          // the paging dimensions are appended once below.
+          const {
+            segments: locatorSegments,
+            count: locatorCount,
+            start: locatorStart,
+          } = extractPagingSegments(normalizeLocatorSegments(typed.locator));
           const hasBranchInLocator = hasBranchSegment(locatorSegments);
+          const startOffset = locatorStart ?? 0;
 
           // Build shared filter parts
           const baseParts: string[] = [...locatorSegments];
@@ -1084,12 +1092,12 @@ const DEV_TOOLS: ToolDefinition[] = [
           }
           if (typed.status) baseParts.push(`status:${typed.status}`);
 
-          const pageSize = typed.pageSize ?? typed.count ?? 100;
+          const pageSize = typed.pageSize ?? locatorCount ?? typed.count ?? 100;
 
           const baseFetch = async ({ count, start }: { count?: number; start?: number }) => {
             const parts = [...baseParts];
             if (typeof count === 'number') parts.push(`count:${count}`);
-            if (typeof start === 'number') parts.push(`start:${start}`);
+            if (typeof start === 'number') parts.push(`start:${start + startOffset}`);
             const locator = parts.length > 0 ? parts.join(',') : undefined;
             // Use the generated client directly to retain nextHref/prevHref in response.data
             return adapter.modules.builds.getAllBuilds(locator as string | undefined, typed.fields);

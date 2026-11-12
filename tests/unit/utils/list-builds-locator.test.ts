@@ -1,5 +1,6 @@
 import {
   buildBranchSegmentInput,
+  extractPagingSegments,
   hasBranchSegment,
   normalizeBranchSegment,
   normalizeLocatorSegments,
@@ -103,5 +104,27 @@ describe('list-builds locator utilities', () => {
     it('respects existing prefixes', () => {
       expect(buildBranchSegmentInput('branch:default:any')).toBe('branch:default:any');
     });
+  });
+});
+
+describe('extractPagingSegments', () => {
+  it('removes top-level count and start and returns their values', () => {
+    expect(
+      extractPagingSegments([
+        'buildType:(id:Example_Build)',
+        'count:15',
+        'START:30',
+        'status:SUCCESS',
+      ])
+    ).toEqual({
+      segments: ['buildType:(id:Example_Build)', 'status:SUCCESS'],
+      count: 15,
+      start: 30,
+    });
+  });
+
+  it('leaves nested and non-numeric paging dimensions untouched', () => {
+    const segments = ['snapshotDependency:(to:(id:1),count:2)', 'count:all'];
+    expect(extractPagingSegments(segments)).toEqual({ segments });
   });
 });
