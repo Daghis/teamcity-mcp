@@ -10,11 +10,11 @@ import {
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { info, debug as logDebug, error as logError } from '@/utils/logger';
+import { info, debug as logDebug, error as logError, warn } from '@/utils/logger';
 
 import packageJson from '../package.json';
 import { getConfig } from './config';
-import { getAvailableTools, getMCPMode, getTool } from './tools';
+import { getAvailableTools, getMCPMode, getTool, getUnknownExtraToolNames } from './tools';
 
 /**
  * Extract a JSON-object payload from a tool's text content to surface as
@@ -51,6 +51,10 @@ export function createSimpleServer(): Server {
 
   // Load available tools to validate configuration
   getAvailableTools();
+  const unknownExtraTools = getUnknownExtraToolNames();
+  if (unknownExtraTools.length > 0) {
+    warn('MCP_EXTRA_TOOLS lists unknown tools', { unknownExtraTools });
+  }
 
   const server = new Server(
     {

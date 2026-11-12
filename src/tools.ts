@@ -789,6 +789,11 @@ export function getMCPMode(): 'dev' | 'full' {
   return getMCPModeFromConfig();
 }
 
+export function getExtraToolNames(): string[] {
+  const raw = process.env['MCP_EXTRA_TOOLS'] ?? '';
+  return raw.split(/[\s,]+/).filter((name) => name.length > 0);
+}
+
 /**
  * Developer tools (dev mode) - Read-only operations for developers
  */
@@ -840,11 +845,12 @@ const DEV_TOOLS: ToolDefinition[] = [
     handler: async () => {
       const mode = getMCPMode();
       const toolCount = getAvailableTools().length;
+      const extraTools = getExtraToolNames();
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({ mode, toolCount }, null, 2),
+            text: JSON.stringify({ mode, toolCount, extraTools }, null, 2),
           },
         ],
       };
@@ -7199,16 +7205,31 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
 /**
  * Get all available tools based on current mode
  */
+function getAllTools(): ToolDefinition[] {
+  const map = new Map<string, ToolDefinition>();
+  for (const t of [...DEV_TOOLS, ...FULL_MODE_TOOLS]) map.set(t.name, t);
+  return Array.from(map.values());
+}
+
 export function getAvailableTools(): ToolDefinition[] {
   const mode = getMCPMode();
   if (mode === 'full') {
-    const combined = [...DEV_TOOLS, ...FULL_MODE_TOOLS];
-    const map = new Map<string, ToolDefinition>();
-    for (const t of combined) map.set(t.name, t);
-    return Array.from(map.values());
+    return getAllTools();
   }
   // Dev mode: include only tools not explicitly marked as full
-  return DEV_TOOLS.filter((t) => t.mode !== 'full');
+  const devTools = DEV_TOOLS.filter((t) => t.mode !== 'full');
+  const extraNames = new Set(getExtraToolNames());
+  if (extraNames.size === 0) {
+    return devTools;
+  }
+  const devNames = new Set(devTools.map((t) => t.name));
+  const extraTools = getAllTools().filter((t) => extraNames.has(t.name) && !devNames.has(t.name));
+  return [...devTools, ...extraTools];
+}
+
+export function getUnknownExtraToolNames(): string[] {
+  const known = new Set(getAllTools().map((t) => t.name));
+  return getExtraToolNames().filter((name) => !known.has(name));
 }
 
 /**

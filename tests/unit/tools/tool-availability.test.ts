@@ -239,4 +239,81 @@ describe('tool availability - mode filtering', () => {
       expect(fullModeNames.length).toBeGreaterThan(devModeNames.length);
     });
   });
+
+  describe('MCP_EXTRA_TOOLS', () => {
+    const originalExtraTools = process.env['MCP_EXTRA_TOOLS'];
+
+    afterEach(() => {
+      if (originalExtraTools === undefined) {
+        delete process.env['MCP_EXTRA_TOOLS'];
+      } else {
+        process.env['MCP_EXTRA_TOOLS'] = originalExtraTools;
+      }
+    });
+
+    const loadTools = (mode: 'dev' | 'full') => {
+      jest.doMock('@/config', () => ({
+        getTeamCityUrl: () => 'https://example.test',
+        getTeamCityToken: () => 'token',
+        getMCPMode: () => mode,
+      }));
+      let tools: typeof import('@/tools') | undefined;
+      jest.isolateModules(() => {
+        tools = require('@/tools');
+      });
+      if (!tools) throw new Error('tools module not loaded');
+      return tools;
+    };
+
+    it('adds the listed full-mode tools in dev mode', () => {
+      process.env['MCP_EXTRA_TOOLS'] = 'move_queued_build_to_top, reorder_queued_builds';
+      const { getToolNames, getRequiredTool } = loadTools('dev');
+
+      const names = getToolNames();
+      expect(names).toEqual(
+        expect.arrayContaining(['move_queued_build_to_top', 'reorder_queued_builds', 'get_build'])
+      );
+      expect(names).not.toContain('delete_project');
+      expect(getRequiredTool('move_queued_build_to_top').name).toBe('move_queued_build_to_top');
+    });
+
+    it('lists every tool once even when a dev tool is named', () => {
+      process.env['MCP_EXTRA_TOOLS'] =
+        'get_build move_queued_build_to_top move_queued_build_to_top';
+      const { getToolNames } = loadTools('dev');
+
+      const names: string[] = getToolNames();
+      expect(names.filter((n) => n === 'get_build')).toHaveLength(1);
+      expect(names.filter((n) => n === 'move_queued_build_to_top')).toHaveLength(1);
+    });
+
+    it('keeps the dev tool list unchanged when unset', () => {
+      delete process.env['MCP_EXTRA_TOOLS'];
+      const withoutExtras: string[] = loadTools('dev').getToolNames();
+      jest.resetModules();
+      process.env['MCP_EXTRA_TOOLS'] = '  ';
+      const withBlank: string[] = loadTools('dev').getToolNames();
+
+      expect(withBlank).toEqual(withoutExtras);
+      expect(withoutExtras).not.toContain('move_queued_build_to_top');
+    });
+
+    it('does not change full mode', () => {
+      delete process.env['MCP_EXTRA_TOOLS'];
+      const plain: string[] = loadTools('full').getToolNames();
+      jest.resetModules();
+      process.env['MCP_EXTRA_TOOLS'] = 'move_queued_build_to_top';
+      const withExtras: string[] = loadTools('full').getToolNames();
+
+      expect(withExtras).toEqual(plain);
+    });
+
+    it('reports names that match no tool', () => {
+      process.env['MCP_EXTRA_TOOLS'] = 'move_queued_build_to_top,no_such_tool';
+      const { getUnknownExtraToolNames, getToolNames } = loadTools('dev');
+
+      expect(getUnknownExtraToolNames()).toEqual(['no_such_tool']);
+      expect(getToolNames()).not.toContain('no_such_tool');
+    });
+  });
 });

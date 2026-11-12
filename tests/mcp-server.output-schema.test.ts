@@ -37,6 +37,7 @@ jest.mock('../src/tools', () => ({
   getAvailableTools: jest.fn(),
   getTool: jest.fn(),
   getMCPMode: jest.fn(() => 'full'),
+  getUnknownExtraToolNames: jest.fn(() => []),
 }));
 jest.mock('@/utils/logger');
 
