@@ -287,9 +287,14 @@ export class BuildQueueManager extends EventEmitter {
       }
 
       // Move build to top via API
-      await this.client.modules.buildQueue.setQueuedBuildsOrder(undefined, {
-        build: [{ id: parseInt(buildId) }],
-      });
+      await this.client.modules.buildQueue.setQueuedBuildsOrder(
+        undefined,
+        {
+          build: [{ id: parseInt(buildId) }],
+        },
+        // The generated client declares application/xml, but the body is JSON.
+        { headers: { 'Content-Type': 'application/json' } }
+      );
 
       // Return updated position
       return await this.getQueuePosition(buildId);
@@ -314,9 +319,14 @@ export class BuildQueueManager extends EventEmitter {
       }
 
       // Reorder queue
-      await this.client.modules.buildQueue.setQueuedBuildsOrder(undefined, {
-        build: buildIds.map((id) => ({ id: parseInt(id) })),
-      });
+      await this.client.modules.buildQueue.setQueuedBuildsOrder(
+        undefined,
+        {
+          build: buildIds.map((id) => ({ id: parseInt(id) })),
+        },
+        // The generated client declares application/xml, but the body is JSON.
+        { headers: { 'Content-Type': 'application/json' } }
+      );
 
       // Return updated positions
       return await Promise.all(buildIds.map((id) => this.getQueuePosition(id)));

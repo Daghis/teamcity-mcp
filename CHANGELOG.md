@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.12.15](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.14...teamcity-mcp-v2.12.15) (2026-11-06)
+
+
+### Bug Fixes
+
+* set isError on failed tool calls ([#556](https://github.com/Daghis/teamcity-mcp/issues/556)) ([32cf2c9](https://github.com/Daghis/teamcity-mcp/commit/32cf2c91c2b987b4f43e8dedc904f74ac005b7f6))
+
+## [2.12.14](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.13...teamcity-mcp-v2.12.14) (2026-11-06)
+
+
+### Bug Fixes
+
+* send JSON content type when setting the build queue order ([#557](https://github.com/Daghis/teamcity-mcp/issues/557)) ([33b9222](https://github.com/Daghis/teamcity-mcp/commit/33b92225e5f032e41fc399766dc0e537e232c8d5))
+
 ## [2.12.13](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.12...teamcity-mcp-v2.12.13) (2026-11-06)
 
 
