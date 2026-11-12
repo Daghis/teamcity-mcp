@@ -1207,6 +1207,11 @@ const DEV_TOOLS: ToolDefinition[] = [
           description: 'Optional build parameters to set when triggering the build',
           additionalProperties: { type: 'string' },
         },
+        moveToTop: {
+          type: 'boolean',
+          description:
+            'Put the build at the top of the queue instead of the end (optional, defaults to false)',
+        },
       },
       required: ['buildTypeId'],
     },
@@ -1216,6 +1221,7 @@ const DEV_TOOLS: ToolDefinition[] = [
         branchName: z.string().min(1).max(255).optional(),
         comment: z.string().max(500).optional(),
         properties: z.record(z.string(), z.string()).optional(),
+        moveToTop: z.boolean().optional(),
       });
 
       return runTool(
@@ -1233,6 +1239,7 @@ const DEV_TOOLS: ToolDefinition[] = [
               ? trimmedPropertyBranch
               : undefined;
           const branchName = normalizedDirectBranch ?? normalizedPropertyBranch;
+          const moveToTop = typed.moveToTop ?? false;
 
           if (
             normalizedDirectBranch &&
@@ -1311,7 +1318,7 @@ const DEV_TOOLS: ToolDefinition[] = [
             )}"/>${branchPart}${commentPart}${propertiesPart}</build>`;
             const response = await adapter.http.post('/app/rest/buildQueue', xml, {
               headers: { 'Content-Type': 'application/xml', Accept: 'application/json' },
-              params: { moveToTop: false },
+              params: { moveToTop },
             });
             const build = response.data as {
               id?: number | string;
@@ -1332,7 +1339,7 @@ const DEV_TOOLS: ToolDefinition[] = [
 
           try {
             const response = await adapter.modules.buildQueue.addBuildToQueue(
-              false,
+              moveToTop,
               buildRequest as Build,
               {
                 headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

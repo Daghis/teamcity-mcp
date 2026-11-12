@@ -114,12 +114,15 @@ Complete infrastructure management including creation, modification, and deletio
 - Trigger a build by build configuration ID
 - Optional branch selection
 - Optional build comment
+- Optionally put the build at the top of the queue
 
 **Parameters**:
 
 - `buildTypeId` (required): Build configuration ID
 - `branchName` (optional): Branch to build
 - `comment` (optional): Build comment/description
+- `properties` (optional): Build parameters to set
+- `moveToTop` (optional): Put the build at the top of the queue instead of the end (default `false`)
 
 **Example Use Cases**:
 
