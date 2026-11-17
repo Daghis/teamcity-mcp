@@ -81,6 +81,11 @@ export interface TeamCityBuildLogChunk {
   totalLines?: number;
 }
 
+export interface TeamCityBuildLogTail {
+  lines: string[];
+  totalLines: number;
+}
+
 export interface TeamCityUnifiedClient {
   /** Direct access to generated REST API modules. */
   modules: Readonly<TeamCityApiSurface>;
@@ -133,6 +138,7 @@ export interface TeamCityClientAdapter extends TeamCityUnifiedClient {
     buildId: string,
     options?: { startLine?: number; lineCount?: number }
   ): Promise<TeamCityBuildLogChunk>;
+  getBuildLogTail(buildId: string, lineCount: number): Promise<TeamCityBuildLogTail>;
   listBuildTypes(projectId?: string): Promise<unknown>;
   getBuildType(buildTypeId: string): Promise<unknown>;
   listTestFailures(buildId: string): Promise<unknown>;

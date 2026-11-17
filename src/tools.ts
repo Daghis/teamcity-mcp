@@ -33,6 +33,12 @@ import { TeamCityAPIError, TeamCityNotFoundError } from '@/teamcity/errors';
 import { createPaginatedFetcher, fetchAllPages } from '@/teamcity/pagination';
 import { sleep } from '@/utils/async';
 import {
+  DEFAULT_MIN_FREE_DISK_BYTES,
+  InsufficientDiskSpaceError,
+  assertDiskSpace,
+  createDiskSpaceGuard,
+} from '@/utils/disk-space';
+import {
   buildBranchSegmentInput,
   hasBranchSegment,
   normalizeLocatorSegments,
@@ -1864,7 +1870,8 @@ const DEV_TOOLS: ToolDefinition[] = [
         tail: { type: 'boolean', description: 'Tail mode: return last N lines' },
         encoding: {
           type: 'string',
-          description: "Response encoding: 'text' (default) or 'stream'",
+          description:
+            "Response encoding: 'text' (default) or 'stream'. 'stream' writes the whole log, or the requested line range, to outputPath; logs can be several GB",
           enum: ['text', 'stream'],
           default: 'text',
         },
@@ -1872,6 +1879,11 @@ const DEV_TOOLS: ToolDefinition[] = [
           type: 'string',
           description:
             'Optional absolute path to write streamed logs; defaults to a temp file when streaming',
+        },
+        minFreeDiskMb: {
+          type: 'number',
+          description:
+            'Streaming only: disk space in MiB that must stay free on the target disk, otherwise the download aborts (default 1024, 0 disables the reserve)',
         },
       },
       required: [],
@@ -1889,6 +1901,7 @@ const DEV_TOOLS: ToolDefinition[] = [
           tail: z.boolean().optional(),
           encoding: z.enum(['text', 'stream']).default('text'),
           outputPath: z.string().min(1).optional(),
+          minFreeDiskMb: z.coerce.number().min(0).optional(),
         })
         .superRefine((value, ctx) => {
           if (!value.buildId && typeof value.buildNumber === 'undefined') {
@@ -2001,12 +2014,11 @@ const DEV_TOOLS: ToolDefinition[] = [
           const attemptBuffered = async () => {
             if (typed.tail) {
               const count = typed.lineCount ?? typed.pageSize ?? 500;
-              const full = await adapter.getBuildLog(effectiveBuildId);
-              const allLines = full.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-              if (allLines.length > 0 && allLines[allLines.length - 1] === '') allLines.pop();
-              const total = allLines.length;
-              const start = Math.max(0, total - count);
-              const lines = allLines.slice(start);
+              const { lines, totalLines: total } = await adapter.getBuildLogTail(
+                effectiveBuildId,
+                count
+              );
+              const start = total - lines.length;
 
               return json({
                 lines,
@@ -2065,12 +2077,14 @@ const DEV_TOOLS: ToolDefinition[] = [
               typeof typed.startLine === 'number'
                 ? typed.startLine
                 : ((typed.page ?? 1) - 1) * effectivePageSize;
+            const ranged =
+              typed.startLine !== undefined ||
+              typed.page !== undefined ||
+              typed.lineCount !== undefined ||
+              typed.pageSize !== undefined;
 
             const response = await adapter.downloadBuildLogContent<Readable>(effectiveBuildId, {
-              params: {
-                start: startLine,
-                count: effectivePageSize,
-              },
+              params: ranged ? { start: startLine, count: effectivePageSize } : undefined,
               responseType: 'stream',
             });
 
@@ -2082,8 +2096,36 @@ const DEV_TOOLS: ToolDefinition[] = [
             const safeBuildId = effectiveBuildId.replace(/[^a-zA-Z0-9._-]/g, '_') || 'build';
             const defaultFileName = `build-log-${safeBuildId}-${startLine}-${randomUUID()}.log`;
             const targetPath = typed.outputPath ?? join(tmpdir(), defaultFileName);
-            await fs.mkdir(dirname(targetPath), { recursive: true });
-            await pipeline(stream, createWriteStream(targetPath));
+            const targetDir = dirname(targetPath);
+            const contentLength = Number(response.headers?.['content-length']);
+            const minFreeBytes =
+              typed.minFreeDiskMb === undefined
+                ? DEFAULT_MIN_FREE_DISK_BYTES
+                : typed.minFreeDiskMb * 1024 ** 2;
+            let freeBytes: number;
+            try {
+              await fs.mkdir(targetDir, { recursive: true });
+              freeBytes = await assertDiskSpace(
+                targetDir,
+                !ranged && Number.isFinite(contentLength) ? contentLength : 0,
+                minFreeBytes
+              );
+            } catch (error) {
+              stream.destroy();
+              throw error;
+            }
+            try {
+              await pipeline(
+                stream,
+                createDiskSpaceGuard(targetDir, freeBytes, minFreeBytes),
+                createWriteStream(targetPath)
+              );
+            } catch (error) {
+              if (error instanceof InsufficientDiskSpaceError) {
+                await fs.rm(targetPath, { force: true });
+              }
+              throw error;
+            }
             const stats = await fs.stat(targetPath);
 
             const page = Math.floor(startLine / effectivePageSize) + 1;
@@ -2097,8 +2139,8 @@ const DEV_TOOLS: ToolDefinition[] = [
                 buildNumber:
                   typeof typed.buildNumber !== 'undefined' ? String(typed.buildNumber) : undefined,
                 buildTypeId: typed.buildTypeId,
-                page,
-                pageSize: effectivePageSize,
+                page: ranged ? page : undefined,
+                pageSize: ranged ? effectivePageSize : undefined,
                 startLine,
               },
             });
@@ -6732,9 +6774,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-          await adapter.modules.buildQueue.setQueuedBuildsOrder(undefined, {
-            build: [{ id: parseInt(typed.buildId) }],
-          });
+          await adapter.modules.buildQueue.setQueuedBuildsOrder(
+            undefined,
+            {
+              build: [{ id: parseInt(typed.buildId) }],
+            },
+            // The generated client declares application/xml, but the body is JSON.
+            { headers: { 'Content-Type': 'application/json' } }
+          );
           return json({
             success: true,
             action: 'move_queued_build_to_top',
@@ -6768,9 +6815,14 @@ const FULL_MODE_TOOLS: ToolDefinition[] = [
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-          await adapter.modules.buildQueue.setQueuedBuildsOrder(undefined, {
-            build: typed.buildIds.map((id) => ({ id: parseInt(id) })),
-          });
+          await adapter.modules.buildQueue.setQueuedBuildsOrder(
+            undefined,
+            {
+              build: typed.buildIds.map((id) => ({ id: parseInt(id) })),
+            },
+            // The generated client declares application/xml, but the body is JSON.
+            { headers: { 'Content-Type': 'application/json' } }
+          );
           return json({
             success: true,
             action: 'reorder_queued_builds',

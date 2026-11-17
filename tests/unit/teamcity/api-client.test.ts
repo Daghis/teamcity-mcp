@@ -242,6 +242,48 @@ describe('TeamCityAPI unified surface', () => {
     expect(getSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('streams the download page for a log chunk when REST paging is unavailable', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    let served = 0;
+    const body = new Readable({
+      read() {
+        served += 1;
+        this.push(`l${served - 1}\n`);
+      },
+    });
+    jest
+      .spyOn(api.http, 'get')
+      .mockRejectedValueOnce(notFound())
+      .mockResolvedValueOnce(createAxiosResponse<Readable>(body));
+
+    const chunk = await api.getBuildLogChunk('123', { startLine: 1, lineCount: 2 });
+
+    expect(chunk).toEqual({ lines: ['l1', 'l2'], startLine: 1, nextStartLine: 3 });
+    expect(body.destroyed).toBe(true);
+  });
+
+  it('tails the streamed download page', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    jest
+      .spyOn(api.http, 'get')
+      .mockResolvedValue(createAxiosResponse<Readable>(Readable.from(['l0\nl1\nl2\n'])));
+
+    await expect(api.getBuildLogTail('123', 2)).resolves.toEqual({
+      lines: ['l1', 'l2'],
+      totalLines: 3,
+    });
+  });
+
+  it('tails a log the server returned as text', async () => {
+    const api = TeamCityAPI.getInstance(baseConfig);
+    jest.spyOn(api.http, 'get').mockResolvedValue(createAxiosResponse<string>('l0\nl1\nl2'));
+
+    await expect(api.getBuildLogTail('123', 1)).resolves.toEqual({
+      lines: ['l2'],
+      totalLines: 3,
+    });
+  });
+
   it('routes listSnapshotDependencies through the generated BuildApi and unwraps payload', async () => {
     const api = TeamCityAPI.getInstance(baseConfig);
     const dependencies = { build: [] };
