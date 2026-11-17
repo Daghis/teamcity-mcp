@@ -177,10 +177,11 @@ claude mcp add --transport http -s user teamcity http://127.0.0.1:3000/mcp
 ```
 
 - Endpoint `/mcp`; options `--http`, `--host` (default `127.0.0.1`) and `--port` (default `3000`), or `MCP_TRANSPORT=http`, `MCP_HTTP_HOST` and `MCP_HTTP_PORT`.
-- **Token per client:** a client's `Authorization: Bearer <TeamCity token>` is used for that session's TeamCity calls, and the session is bound to it (other tokens get `401`). Without `TEAMCITY_TOKEN` on the server, a bearer token is required; with it, clients that send none fall back to the server's token.
+- **Token per client:** every client must send `Authorization: Bearer <TeamCity token>`; it is used for that session's TeamCity calls, and the session is bound to it. A request with another token, or none, gets `404`, so the client opens a new session.
+- **Server token (opt-in):** with `--allow-server-token` (or `MCP_HTTP_ALLOW_SERVER_TOKEN=true`), clients that send no token use the server's `TEAMCITY_TOKEN`. Every local user and process that can reach the port can then use that token, so this is refused on a non-loopback bind address.
 - Each client gets its own MCP session; a runtime switch with `set_mcp_mode` only affects the session that made it.
-- Keep it on loopback: it rejects requests whose `Host` or browser `Origin` is not a loopback name or the bind address.
-- After a server restart, clients get `404` for their old session and re-initialize on their own.
+- Sessions without requests for 30 minutes are closed, and at most 100 can be open at once; a closed session gets `404` and the client re-initializes on its own, also after a server restart.
+- Requests are rejected unless their `Host` is a loopback name or the bind address; browser requests (with an `Origin` header) are not supported.
 
 ## Configuration
 
