@@ -194,6 +194,7 @@ export interface SessionState {
   mode: 'dev' | 'full' | null;
   server: import('@modelcontextprotocol/sdk/server/index.js').Server;
   teamcityToken?: string;
+  apiClient?: unknown;
 }
 
 const sessionContext = new AsyncLocalStorage<SessionState>();

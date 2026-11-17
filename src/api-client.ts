@@ -117,7 +117,6 @@ interface NormalizedClientConfig {
 export class TeamCityAPI {
   private static instance: TeamCityAPI | undefined;
   private static instanceConfig: NormalizedClientConfig | undefined;
-  private static sessionInstances = new Map<string, TeamCityAPI>();
   private readonly axiosInstance: AxiosInstance;
   private readonly config: Configuration;
   private readonly baseUrl: string;
@@ -304,20 +303,16 @@ export class TeamCityAPI {
       return this.instance;
     }
 
-    const sessionToken = getSessionState()?.teamcityToken;
-    if (sessionToken) {
-      let sessionInstance = this.sessionInstances.get(sessionToken);
-      if (sessionInstance == null) {
-        sessionInstance = new TeamCityAPI(
-          this.normalizeConfig({
-            baseUrl: getTeamCityUrl(),
-            token: sessionToken,
-            extraHeaders: getTeamCityExtraHeaders(),
-          })
-        );
-        this.sessionInstances.set(sessionToken, sessionInstance);
-      }
-      return sessionInstance;
+    const session = getSessionState();
+    if (session?.teamcityToken) {
+      session.apiClient ??= new TeamCityAPI(
+        this.normalizeConfig({
+          baseUrl: getTeamCityUrl(),
+          token: session.teamcityToken,
+          extraHeaders: getTeamCityExtraHeaders(),
+        })
+      );
+      return session.apiClient as TeamCityAPI;
     }
 
     if (this.instance == null) {
@@ -648,7 +643,6 @@ export class TeamCityAPI {
   static reset() {
     this.instance = undefined;
     this.instanceConfig = undefined;
-    this.sessionInstances.clear();
   }
 
   private createApi<T>(
