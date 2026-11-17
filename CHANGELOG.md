@@ -1,5 +1,47 @@
 # Changelog
 
+## [2.12.16](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.15...teamcity-mcp-v2.12.16) (2026-11-12)
+
+
+### Bug Fixes
+
+* **api:** send JSON Content-Type for object bodies on XML-labelled methods ([#561](https://github.com/Daghis/teamcity-mcp/issues/561)) ([c1cd2c6](https://github.com/Daghis/teamcity-mcp/commit/c1cd2c66c22650b1e38df4c81b8d1d50cb8d6de8))
+
+## [2.12.15](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.14...teamcity-mcp-v2.12.15) (2026-11-06)
+
+
+### Bug Fixes
+
+* set isError on failed tool calls ([#556](https://github.com/Daghis/teamcity-mcp/issues/556)) ([32cf2c9](https://github.com/Daghis/teamcity-mcp/commit/32cf2c91c2b987b4f43e8dedc904f74ac005b7f6))
+
+## [2.12.14](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.13...teamcity-mcp-v2.12.14) (2026-11-06)
+
+
+### Bug Fixes
+
+* send JSON content type when setting the build queue order ([#557](https://github.com/Daghis/teamcity-mcp/issues/557)) ([33b9222](https://github.com/Daghis/teamcity-mcp/commit/33b92225e5f032e41fc399766dc0e537e232c8d5))
+
+## [2.12.13](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.12...teamcity-mcp-v2.12.13) (2026-11-06)
+
+
+### Bug Fixes
+
+* **security:** bump follow-redirects to 1.16.2 and @hono/node-server to 2.x ([#559](https://github.com/Daghis/teamcity-mcp/issues/559)) ([8c0c50b](https://github.com/Daghis/teamcity-mcp/commit/8c0c50ba142c5b7852f55287b7e7e5a8583bd9d2))
+
+## [2.12.12](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.11...teamcity-mcp-v2.12.12) (2026-10-28)
+
+
+### Bug Fixes
+
+* **security:** bump zod, body-parser, fast-uri, ip-address and qs ([#554](https://github.com/Daghis/teamcity-mcp/issues/554)) ([5094e49](https://github.com/Daghis/teamcity-mcp/commit/5094e496f520aec345f3305cfc47bf3abab963af))
+
+## [2.12.11](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.10...teamcity-mcp-v2.12.11) (2026-10-28)
+
+
+### Bug Fixes
+
+* **build-log:** keep memory bounded for log chunks, tails and streams ([#549](https://github.com/Daghis/teamcity-mcp/issues/549)) ([7815ab1](https://github.com/Daghis/teamcity-mcp/commit/7815ab10a2b7a395a680d665ca68ebe52a7d629e))
+
 ## [2.12.10](https://github.com/Daghis/teamcity-mcp/compare/teamcity-mcp-v2.12.9...teamcity-mcp-v2.12.10) (2026-10-21)
 
 

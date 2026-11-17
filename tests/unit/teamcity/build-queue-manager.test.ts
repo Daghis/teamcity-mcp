@@ -264,9 +264,13 @@ describe('BuildQueueManager', () => {
       });
 
       expect(result.buildId).toBe('12348');
-      expect(mockClient.buildQueue.setQueuedBuildsOrder).toHaveBeenCalledWith(undefined, {
-        build: [{ id: 12348 }],
-      });
+      expect(mockClient.buildQueue.setQueuedBuildsOrder).toHaveBeenCalledWith(
+        undefined,
+        {
+          build: [{ id: 12348 }],
+        },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
     });
   });
 
@@ -483,9 +487,13 @@ describe('BuildQueueManager', () => {
 
       await manager.moveToTop('12346');
 
-      expect(mockClient.buildQueue.setQueuedBuildsOrder).toHaveBeenCalledWith(undefined, {
-        build: [{ id: 12346 }],
-      });
+      expect(mockClient.buildQueue.setQueuedBuildsOrder).toHaveBeenCalledWith(
+        undefined,
+        {
+          build: [{ id: 12346 }],
+        },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
     });
 
     it('should reorder queue', async () => {
@@ -505,9 +513,13 @@ describe('BuildQueueManager', () => {
 
       await manager.reorderQueue(buildIds);
 
-      expect(mockClient.buildQueue.setQueuedBuildsOrder).toHaveBeenCalledWith(undefined, {
-        build: buildIds.map((id) => ({ id: parseInt(id) })),
-      });
+      expect(mockClient.buildQueue.setQueuedBuildsOrder).toHaveBeenCalledWith(
+        undefined,
+        {
+          build: buildIds.map((id) => ({ id: parseInt(id) })),
+        },
+        { headers: { 'Content-Type': 'application/json' } }
+      );
     });
 
     it('should not move build with dependencies to top', async () => {

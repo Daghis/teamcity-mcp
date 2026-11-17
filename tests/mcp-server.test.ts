@@ -283,6 +283,7 @@ describe('MCP Server Initialization', () => {
             text: 'Tool error',
           },
         ],
+        isError: true,
       });
     });
 
