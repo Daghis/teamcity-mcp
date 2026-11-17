@@ -19,10 +19,23 @@ export interface CliArgs {
   mode?: 'dev' | 'full';
   /** Path to .env format config file */
   config?: string;
+  http?: boolean;
+  host?: string;
+  port?: number;
+  allowServerToken?: boolean;
   /** Show help and exit */
   help: boolean;
   /** Show version and exit */
   version: boolean;
+}
+
+export function parsePort(value: string): number | undefined {
+  const port = /^\d+$/.test(value) ? Number(value) : NaN;
+  if (port >= 0 && port <= 65535) {
+    return port;
+  }
+  process.stderr.write(`Warning: Invalid port '${value}'. Expected a number from 0 to 65535.\n`);
+  return undefined;
 }
 
 /**
@@ -50,6 +63,22 @@ export function parseCliArgs(argv: string[]): CliArgs {
     }
     if (arg === '--version' || arg === '-v') {
       result.version = true;
+      continue;
+    }
+    if (arg === '--http') {
+      result.http = true;
+      continue;
+    }
+    if (arg === '--allow-server-token') {
+      result.allowServerToken = true;
+      continue;
+    }
+    if (arg.startsWith('--host=')) {
+      result.host = arg.slice('--host='.length);
+      continue;
+    }
+    if (arg.startsWith('--port=')) {
+      result.port = parsePort(arg.slice('--port='.length));
       continue;
     }
 
@@ -107,6 +136,16 @@ export function parseCliArgs(argv: string[]): CliArgs {
         i++;
         continue;
       }
+      if (arg === '--host') {
+        result.host = nextArg;
+        i++;
+        continue;
+      }
+      if (arg === '--port') {
+        result.port = parsePort(nextArg);
+        i++;
+        continue;
+      }
     }
   }
 
@@ -158,6 +197,15 @@ OPTIONS:
   --token <token>     TeamCity API token for authentication
   --mode <dev|full>   Tool exposure mode: dev (limited) or full (all tools)
   --config <path>     Path to .env format configuration file
+  --http              Serve MCP over Streamable HTTP at /mcp instead of stdio
+                      (env: MCP_TRANSPORT=http); one process serves many clients.
+                      Each client sends its own TeamCity token as
+                      "Authorization: Bearer <token>"
+  --allow-server-token
+                      HTTP: let clients without a token use the server's token
+                      (env: MCP_HTTP_ALLOW_SERVER_TOKEN=true); loopback bind only
+  --host <address>    HTTP bind address (env: MCP_HTTP_HOST, default 127.0.0.1)
+  --port <number>     HTTP port (env: MCP_HTTP_PORT, default 3000)
 
   -h, --help          Show this help message
   -v, --version       Show version number
@@ -183,6 +231,9 @@ EXAMPLES:
 
   # Override config file with CLI arg
   teamcity-mcp --config prod.env --mode dev
+
+  # One shared HTTP server for many MCP clients, each with its own token
+  teamcity-mcp --url https://tc.example.com --http --port 3000
 
 CONFIG FILE FORMAT (.env):
   TEAMCITY_URL=https://tc.example.com

@@ -6,7 +6,12 @@ import axios, { type AxiosInstance, type AxiosResponse, type RawAxiosRequestConf
 import axiosRetry from 'axios-retry';
 import { Readable } from 'stream';
 
-import { getTeamCityExtraHeaders, getTeamCityToken, getTeamCityUrl } from '@/config';
+import {
+  getSessionState,
+  getTeamCityExtraHeaders,
+  getTeamCityToken,
+  getTeamCityUrl,
+} from '@/config';
 import {
   addRequestId,
   logAndTransformError,
@@ -296,6 +301,18 @@ export class TeamCityAPI {
       this.instance = new TeamCityAPI(requestedConfig);
       this.instanceConfig = requestedConfig;
       return this.instance;
+    }
+
+    const session = getSessionState();
+    if (session?.teamcityToken) {
+      session.apiClient ??= new TeamCityAPI(
+        this.normalizeConfig({
+          baseUrl: getTeamCityUrl(),
+          token: session.teamcityToken,
+          extraHeaders: getTeamCityExtraHeaders(),
+        })
+      );
+      return session.apiClient as TeamCityAPI;
     }
 
     if (this.instance == null) {

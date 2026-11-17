@@ -7,8 +7,14 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import * as dotenv from 'dotenv';
 
 import { getTeamCityToken, getTeamCityUrl, setServerInstance } from '@/config';
+import {
+  DEFAULT_HTTP_HOST,
+  DEFAULT_HTTP_PORT,
+  type RunningHttpServer,
+  startHttpServer,
+} from '@/http-server';
 import { startServerLifecycle } from '@/server-runner';
-import { getHelpText, getVersion, parseCliArgs } from '@/utils/cli-args';
+import { getHelpText, getVersion, parseCliArgs, parsePort } from '@/utils/cli-args';
 import { loadEnvFile } from '@/utils/env-file';
 
 import { createSimpleServer } from './server';
@@ -62,7 +68,20 @@ if (cliArgs.mode) {
 
 let activeServer: Server | null = null;
 let lifecyclePromise: Promise<void> | null = null;
+let httpServer: RunningHttpServer | null = null;
 let shuttingDown = false;
+
+const nonEmpty = (value: string | undefined): string | undefined =>
+  value !== undefined && value.trim().length > 0 ? value.trim() : undefined;
+
+const useHttp = cliArgs.http === true || process.env['MCP_TRANSPORT'] === 'http';
+const httpHost =
+  nonEmpty(cliArgs.host) ?? nonEmpty(process.env['MCP_HTTP_HOST']) ?? DEFAULT_HTTP_HOST;
+const envPort = nonEmpty(process.env['MCP_HTTP_PORT']);
+const httpPort =
+  cliArgs.port ?? (envPort !== undefined ? parsePort(envPort) : undefined) ?? DEFAULT_HTTP_PORT;
+const allowServerToken =
+  cliArgs.allowServerToken === true || process.env['MCP_HTTP_ALLOW_SERVER_TOKEN'] === 'true';
 
 const clearServerState = () => {
   activeServer = null;
@@ -81,6 +100,7 @@ async function shutdown(exitCode: number): Promise<never> {
     const serverToClose = activeServer;
     const lifecycleToAwait = lifecyclePromise;
 
+    await httpServer?.close();
     await serverToClose?.close();
     await lifecycleToAwait;
   } catch (error) {
@@ -97,9 +117,17 @@ async function main() {
   try {
     // Validate required environment variables via centralized config
     let hasUrl: string;
+    let hasServerToken = true;
     try {
       hasUrl = getTeamCityUrl();
-      getTeamCityToken();
+      try {
+        getTeamCityToken();
+      } catch (tokenError) {
+        if (!useHttp) {
+          throw tokenError;
+        }
+        hasServerToken = false;
+      }
     } catch (e) {
       process.stderr.write(`${(e as Error).message}\n`);
       process.stderr.write(
@@ -115,6 +143,27 @@ async function main() {
 
     process.stderr.write('Starting TeamCity MCP Server\n');
     process.stderr.write(`TeamCity URL: ${hasUrl}\n`);
+
+    if (useHttp) {
+      httpServer = await startHttpServer({
+        host: httpHost,
+        port: httpPort,
+        createServer: createSimpleServer,
+        allowServerToken: allowServerToken && hasServerToken,
+      });
+      process.stderr.write(
+        `TeamCity MCP Server is listening on http://${httpHost}:${httpServer.port}/mcp\n`
+      );
+      if (allowServerToken && !hasServerToken) {
+        process.stderr.write('--allow-server-token has no effect: no TEAMCITY_TOKEN configured\n');
+      }
+      process.stderr.write(
+        allowServerToken && hasServerToken
+          ? 'Clients without "Authorization: Bearer <token>" use the server token\n'
+          : 'Each client must send its TeamCity token as "Authorization: Bearer <token>"\n'
+      );
+      return;
+    }
 
     // Create and start server
     const server = createSimpleServer();
