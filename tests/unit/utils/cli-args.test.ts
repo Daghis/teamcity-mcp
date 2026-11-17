@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 
-import { type CliArgs, getHelpText, getVersion, parseCliArgs } from '@/utils/cli-args';
+import { type CliArgs, getHelpText, getVersion, parseCliArgs, parsePort } from '@/utils/cli-args';
 
 // Mock fs for getVersion tests
 jest.mock('fs', () => ({
@@ -197,12 +197,15 @@ describe('parseCliArgs', () => {
 
   describe('HTTP transport', () => {
     it('should parse --http with --host and --port in both formats', () => {
-      expect(parseCliArgs(['--http', '--host', '::1', '--port', '4100'])).toEqual<CliArgs>({
+      expect(
+        parseCliArgs(['--http', '--host', '::1', '--port', '4100', '--allow-server-token'])
+      ).toEqual<CliArgs>({
         help: false,
         version: false,
         http: true,
         host: '::1',
         port: 4100,
+        allowServerToken: true,
       });
       expect(parseCliArgs(['--host=127.0.0.1', '--port=0'])).toMatchObject({
         host: '127.0.0.1',
@@ -216,6 +219,16 @@ describe('parseCliArgs', () => {
         expect(parseCliArgs(['--port=99999']).port).toBeUndefined();
         expect(parseCliArgs(['--port', 'abc']).port).toBeUndefined();
         expect(stderr).toHaveBeenCalledWith(expect.stringContaining("Invalid port '99999'"));
+      } finally {
+        stderr.mockRestore();
+      }
+    });
+
+    it.each(['', '0x50', '1e3', '-1', '80.5'])('should reject the port %p', (value) => {
+      const stderr = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      try {
+        expect(parsePort(value)).toBeUndefined();
+        expect(parseCliArgs([`--port=${value}`]).port).toBeUndefined();
       } finally {
         stderr.mockRestore();
       }

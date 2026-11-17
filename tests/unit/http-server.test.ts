@@ -13,7 +13,7 @@ import {
   runInSession,
   setMCPMode,
 } from '@/config';
-import { type RunningHttpServer, startHttpServer } from '@/http-server';
+import { type HttpServerOptions, type RunningHttpServer, startHttpServer } from '@/http-server';
 
 // jest.config maps the SDK's Server and types.js to stubs; this end-to-end test needs the real ones.
 import { Server } from '../../node_modules/@modelcontextprotocol/sdk/dist/cjs/server/index.js';
@@ -54,6 +54,7 @@ const send = (
   options: { method?: string; path?: string; headers?: Record<string, string>; body?: string }
 ): Promise<Reply> =>
   new Promise((resolve, reject) => {
+    let answered = false;
     const req = request(
       {
         host: '127.0.0.1',
@@ -67,8 +68,10 @@ const send = (
         },
       },
       (res) => {
+        answered = true;
         const chunks: Buffer[] = [];
         res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('error', reject);
         res.on('end', () =>
           resolve({
             status: res.statusCode ?? 0,
@@ -78,7 +81,12 @@ const send = (
         );
       }
     );
-    req.on('error', reject);
+    req.on('error', (error: NodeJS.ErrnoException) => {
+      if (answered && (error.code === 'ECONNRESET' || error.code === 'EPIPE')) {
+        return;
+      }
+      reject(error);
+    });
     req.end(options.body);
   });
 
@@ -141,23 +149,52 @@ const callTool = async (
 const callMode = (port: number, sessionId: string, set?: 'dev' | 'full'): Promise<string> =>
   callTool(port, sessionId, 'mode', set ? { set } : {});
 
+const savedServerEnv = {
+  TEAMCITY_URL: process.env['TEAMCITY_URL'],
+  TEAMCITY_TOKEN: process.env['TEAMCITY_TOKEN'],
+};
+
+const useServerToken = (): void => {
+  process.env['TEAMCITY_URL'] = 'https://tc.example.com';
+  process.env['TEAMCITY_TOKEN'] = 'tc-server';
+  resetConfigCache();
+};
+
+const restoreServerToken = (): void => {
+  for (const [key, value] of Object.entries(savedServerEnv)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+  resetConfigCache();
+};
+
+const startShared = (overrides: Partial<HttpServerOptions> = {}): Promise<RunningHttpServer> =>
+  startHttpServer({
+    host: '127.0.0.1',
+    port: 0,
+    createServer: createModeServer,
+    allowServerToken: true,
+    log: () => undefined,
+    ...overrides,
+  });
+
 describe('startHttpServer', () => {
   let running: RunningHttpServer;
 
   beforeEach(async () => {
     process.env['MCP_MODE'] = 'dev';
+    useServerToken();
     resetMCPMode();
-    running = await startHttpServer({
-      host: '127.0.0.1',
-      port: 0,
-      createServer: createModeServer,
-      log: () => undefined,
-    });
+    running = await startShared();
   });
 
   afterEach(async () => {
     await running.close();
     resetMCPMode();
+    restoreServerToken();
   });
 
   it('opens a session on initialize and serves requests within it', async () => {
@@ -215,22 +252,25 @@ describe('startHttpServer', () => {
     expect(running.sessionCount()).toBe(0);
   });
 
-  it('rejects a browser request from a foreign Origin', async () => {
-    const reply = await send(running.port, {
-      headers: { origin: 'https://attacker.example' },
-      body: initializeBody,
-    });
+  it.each(['https://attacker.example', 'http://localhost:6274'])(
+    'rejects a browser request from Origin %s',
+    async (origin) => {
+      const reply = await send(running.port, { headers: { origin }, body: initializeBody });
 
-    expect(reply.status).toBe(403);
-  });
+      expect(reply.status).toBe(403);
+      expect(running.sessionCount()).toBe(0);
+    }
+  );
 
-  it('accepts a browser request from a loopback Origin', async () => {
-    const reply = await send(running.port, {
-      headers: { origin: 'http://localhost:6274' },
-      body: initializeBody,
-    });
+  it('rejects a malformed initialize without building a session', async () => {
+    const createServer = jest.fn(createModeServer);
+    await running.close();
+    running = await startShared({ createServer });
 
-    expect(reply.status).toBe(200);
+    const reply = await send(running.port, { body: JSON.stringify({ method: 'initialize' }) });
+
+    expect(reply.status).toBe(400);
+    expect(createServer).not.toHaveBeenCalled();
   });
 
   it('answers malformed JSON with a parse error', async () => {
@@ -260,18 +300,63 @@ describe('startHttpServer', () => {
     await running.close();
 
     expect(running.sessionCount()).toBe(0);
-    running = await startHttpServer({
-      host: '127.0.0.1',
-      port: 0,
-      createServer: createModeServer,
-      log: () => undefined,
-    });
+    running = await startShared();
   });
 
-  it('falls back to the server token when a client sends none', async () => {
+  it('falls back to the server token when allowed and a client sends none', async () => {
     const sessionId = await openSession(running.port);
 
-    expect(await callTool(running.port, sessionId, 'token')).toBe('test-token');
+    expect(await callTool(running.port, sessionId, 'token')).toBe('tc-server');
+  });
+
+  it('answers 404 when a request brings a token its session was not opened with', async () => {
+    const sessionId = await openSession(running.port);
+
+    const reply = await send(running.port, {
+      headers: { 'mcp-session-id': sessionId, ...auth('tc-alice') },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/list' }),
+    });
+
+    expect(reply.status).toBe(404);
+  });
+
+  it('closes sessions that stay idle and answers them with 404', async () => {
+    await running.close();
+    running = await startShared({ sessionIdleTimeoutMs: 50 });
+    const sessionId = await openSession(running.port);
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(running.sessionCount()).toBe(0);
+    const reply = await send(running.port, {
+      headers: { 'mcp-session-id': sessionId },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/list' }),
+    });
+    expect(reply.status).toBe(404);
+  });
+
+  it('refuses new sessions beyond the limit', async () => {
+    await running.close();
+    running = await startShared({ maxSessions: 1 });
+    await openSession(running.port);
+
+    const reply = await send(running.port, { body: initializeBody });
+
+    expect(reply.status).toBe(503);
+    expect(running.sessionCount()).toBe(1);
+  });
+});
+
+describe('startHttpServer on a non-loopback address', () => {
+  it('refuses to share the server token', async () => {
+    await expect(
+      startHttpServer({
+        host: '0.0.0.0',
+        port: 0,
+        createServer: createModeServer,
+        allowServerToken: true,
+      })
+    ).rejects.toThrow("non-loopback address '0.0.0.0'");
   });
 });
 
@@ -279,24 +364,25 @@ describe('startHttpServer with client tokens', () => {
   let running: RunningHttpServer;
 
   beforeEach(async () => {
+    useServerToken();
     running = await startHttpServer({
       host: '127.0.0.1',
       port: 0,
       createServer: createModeServer,
-      requireClientToken: true,
       log: () => undefined,
     });
   });
 
   afterEach(async () => {
     await running.close();
+    restoreServerToken();
   });
 
-  it('refuses an initialize without a bearer token', async () => {
+  it('refuses an initialize without a bearer token by default', async () => {
     const reply = await send(running.port, { body: initializeBody });
 
     expect(reply.status).toBe(401);
-    expect(reply.headers['www-authenticate']).toBe('Bearer');
+    expect(reply.headers['www-authenticate']).toBeUndefined();
     expect(running.sessionCount()).toBe(0);
   });
 
@@ -308,7 +394,7 @@ describe('startHttpServer with client tokens', () => {
     expect(await callTool(running.port, bob, 'token', {}, 'tc-bob')).toBe('tc-bob');
   });
 
-  it('refuses a request whose token does not match its session', async () => {
+  it('answers 404 to a request whose token does not match its session', async () => {
     const alice = await openSession(running.port, 'tc-alice');
     const body = JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/list' });
 
@@ -318,8 +404,9 @@ describe('startHttpServer with client tokens', () => {
     });
     const missing = await send(running.port, { headers: { 'mcp-session-id': alice }, body });
 
-    expect(wrong.status).toBe(401);
-    expect(missing.status).toBe(401);
+    expect(wrong.status).toBe(404);
+    expect(missing.status).toBe(404);
+    expect(running.sessionCount()).toBe(1);
   });
 });
 
@@ -354,18 +441,23 @@ describe('TeamCityAPI.getInstance within a session', () => {
     TeamCityAPI.reset();
   });
 
-  const inSession = <T>(teamcityToken: string | undefined, fn: () => T): T =>
-    runInSession({ mode: null, server: {} as SessionState['server'], teamcityToken }, fn);
+  const session = (teamcityToken: string | undefined): SessionState => ({
+    mode: null,
+    server: {} as SessionState['server'],
+    teamcityToken,
+  });
 
-  it('gives each client token its own client and keeps the shared one outside sessions', () => {
+  it('keeps one client per session and the shared one outside sessions', () => {
     const shared = TeamCityAPI.getInstance();
-    const alice = inSession('tc-alice', () => TeamCityAPI.getInstance());
-    const aliceAgain = inSession('tc-alice', () => TeamCityAPI.getInstance());
-    const bob = inSession('tc-bob', () => TeamCityAPI.getInstance());
+    const aliceSession = session('tc-alice');
+    const alice = runInSession(aliceSession, () => TeamCityAPI.getInstance());
+    const aliceAgain = runInSession(aliceSession, () => TeamCityAPI.getInstance());
+    const aliceElsewhere = runInSession(session('tc-alice'), () => TeamCityAPI.getInstance());
 
     expect(alice).toBe(aliceAgain);
-    expect(alice).not.toBe(bob);
+    expect(aliceSession.apiClient).toBe(alice);
+    expect(aliceElsewhere).not.toBe(alice);
     expect(alice).not.toBe(shared);
-    expect(inSession(undefined, () => TeamCityAPI.getInstance())).toBe(shared);
+    expect(runInSession(session(undefined), () => TeamCityAPI.getInstance())).toBe(shared);
   });
 });

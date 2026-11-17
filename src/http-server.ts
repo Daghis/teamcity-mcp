@@ -9,11 +9,15 @@ import type { AddressInfo } from 'node:net';
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { isInitializeRequest, isJSONRPCRequest } from '@modelcontextprotocol/sdk/types.js';
 
 import { type SessionState, runInSession } from '@/config';
+import { error as logError } from '@/utils/logger';
 
 export const DEFAULT_HTTP_HOST = '127.0.0.1';
 export const DEFAULT_HTTP_PORT = 3000;
+export const DEFAULT_SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+export const DEFAULT_MAX_SESSIONS = 100;
 const MCP_PATH = '/mcp';
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
@@ -22,7 +26,9 @@ export interface HttpServerOptions {
   host: string;
   port: number;
   createServer: () => Server;
-  requireClientToken?: boolean;
+  allowServerToken?: boolean;
+  sessionIdleTimeoutMs?: number;
+  maxSessions?: number;
   log?: (message: string) => void;
 }
 
@@ -35,6 +41,8 @@ export interface RunningHttpServer {
 interface Session {
   transport: StreamableHTTPServerTransport;
   state: SessionState;
+  lastActive: number;
+  openRequests: number;
 }
 
 class HttpError extends Error {
@@ -55,17 +63,17 @@ const hostnameOf = (value: string): string | undefined => {
   }
 };
 
-const originHostname = (origin: string): string | undefined => {
-  try {
-    return new URL(origin).hostname.toLowerCase();
-  } catch {
-    return undefined;
-  }
+const bindHostname = (bindHost: string): string | undefined =>
+  hostnameOf(bindHost.includes(':') ? `[${bindHost}]` : bindHost);
+
+export const isLoopbackHost = (bindHost: string): boolean => {
+  const host = bindHostname(bindHost);
+  return host !== undefined && (LOOPBACK_HOSTS.has(host) || /^127(\.\d{1,3}){3}$/.test(host));
 };
 
 const allowedHostnames = (bindHost: string): Set<string> => {
   const allowed = new Set(LOOPBACK_HOSTS);
-  const bind = hostnameOf(bindHost.includes(':') ? `[${bindHost}]` : bindHost);
+  const bind = bindHostname(bindHost);
   if (bind && bind !== '0.0.0.0' && bind !== '[::]') {
     allowed.add(bind);
   }
@@ -77,12 +85,8 @@ const assertTrustedRequest = (req: IncomingMessage, allowed: Set<string>): void 
   if (!host || !allowed.has(host)) {
     throw new HttpError(403, -32000, `Forbidden: Host '${req.headers.host ?? ''}' is not allowed`);
   }
-  const origin = req.headers.origin;
-  if (origin !== undefined) {
-    const originHost = originHostname(origin);
-    if (!originHost || !allowed.has(originHost)) {
-      throw new HttpError(403, -32000, `Forbidden: Origin '${origin}' is not allowed`);
-    }
+  if (req.headers.origin !== undefined) {
+    throw new HttpError(403, -32000, 'Forbidden: browser requests (Origin) are not supported');
   }
 };
 
@@ -116,36 +120,36 @@ const bearerToken = (req: IncomingMessage): string | undefined => {
   return match?.[1];
 };
 
-const sameToken = (a: string | undefined, b: string): boolean => {
-  if (a === undefined) {
-    return false;
+const sameToken = (a: string | undefined, b: string | undefined): boolean => {
+  if (a === undefined || b === undefined) {
+    return a === b;
   }
   const left = Buffer.from(a);
   const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
 };
 
-const isInitializeRequest = (body: unknown): boolean =>
-  typeof body === 'object' &&
-  body !== null &&
-  (body as { method?: unknown }).method === 'initialize';
-
 const sendError = (res: ServerResponse, status: number, code: number, message: string): void => {
   if (res.headersSent) {
     res.end();
     return;
   }
-  res.writeHead(status, {
-    'Content-Type': 'application/json',
-    ...(status === 401 ? { 'WWW-Authenticate': 'Bearer' } : {}),
-  });
+  res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ jsonrpc: '2.0', error: { code, message }, id: null }));
 };
 
 export async function startHttpServer(options: HttpServerOptions): Promise<RunningHttpServer> {
-  const log = options.log ?? ((message: string) => process.stderr.write(`${message}\n`));
+  if (options.allowServerToken === true && !isLoopbackHost(options.host)) {
+    throw new Error(
+      `Refusing to share the server's TeamCity token on the non-loopback address '${options.host}'`
+    );
+  }
+  const log = options.log ?? ((message: string) => logError(message));
+  const idleTimeoutMs = options.sessionIdleTimeoutMs ?? DEFAULT_SESSION_IDLE_TIMEOUT_MS;
+  const maxSessions = options.maxSessions ?? DEFAULT_MAX_SESSIONS;
   const allowed = allowedHostnames(options.host);
   const sessions = new Map<string, Session>();
+  let closing = false;
 
   const openSession = async (teamcityToken: string | undefined): Promise<Session> => {
     const server = options.createServer();
@@ -153,19 +157,36 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
     const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (sessionId) => {
-        sessions.set(sessionId, { transport, state });
+        sessions.set(sessionId, session);
       },
     });
+    const session: Session = { transport, state, lastActive: Date.now(), openRequests: 0 };
     transport.onclose = () => {
       if (transport.sessionId) {
         sessions.delete(transport.sessionId);
       }
     };
     await server.connect(transport);
-    return { transport, state };
+    return session;
   };
 
+  const expireIdleSessions = (): void => {
+    const now = Date.now();
+    for (const session of sessions.values()) {
+      if (session.openRequests === 0 && now - session.lastActive >= idleTimeoutMs) {
+        session.state.server.close().catch((error: unknown) => {
+          log(`Closing an idle session failed: ${String(error)}`);
+        });
+      }
+    }
+  };
+  const sweep = setInterval(expireIdleSessions, Math.min(idleTimeoutMs, 60_000));
+  sweep.unref();
+
   const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+    if (closing) {
+      throw new HttpError(503, -32000, 'Server is shutting down');
+    }
     const path = new URL(req.url ?? '/', 'http://localhost').pathname;
     if (path !== MCP_PATH) {
       throw new HttpError(404, -32601, `Not found: ${path}`);
@@ -186,21 +207,20 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
     let session: Session;
     if (sessionId) {
       const existing = sessions.get(sessionId);
-      if (!existing) {
+      if (!existing || !sameToken(token, existing.state.teamcityToken)) {
         throw new HttpError(404, -32001, 'Session not found');
       }
-      const bound = existing.state.teamcityToken;
-      if (bound !== undefined && !sameToken(token, bound)) {
-        throw new HttpError(401, -32000, 'Unauthorized: token does not match this session');
-      }
       session = existing;
-    } else if (req.method === 'POST' && isInitializeRequest(body)) {
-      if (token === undefined && options.requireClientToken === true) {
+    } else if (req.method === 'POST' && isJSONRPCRequest(body) && isInitializeRequest(body)) {
+      if (token === undefined && options.allowServerToken !== true) {
         throw new HttpError(
           401,
           -32000,
           'Unauthorized: send the TeamCity token as "Authorization: Bearer <token>"'
         );
+      }
+      if (sessions.size >= maxSessions) {
+        throw new HttpError(503, -32000, 'Too many open sessions');
       }
       session = await openSession(token);
     } else {
@@ -211,6 +231,12 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
       );
     }
 
+    session.openRequests++;
+    session.lastActive = Date.now();
+    res.once('close', () => {
+      session.openRequests--;
+      session.lastActive = Date.now();
+    });
     await runInSession(session.state, () => session.transport.handleRequest(req, res, body));
   };
 
@@ -238,13 +264,14 @@ export async function startHttpServer(options: HttpServerOptions): Promise<Runni
     port,
     sessionCount: () => sessions.size,
     close: async () => {
+      closing = true;
+      clearInterval(sweep);
+      const stopped = new Promise<void>((resolve) => httpServer.close(() => resolve()));
       const open = [...sessions.values()];
       sessions.clear();
       await Promise.allSettled(open.map((session) => session.state.server.close()));
-      await new Promise<void>((resolve) => {
-        httpServer.close(() => resolve());
-        httpServer.closeAllConnections();
-      });
+      httpServer.closeAllConnections();
+      await stopped;
     },
   };
 }

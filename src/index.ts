@@ -14,7 +14,7 @@ import {
   startHttpServer,
 } from '@/http-server';
 import { startServerLifecycle } from '@/server-runner';
-import { getHelpText, getVersion, parseCliArgs } from '@/utils/cli-args';
+import { getHelpText, getVersion, parseCliArgs, parsePort } from '@/utils/cli-args';
 import { loadEnvFile } from '@/utils/env-file';
 
 import { createSimpleServer } from './server';
@@ -71,9 +71,17 @@ let lifecyclePromise: Promise<void> | null = null;
 let httpServer: RunningHttpServer | null = null;
 let shuttingDown = false;
 
+const nonEmpty = (value: string | undefined): string | undefined =>
+  value !== undefined && value.trim().length > 0 ? value.trim() : undefined;
+
 const useHttp = cliArgs.http === true || process.env['MCP_TRANSPORT'] === 'http';
-const httpHost = cliArgs.host ?? process.env['MCP_HTTP_HOST'] ?? DEFAULT_HTTP_HOST;
-const httpPort = cliArgs.port ?? (Number(process.env['MCP_HTTP_PORT']) || DEFAULT_HTTP_PORT);
+const httpHost =
+  nonEmpty(cliArgs.host) ?? nonEmpty(process.env['MCP_HTTP_HOST']) ?? DEFAULT_HTTP_HOST;
+const envPort = nonEmpty(process.env['MCP_HTTP_PORT']);
+const httpPort =
+  cliArgs.port ?? (envPort !== undefined ? parsePort(envPort) : undefined) ?? DEFAULT_HTTP_PORT;
+const allowServerToken =
+  cliArgs.allowServerToken === true || process.env['MCP_HTTP_ALLOW_SERVER_TOKEN'] === 'true';
 
 const clearServerState = () => {
   activeServer = null;
@@ -141,16 +149,19 @@ async function main() {
         host: httpHost,
         port: httpPort,
         createServer: createSimpleServer,
-        requireClientToken: !hasServerToken,
+        allowServerToken: allowServerToken && hasServerToken,
       });
       process.stderr.write(
         `TeamCity MCP Server is listening on http://${httpHost}:${httpServer.port}/mcp\n`
       );
-      if (!hasServerToken) {
-        process.stderr.write(
-          'No TEAMCITY_TOKEN configured: each client must send its TeamCity token as "Authorization: Bearer <token>"\n'
-        );
+      if (allowServerToken && !hasServerToken) {
+        process.stderr.write('--allow-server-token has no effect: no TEAMCITY_TOKEN configured\n');
       }
+      process.stderr.write(
+        allowServerToken && hasServerToken
+          ? 'Clients without "Authorization: Bearer <token>" use the server token\n'
+          : 'Each client must send its TeamCity token as "Authorization: Bearer <token>"\n'
+      );
       return;
     }
 
