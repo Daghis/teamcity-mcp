@@ -13,7 +13,13 @@ import { isAxiosError } from 'axios';
 import { z } from 'zod';
 
 import { getMCPMode as getMCPModeFromConfig, getServerInstance, setMCPMode } from '@/config';
-import { type Build, type Mutes, type PinInfo, ResolutionTypeEnum } from '@/teamcity-client/models';
+import {
+  type Build,
+  type Comment,
+  type Mutes,
+  type PinInfo,
+  ResolutionTypeEnum,
+} from '@/teamcity-client/models';
 import type { Step } from '@/teamcity-client/models/step';
 import { AgentRequirementsManager } from '@/teamcity/agent-requirements-manager';
 import { type ArtifactContent, ArtifactManager } from '@/teamcity/artifact-manager';
@@ -128,14 +134,21 @@ const buildIdentifierSchema = z
  * Returns the buildId as-is if provided, otherwise composes a
  * `buildType:(id:X),number:Y` locator from buildNumber + buildTypeId.
  */
-function resolveBuildLocator(input: {
-  buildId?: string;
-  buildNumber?: string | number;
-  buildTypeId?: string;
-}): { locator: string; friendlyId: string } {
+function resolveBuildLocator(
+  input: {
+    buildId?: string;
+    buildNumber?: string | number;
+    buildTypeId?: string;
+  },
+  options: { anyBranch?: boolean } = {}
+): { locator: string; friendlyId: string; buildId?: string } {
   const trimmedBuildId = typeof input.buildId === 'string' ? input.buildId.trim() : undefined;
   if (trimmedBuildId && trimmedBuildId.length > 0) {
-    return { locator: `id:${trimmedBuildId}`, friendlyId: `ID '${trimmedBuildId}'` };
+    return {
+      locator: `id:${trimmedBuildId}`,
+      friendlyId: `ID '${trimmedBuildId}'`,
+      buildId: trimmedBuildId,
+    };
   }
 
   const buildNumber =
@@ -143,8 +156,9 @@ function resolveBuildLocator(input: {
   const buildTypeId = input.buildTypeId?.trim();
 
   if (buildTypeId && buildNumber) {
+    const branch = options.anyBranch ? ',branch:(default:any)' : '';
     return {
-      locator: `buildType:(id:${buildTypeId}),number:${buildNumber}`,
+      locator: `buildType:(id:${buildTypeId}),number:${buildNumber}${branch}`,
       friendlyId: `build type '${buildTypeId}' #${buildNumber}`,
     };
   }
@@ -152,28 +166,57 @@ function resolveBuildLocator(input: {
   throw new TeamCityAPIError('Unable to resolve build identifier', 'INVALID_BUILD_IDENTIFIER');
 }
 
-/**
- * Like resolveBuildLocator, but a build number is also found on non-default branches.
- */
-function resolvePinBuildLocator(input: {
-  buildId?: string;
-  buildNumber?: string | number;
+const BUILD_LOOKUP_LIMIT = 50000;
+
+interface ResolvedBuild {
+  buildId: string;
   buildTypeId?: string;
-}): { locator: string; friendlyId: string } {
-  const resolved = resolveBuildLocator(input);
-  if (resolved.locator.startsWith('id:')) {
-    return resolved;
+  buildNumber?: string;
+  branchName?: string;
+}
+
+async function resolveSingleBuild(
+  adapter: TeamCityClientAdapter,
+  input: { buildId?: string; buildNumber?: string | number; buildTypeId?: string }
+): Promise<ResolvedBuild> {
+  const resolved = resolveBuildLocator(input, { anyBranch: true });
+  if (resolved.buildId) {
+    return { buildId: resolved.buildId };
   }
-  return { ...resolved, locator: `${resolved.locator},branch:(default:any)` };
+  const response = await adapter.modules.builds.getAllBuilds(
+    `${resolved.locator},lookupLimit:${BUILD_LOOKUP_LIMIT},count:2`,
+    'build(id,number,buildTypeId,branchName)'
+  );
+  const builds = response.data.build ?? [];
+  const [first] = builds;
+  if (first?.id === undefined) {
+    throw new TeamCityNotFoundError(`Build ${input.buildTypeId} #${input.buildNumber}`);
+  }
+  if (builds.length > 1) {
+    throw new TeamCityAPIError(
+      `Several builds match ${resolved.friendlyId}. Pass buildId instead.`,
+      'AMBIGUOUS_BUILD_IDENTIFIER',
+      400
+    );
+  }
+  return {
+    buildId: String(first.id),
+    buildTypeId: first.buildTypeId,
+    buildNumber: first.number,
+    branchName: first.branchName,
+  };
+}
+
+function toPinCommentSummary(comment: Comment | undefined) {
+  return {
+    comment: comment?.text,
+    pinnedBy: comment?.user?.username ?? comment?.user?.name,
+    pinnedAt: comment?.timestamp,
+  };
 }
 
 function toPinSummary(pinInfo: PinInfo) {
-  return {
-    pinned: pinInfo.status === true,
-    comment: pinInfo.comment?.text,
-    pinnedBy: pinInfo.comment?.user?.username ?? pinInfo.comment?.user?.name,
-    pinnedAt: pinInfo.comment?.timestamp,
-  };
+  return { pinned: pinInfo.status === true, ...toPinCommentSummary(pinInfo.comment) };
 }
 
 /** Standard inputSchema properties for build identification (buildId OR buildNumber + buildTypeId). */
@@ -1482,7 +1525,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Get the pin status of a build, including comment, user and time. Finds build numbers on any branch.',
+      'Get the pin status of a build, including comment, user and time. Finds build numbers on any branch; returns an error if a number matches several builds.',
     inputSchema: {
       type: 'object',
       properties: { ...buildIdentifierInputProperties },
@@ -1493,9 +1536,9 @@ const DEV_TOOLS: ToolDefinition[] = [
         buildIdentifierSchema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-          const { locator, friendlyId } = resolvePinBuildLocator(typed);
-          const response = await adapter.modules.builds.getBuildPinInfo(locator);
-          return json({ build: friendlyId, ...toPinSummary(response.data) });
+          const build = await resolveSingleBuild(adapter, typed);
+          const response = await adapter.modules.builds.getBuildPinInfo(`id:${build.buildId}`);
+          return json({ ...build, ...toPinSummary(response.data) });
         },
         args
       );
@@ -1511,7 +1554,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'Set the pin status of a build; the TeamCity cleanup keeps a pinned build and its artifacts. Idempotent; pinning again replaces the comment. Returns the resulting pin status; returns 404 if the build is unknown.',
+      'Set the pin status of a build; the TeamCity cleanup keeps a pinned build and its artifacts. Idempotent; pinning again replaces the comment. Returns the buildId and the new pin status; returns 404 if the build is unknown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1525,7 +1568,11 @@ const DEV_TOOLS: ToolDefinition[] = [
       const schema = buildIdentifierSchema.and(
         z.object({
           pinned: z.boolean(),
-          comment: z.string().trim().min(1).optional(),
+          comment: z
+            .string()
+            .trim()
+            .optional()
+            .transform((s) => (s === '' ? undefined : s)),
         })
       );
       return runTool(
@@ -1533,17 +1580,19 @@ const DEV_TOOLS: ToolDefinition[] = [
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-          const { locator, friendlyId } = resolvePinBuildLocator(typed);
+          const build = await resolveSingleBuild(adapter, typed);
           const body: PinInfo = typed.pinned
             ? { status: true, comment: { text: typed.comment ?? 'Pinned via MCP' } }
             : { status: false };
-          const response = await adapter.modules.builds.setBuildPinInfo(locator, undefined, body, {
-            headers: { 'Content-Type': 'application/json' },
-          });
+          const response = await adapter.modules.builds.setBuildPinInfo(
+            `id:${build.buildId}`,
+            undefined,
+            body
+          );
           return json({
             success: true,
             action: 'set_build_pin',
-            build: friendlyId,
+            ...build,
             ...toPinSummary(response.data),
           });
         },
@@ -1561,7 +1610,7 @@ const DEV_TOOLS: ToolDefinition[] = [
       openWorldHint: true,
     },
     description:
-      'List pinned builds with their pin comment, user and time, scoped to all branches. Filter by build configuration or project.',
+      'List pinned builds with pin comment, user and time on all branches, including canceled and personal builds. Filter by build configuration or project; supports pagination.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1570,40 +1619,70 @@ const DEV_TOOLS: ToolDefinition[] = [
           type: 'string',
           description: 'Only builds of this project and its subprojects',
         },
-        count: { type: 'number', description: 'Maximum number of builds (default 100)' },
+        pageSize: { type: 'number', description: 'Items per page (default 100)' },
+        maxPages: { type: 'number', description: 'Max pages to fetch (when all=true)' },
+        all: { type: 'boolean', description: 'Fetch all pages up to maxPages' },
       },
     },
     handler: async (args: unknown) => {
       const schema = z.object({
         buildTypeId: z.string().trim().min(1).optional(),
         projectId: z.string().trim().min(1).optional(),
-        count: z.number().int().min(1).max(1000).optional(),
+        pageSize: z.coerce.number().int().min(1).max(1000).optional(),
+        maxPages: z.coerce.number().int().min(1).max(1000).optional(),
+        all: z.boolean().optional(),
       });
       return runTool(
         'list_pinned_builds',
         schema,
         async (typed) => {
           const adapter = createAdapterFromTeamCityAPI(TeamCityAPI.getInstance());
-          const parts = ['pinned:true', 'branch:(default:any)', `count:${typed.count ?? 100}`];
-          if (typed.buildTypeId) parts.push(`buildType:(id:${typed.buildTypeId})`);
-          if (typed.projectId) parts.push(`affectedProject:(id:${typed.projectId})`);
-          const response = await adapter.modules.builds.getAllBuilds(
-            parts.join(','),
-            'build(id,number,buildTypeId,branchName,status,finishDate,webUrl,pinInfo(text,timestamp,user(username,name)))'
+          const baseParts = [
+            'pinned:true',
+            'branch:(default:any)',
+            'defaultFilter:false',
+            `lookupLimit:${BUILD_LOOKUP_LIMIT}`,
+          ];
+          if (typed.buildTypeId) baseParts.push(`buildType:(id:${typed.buildTypeId})`);
+          if (typed.projectId) baseParts.push(`affectedProject:(id:${typed.projectId})`);
+          const pageSize = typed.pageSize ?? 100;
+
+          const fetcher = createPaginatedFetcher(
+            ({ count, start }: { count?: number; start?: number }) => {
+              const parts = [...baseParts];
+              if (typeof count === 'number') parts.push(`count:${count}`);
+              if (typeof start === 'number') parts.push(`start:${start}`);
+              return adapter.modules.builds.getAllBuilds(
+                parts.join(','),
+                'count,build(id,number,buildTypeId,branchName,status,state,finishDate,webUrl,pinInfo(text,timestamp,user(username,name)))'
+              );
+            },
+            (response: unknown) => {
+              const data = response as { build?: Build[] };
+              return (data.build ?? []).map((build) => ({
+                id: build.id,
+                number: build.number,
+                buildTypeId: build.buildTypeId,
+                branchName: build.branchName,
+                status: build.status,
+                state: build.state,
+                finishDate: build.finishDate,
+                webUrl: build.webUrl,
+                ...toPinCommentSummary(build.pinInfo),
+              }));
+            },
+            (response: unknown) => {
+              const data = response as { count?: number };
+              return typeof data.count === 'number' ? data.count : undefined;
+            }
           );
-          const items = (response.data.build ?? []).map((build) => ({
-            id: build.id,
-            number: build.number,
-            buildTypeId: build.buildTypeId,
-            branchName: build.branchName,
-            status: build.status,
-            finishDate: build.finishDate,
-            webUrl: build.webUrl,
-            pinComment: build.pinInfo?.text,
-            pinnedBy: build.pinInfo?.user?.username ?? build.pinInfo?.user?.name,
-            pinnedAt: build.pinInfo?.timestamp,
-          }));
-          return json({ count: items.length, items });
+
+          if (typed.all) {
+            const items = await fetchAllPages(fetcher, { pageSize, maxPages: typed.maxPages });
+            return json({ items, pagination: { mode: 'all', pageSize, fetched: items.length } });
+          }
+          const firstPage = await fetcher({ count: pageSize, start: 0 });
+          return json({ items: firstPage.items, pagination: { page: 1, pageSize } });
         },
         args
       );

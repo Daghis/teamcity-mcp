@@ -8,7 +8,7 @@ const hasTeamCityEnv = Boolean(
 );
 
 // Expected dev-mode tools as per docs/mcp-tools-mode-matrix.md
-// Note: 32 dev-mode tools focused on developer workflows; admin/infrastructure tools moved to full mode
+// Note: 35 dev-mode tools focused on developer workflows; admin/infrastructure tools moved to full mode
 const EXPECTED_DEV_TOOLS = new Set([
   'ping',
   // Mode management
@@ -24,6 +24,9 @@ const EXPECTED_DEV_TOOLS = new Set([
   'trigger_build',
   'cancel_queued_build',
   'cancel_build',
+  'get_build_pin',
+  'set_build_pin',
+  'list_pinned_builds',
   'get_build_status',
   'wait_for_build',
   'fetch_build_log',
