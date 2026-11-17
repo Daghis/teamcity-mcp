@@ -134,7 +134,10 @@ const sendError = (res: ServerResponse, status: number, code: number, message: s
     res.end();
     return;
   }
-  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    ...(status === 413 ? { Connection: 'close' } : {}),
+  });
   res.end(JSON.stringify({ jsonrpc: '2.0', error: { code, message }, id: null }));
 };
 

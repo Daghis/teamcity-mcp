@@ -284,6 +284,7 @@ describe('startHttpServer', () => {
     const reply = await send(running.port, { body: 'x'.repeat(5 * 1024 * 1024) });
 
     expect(reply.status).toBe(413);
+    expect(reply.headers['connection']).toBe('close');
   });
 
   it('answers paths other than /mcp with 404', async () => {
