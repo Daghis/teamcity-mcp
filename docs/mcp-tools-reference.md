@@ -4,7 +4,7 @@ This document lists all Model Context Protocol (MCP) tools exposed by the TeamCi
 
 - Server name: `teamcity-mcp`
 - Modes: `dev` (default) and `full` via env `MCP_MODE`
-  - `dev` mode: read‑only and safe operations
+  - `dev` mode: read operations plus safe build actions (trigger, cancel, pin)
   - `full` mode: includes write/modify operations in addition to all `dev` tools
 - Capabilities: tools only (no prompts/resources)
 
@@ -55,11 +55,13 @@ This document lists all Model Context Protocol (MCP) tools exposed by the TeamCi
 - `cancel_build` — Cancel or stop a running (or queued) build
   - Args: `buildId: string`, `comment?: string`, `readdIntoQueue?: boolean`
 - `get_build_pin` — Pin status of a build (pinned, comment, user, time)
-  - Args: `buildId?: string` or `buildNumber` + `buildTypeId` (any branch)
+  - Args: `buildId?: string` or `buildNumber` + `buildTypeId` (any branch; a number that matches several builds is refused)
+  - Returns: `{ buildId, buildTypeId?, buildNumber?, branchName?, pinned, comment?, pinnedBy?, pinnedAt? }`
 - `set_build_pin` — Pin or unpin a build (pinned builds survive the TeamCity cleanup)
-  - Args: `buildId?: string` or `buildNumber` + `buildTypeId` (any branch), `pinned: boolean`, `comment?: string`
-- `list_pinned_builds` — Pinned builds across all branches with pin comment, user and time
-  - Args: `buildTypeId?: string`, `projectId?: string`, `count?: number` (default 100)
+  - Args: `buildId?: string` or `buildNumber` + `buildTypeId` (any branch; a number that matches several builds is refused), `pinned: boolean`, `comment?: string` (blank = default comment)
+  - Returns: `{ success, action, buildId, buildTypeId?, buildNumber?, branchName?, pinned, comment?, pinnedBy?, pinnedAt? }`
+- `list_pinned_builds` — Pinned builds across all branches, including canceled and personal builds, with pin comment, user and time (paginated)
+  - Args: `buildTypeId?: string`, `projectId?: string`, `pageSize?: number`, `maxPages?: number`, `all?: boolean`
 - `get_build_status` — Build status with optional queue context
   - Args: `buildId: string`, `includeTests?: boolean`, `includeProblems?: boolean`, `includeQueueTotals?: boolean` (adds totalQueued; extra call when queued), `includeQueueReason?: boolean` (adds waitReason; extra call when queued)
 - `wait_for_build` — Poll until a build reaches a terminal state (finished/canceled/failed) or timeout
