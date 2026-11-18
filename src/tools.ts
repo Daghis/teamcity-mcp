@@ -129,6 +129,9 @@ const buildIdentifierSchema = z
     }
   });
 
+const locatorValue = (value: string): string =>
+  /[,():]/.test(value) ? `($base64:${Buffer.from(value).toString('base64url')})` : value;
+
 /**
  * Resolve a build identifier to a TeamCity build locator string.
  * Returns the buildId as-is if provided, otherwise composes a
@@ -158,7 +161,7 @@ function resolveBuildLocator(
   if (buildTypeId && buildNumber) {
     const branch = options.anyBranch ? ',branch:(default:any)' : '';
     return {
-      locator: `buildType:(id:${buildTypeId}),number:${buildNumber}${branch}`,
+      locator: `buildType:(id:${buildTypeId}),number:${locatorValue(buildNumber)}${branch}`,
       friendlyId: `build type '${buildTypeId}' #${buildNumber}`,
     };
   }
@@ -184,7 +187,7 @@ async function resolveSingleBuild(
     return { buildId: resolved.buildId };
   }
   const response = await adapter.modules.builds.getAllBuilds(
-    `${resolved.locator},lookupLimit:${BUILD_LOOKUP_LIMIT},count:2`,
+    `${resolved.locator},defaultFilter:false,lookupLimit:${BUILD_LOOKUP_LIMIT},count:2`,
     'build(id,number,buildTypeId,branchName)'
   );
   const builds = response.data.build ?? [];

@@ -606,10 +606,26 @@ describe('tools: build pins', () => {
         pinned: false,
       });
       expect(getAllBuilds).toHaveBeenCalledWith(
-        'buildType:(id:Mac_Build),number:40,branch:(default:any),lookupLimit:50000,count:2',
+        'buildType:(id:Mac_Build),number:40,branch:(default:any),defaultFilter:false,lookupLimit:50000,count:2',
         BUILD_FIELDS
       );
       expect(store.getBuildPinInfo).toHaveBeenCalledWith('id:7');
+    });
+  });
+
+  it('get_build_pin encodes a build number that contains locator syntax', async () => {
+    const store = createPinStore();
+    const getAllBuilds = buildsFound({ id: 8, number: 'release,40', buildTypeId: 'Mac_Build' });
+    await runWithBuilds({ ...store, getAllBuilds }, async (getRequiredTool) => {
+      await getRequiredTool('get_build_pin').handler({
+        buildTypeId: 'Mac_Build',
+        buildNumber: 'release,40',
+      });
+      expect(getAllBuilds).toHaveBeenCalledWith(
+        'buildType:(id:Mac_Build),number:($base64:cmVsZWFzZSw0MA),branch:(default:any),defaultFilter:false,lookupLimit:50000,count:2',
+        BUILD_FIELDS
+      );
+      expect(store.getBuildPinInfo).toHaveBeenCalledWith('id:8');
     });
   });
 
