@@ -526,3 +526,346 @@ describe('tools: trigger_build XML fallback coverage', () => {
     });
   });
 });
+
+describe('tools: build pins', () => {
+  const runWithBuilds = async (
+    builds: Record<string, jest.Mock>,
+    body: (
+      getRequiredTool: (name: string) => {
+        handler: (args: unknown) => Promise<{ content?: Array<{ text?: string }> }>;
+      }
+    ) => Promise<void>
+  ) => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: { getInstance: () => ({ modules: { builds } }) },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          await body(getRequiredTool);
+          resolve();
+        })().catch(reject);
+      });
+    });
+  };
+
+  const payloadOf = (res: { content?: Array<{ text?: string }> }) =>
+    JSON.parse(res.content?.[0]?.text ?? '{}');
+
+  type FakePin = {
+    status?: boolean;
+    comment?: { text?: string; timestamp?: string; user?: { username?: string } };
+  };
+
+  const createPinStore = () => {
+    let pin: FakePin = { status: false };
+    return {
+      getBuildPinInfo: jest.fn(async () => ({ data: pin })),
+      setBuildPinInfo: jest.fn(async (_locator: string, _fields: unknown, body: FakePin) => {
+        pin = body.status
+          ? {
+              status: true,
+              comment: {
+                text: body.comment?.text,
+                timestamp: '20261027T210000+0100',
+                user: { username: 'fred' },
+              },
+            }
+          : { status: false };
+        return { data: pin };
+      }),
+    };
+  };
+
+  const BUILD_FIELDS = 'build(id,number,buildTypeId,branchName)';
+
+  const buildsFound = (...builds: Array<Record<string, unknown>>) =>
+    jest.fn(async () => ({ data: { build: builds } }));
+
+  const buildsWithDefaultFilter = (
+    visible: Array<Record<string, unknown>>,
+    filteredOut: Array<Record<string, unknown>>
+  ) =>
+    jest.fn(async (locator: string) => ({
+      data: {
+        build: locator.includes('defaultFilter:false') ? [...visible, ...filteredOut] : visible,
+      },
+    }));
+
+  it('get_build_pin resolves a build number on any branch to one build id', async () => {
+    const store = createPinStore();
+    const getAllBuilds = buildsFound({
+      id: 7,
+      number: '40',
+      buildTypeId: 'Mac_Build',
+      branchName: 'release',
+    });
+    await runWithBuilds({ ...store, getAllBuilds }, async (getRequiredTool) => {
+      const res = await getRequiredTool('get_build_pin').handler({
+        buildTypeId: 'Mac_Build',
+        buildNumber: 40,
+      });
+      expect(payloadOf(res)).toEqual({
+        buildId: '7',
+        buildTypeId: 'Mac_Build',
+        buildNumber: '40',
+        branchName: 'release',
+        pinned: false,
+      });
+      expect(getAllBuilds).toHaveBeenCalledWith(
+        'buildType:(id:Mac_Build),number:40,branch:(default:any),defaultFilter:false,lookupLimit:50000,count:2',
+        BUILD_FIELDS
+      );
+      expect(store.getBuildPinInfo).toHaveBeenCalledWith('id:7');
+    });
+  });
+
+  it('get_build_pin encodes a build number that contains locator syntax', async () => {
+    const store = createPinStore();
+    const getAllBuilds = buildsFound({ id: 8, number: 'release,40', buildTypeId: 'Mac_Build' });
+    await runWithBuilds({ ...store, getAllBuilds }, async (getRequiredTool) => {
+      await getRequiredTool('get_build_pin').handler({
+        buildTypeId: 'Mac_Build',
+        buildNumber: 'release,40',
+      });
+      expect(getAllBuilds).toHaveBeenCalledWith(
+        'buildType:(id:Mac_Build),number:($base64:cmVsZWFzZSw0MA),branch:(default:any),defaultFilter:false,lookupLimit:50000,count:2',
+        BUILD_FIELDS
+      );
+      expect(store.getBuildPinInfo).toHaveBeenCalledWith('id:8');
+    });
+  });
+
+  it('set_build_pin refuses a build number that matches several builds', async () => {
+    const store = createPinStore();
+    const getAllBuilds = buildsFound(
+      { id: 7, number: '40', branchName: 'main' },
+      { id: 9, number: '40', branchName: 'feature' }
+    );
+    await runWithBuilds({ ...store, getAllBuilds }, async (getRequiredTool) => {
+      const res = (await getRequiredTool('set_build_pin').handler({
+        buildTypeId: 'Mac_Build',
+        buildNumber: '40',
+        pinned: true,
+      })) as { success?: boolean; error?: string };
+      expect(res.success).toBe(false);
+      expect(res.error).toContain('Pass buildId');
+      expect(store.setBuildPinInfo).not.toHaveBeenCalled();
+    });
+  });
+
+  it('get_build_pin resolves a build number that only a personal build has', async () => {
+    const store = createPinStore();
+    const getAllBuilds = buildsWithDefaultFilter(
+      [],
+      [{ id: 11, number: '40', buildTypeId: 'Mac_Build', branchName: 'main', personal: true }]
+    );
+    await runWithBuilds({ ...store, getAllBuilds }, async (getRequiredTool) => {
+      const res = await getRequiredTool('get_build_pin').handler({
+        buildTypeId: 'Mac_Build',
+        buildNumber: '40',
+      });
+      expect(payloadOf(res)).toMatchObject({ buildId: '11', pinned: false });
+      expect(store.getBuildPinInfo).toHaveBeenCalledWith('id:11');
+    });
+  });
+
+  it('set_build_pin refuses a build number shared by a normal and a canceled build', async () => {
+    const store = createPinStore();
+    const getAllBuilds = buildsWithDefaultFilter(
+      [{ id: 7, number: '40', buildTypeId: 'Mac_Build', branchName: 'main' }],
+      [{ id: 12, number: '40', buildTypeId: 'Mac_Build', branchName: 'main', canceled: true }]
+    );
+    await runWithBuilds({ ...store, getAllBuilds }, async (getRequiredTool) => {
+      const res = (await getRequiredTool('set_build_pin').handler({
+        buildTypeId: 'Mac_Build',
+        buildNumber: '40',
+        pinned: true,
+      })) as { success?: boolean; error?: string };
+      expect(res.success).toBe(false);
+      expect(res.error).toContain('Pass buildId');
+      expect(store.setBuildPinInfo).not.toHaveBeenCalled();
+    });
+  });
+
+  it('get_build_pin reports an unknown build number as not found', async () => {
+    const store = createPinStore();
+    await runWithBuilds({ ...store, getAllBuilds: buildsFound() }, async (getRequiredTool) => {
+      const res = (await getRequiredTool('get_build_pin').handler({
+        buildTypeId: 'Mac_Build',
+        buildNumber: '41',
+      })) as { success?: boolean; error?: string };
+      expect(res.success).toBe(false);
+      expect(res.error).toContain('Build Mac_Build #41 not found');
+      expect(store.getBuildPinInfo).not.toHaveBeenCalled();
+    });
+  });
+
+  it('set_build_pin pins a build that get_build_pin then reports as pinned', async () => {
+    const store = createPinStore();
+    const getAllBuilds = jest.fn();
+    await runWithBuilds({ ...store, getAllBuilds }, async (getRequiredTool) => {
+      const res = await getRequiredTool('set_build_pin').handler({
+        buildId: '123',
+        pinned: true,
+        comment: 'released to beta',
+      });
+      expect(payloadOf(res)).toEqual({
+        success: true,
+        action: 'set_build_pin',
+        buildId: '123',
+        pinned: true,
+        comment: 'released to beta',
+        pinnedBy: 'fred',
+        pinnedAt: '20261027T210000+0100',
+      });
+      expect(store.setBuildPinInfo).toHaveBeenCalledWith('id:123', undefined, {
+        status: true,
+        comment: { text: 'released to beta' },
+      });
+      expect(getAllBuilds).not.toHaveBeenCalled();
+
+      const status = await getRequiredTool('get_build_pin').handler({ buildId: '123' });
+      expect(payloadOf(status)).toMatchObject({ pinned: true, comment: 'released to beta' });
+    });
+  });
+
+  it('set_build_pin is idempotent and replaces the comment when pinning again', async () => {
+    await runWithBuilds(createPinStore(), async (getRequiredTool) => {
+      const tool = getRequiredTool('set_build_pin');
+      const first = await tool.handler({ buildId: '123', pinned: true, comment: 'release' });
+      const second = await tool.handler({ buildId: '123', pinned: true, comment: 'release' });
+      expect(payloadOf(second)).toEqual(payloadOf(first));
+
+      const renamed = await tool.handler({ buildId: '123', pinned: true, comment: 'hotfix' });
+      expect(payloadOf(renamed)).toMatchObject({ pinned: true, comment: 'hotfix' });
+    });
+  });
+
+  it.each([undefined, '', '   '])(
+    'set_build_pin uses the default comment when pinning with comment %p',
+    async (comment) => {
+      const store = createPinStore();
+      await runWithBuilds(store, async (getRequiredTool) => {
+        const res = await getRequiredTool('set_build_pin').handler({
+          buildId: '123',
+          pinned: true,
+          comment,
+        });
+        expect(payloadOf(res)).toMatchObject({ pinned: true, comment: 'Pinned via MCP' });
+        expect(store.setBuildPinInfo).toHaveBeenCalledWith('id:123', undefined, {
+          status: true,
+          comment: { text: 'Pinned via MCP' },
+        });
+      });
+    }
+  );
+
+  it('set_build_pin unpins a pinned build and ignores a blank comment', async () => {
+    const store = createPinStore();
+    await runWithBuilds(store, async (getRequiredTool) => {
+      const tool = getRequiredTool('set_build_pin');
+      await tool.handler({ buildId: '123', pinned: true, comment: 'release' });
+      const res = await tool.handler({ buildId: '123', pinned: false, comment: '' });
+      expect(payloadOf(res)).toEqual({
+        success: true,
+        action: 'set_build_pin',
+        buildId: '123',
+        pinned: false,
+      });
+      expect(store.setBuildPinInfo).toHaveBeenLastCalledWith('id:123', undefined, {
+        status: false,
+      });
+
+      const status = await getRequiredTool('get_build_pin').handler({ buildId: '123' });
+      expect(payloadOf(status)).toMatchObject({ pinned: false });
+    });
+  });
+
+  it('set_build_pin returns a failure result when the build is unknown', async () => {
+    const notFound = Object.assign(new Error('Request failed with status code 404'), {
+      isAxiosError: true,
+      response: { status: 404, statusText: 'Not Found', data: 'No build found', headers: {} },
+    });
+    const setBuildPinInfo = jest.fn(async () => {
+      throw notFound;
+    });
+    await runWithBuilds({ setBuildPinInfo }, async (getRequiredTool) => {
+      const res = (await getRequiredTool('set_build_pin').handler({
+        buildId: '999',
+        pinned: true,
+      })) as { success?: boolean };
+      expect(res.success).toBe(false);
+    });
+  });
+
+  const LIST_FIELDS =
+    'count,build(id,number,buildTypeId,branchName,status,state,finishDate,webUrl,pinInfo(text,timestamp,user(username,name)))';
+
+  const pinnedBuild = (id: number) => ({
+    id,
+    number: String(id),
+    buildTypeId: 'Mac_Build',
+    branchName: 'master',
+    status: 'SUCCESS',
+    state: 'finished',
+    finishDate: '20261027T205400+0100',
+    webUrl: `https://tc/build/${id}`,
+    pinInfo: { text: 'released', timestamp: '20261027T210000+0100', user: { name: 'Fred' } },
+  });
+
+  it('list_pinned_builds filters on pinned builds of all branches and states', async () => {
+    const getAllBuilds = jest.fn(async () => ({ data: { count: 1, build: [pinnedBuild(7)] } }));
+    await runWithBuilds({ getAllBuilds }, async (getRequiredTool) => {
+      const res = await getRequiredTool('list_pinned_builds').handler({
+        buildTypeId: 'Mac_Build',
+        projectId: 'Mac',
+        pageSize: '50',
+      });
+      expect(payloadOf(res)).toEqual({
+        items: [
+          {
+            id: 7,
+            number: '7',
+            buildTypeId: 'Mac_Build',
+            branchName: 'master',
+            status: 'SUCCESS',
+            state: 'finished',
+            finishDate: '20261027T205400+0100',
+            webUrl: 'https://tc/build/7',
+            comment: 'released',
+            pinnedBy: 'Fred',
+            pinnedAt: '20261027T210000+0100',
+          },
+        ],
+        pagination: { page: 1, pageSize: 50 },
+      });
+      expect(getAllBuilds).toHaveBeenCalledWith(
+        'pinned:true,branch:(default:any),defaultFilter:false,lookupLimit:50000,buildType:(id:Mac_Build),affectedProject:(id:Mac),count:50,start:0',
+        LIST_FIELDS
+      );
+    });
+  });
+
+  it('list_pinned_builds pages through all pinned builds with all=true', async () => {
+    const pages = [[pinnedBuild(1), pinnedBuild(2)], [pinnedBuild(3)]];
+    const getAllBuilds = jest.fn(async (locator: string) => {
+      const start = Number(/start:(\d+)/.exec(locator)?.[1] ?? 0);
+      const build = pages[start / 2] ?? [];
+      return { data: { count: build.length, build } };
+    });
+    await runWithBuilds({ getAllBuilds }, async (getRequiredTool) => {
+      const res = await getRequiredTool('list_pinned_builds').handler({ pageSize: 2, all: true });
+      const payload = payloadOf(res);
+      expect(payload.items.map((b: { id: number }) => b.id)).toEqual([1, 2, 3]);
+      expect(payload.pagination).toEqual({ mode: 'all', pageSize: 2, fetched: 3 });
+      expect(getAllBuilds).toHaveBeenCalledWith(
+        'pinned:true,branch:(default:any),defaultFilter:false,lookupLimit:50000,count:2,start:2',
+        LIST_FIELDS
+      );
+    });
+  });
+});
