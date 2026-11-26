@@ -585,6 +585,16 @@ describe('tools: build pins', () => {
   const buildsFound = (...builds: Array<Record<string, unknown>>) =>
     jest.fn(async () => ({ data: { build: builds } }));
 
+  const buildsWithDefaultFilter = (
+    visible: Array<Record<string, unknown>>,
+    filteredOut: Array<Record<string, unknown>>
+  ) =>
+    jest.fn(async (locator: string) => ({
+      data: {
+        build: locator.includes('defaultFilter:false') ? [...visible, ...filteredOut] : visible,
+      },
+    }));
+
   it('get_build_pin resolves a build number on any branch to one build id', async () => {
     const store = createPinStore();
     const getAllBuilds = buildsFound({
@@ -634,6 +644,40 @@ describe('tools: build pins', () => {
     const getAllBuilds = buildsFound(
       { id: 7, number: '40', branchName: 'main' },
       { id: 9, number: '40', branchName: 'feature' }
+    );
+    await runWithBuilds({ ...store, getAllBuilds }, async (getRequiredTool) => {
+      const res = (await getRequiredTool('set_build_pin').handler({
+        buildTypeId: 'Mac_Build',
+        buildNumber: '40',
+        pinned: true,
+      })) as { success?: boolean; error?: string };
+      expect(res.success).toBe(false);
+      expect(res.error).toContain('Pass buildId');
+      expect(store.setBuildPinInfo).not.toHaveBeenCalled();
+    });
+  });
+
+  it('get_build_pin resolves a build number that only a personal build has', async () => {
+    const store = createPinStore();
+    const getAllBuilds = buildsWithDefaultFilter(
+      [],
+      [{ id: 11, number: '40', buildTypeId: 'Mac_Build', branchName: 'main', personal: true }]
+    );
+    await runWithBuilds({ ...store, getAllBuilds }, async (getRequiredTool) => {
+      const res = await getRequiredTool('get_build_pin').handler({
+        buildTypeId: 'Mac_Build',
+        buildNumber: '40',
+      });
+      expect(payloadOf(res)).toMatchObject({ buildId: '11', pinned: false });
+      expect(store.getBuildPinInfo).toHaveBeenCalledWith('id:11');
+    });
+  });
+
+  it('set_build_pin refuses a build number shared by a normal and a canceled build', async () => {
+    const store = createPinStore();
+    const getAllBuilds = buildsWithDefaultFilter(
+      [{ id: 7, number: '40', buildTypeId: 'Mac_Build', branchName: 'main' }],
+      [{ id: 12, number: '40', buildTypeId: 'Mac_Build', branchName: 'main', canceled: true }]
     );
     await runWithBuilds({ ...store, getAllBuilds }, async (getRequiredTool) => {
       const res = (await getRequiredTool('set_build_pin').handler({
