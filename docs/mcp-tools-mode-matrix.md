@@ -97,7 +97,7 @@ Legend: Dev = developer-focused (PRs/builds/logs/trigger, read-only config). Ful
 | Users & Roles | `list_users` | No | Yes |
 | Users & Roles | `list_roles` | No | Yes |
 
-**Summary:** 91 tools total — 35 available in Dev mode, 56 Full-only.
+**Summary:** 92 tools total — 36 available in Dev mode, 56 Full-only.
 
 Notes:
 - Dev mode focuses on developer workflows (builds, tests, logs) and excludes infrastructure/admin tools to reduce context size (~12k tokens saved).
