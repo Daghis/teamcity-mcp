@@ -1297,10 +1297,31 @@ const DEV_TOOLS: ToolDefinition[] = [
             buildRequest.properties = propertiesPayload;
           }
 
-          if (typed.agentId !== undefined) {
-            buildRequest.agent = { id: typed.agentId };
-          } else if (typed.agentName) {
-            buildRequest.agent = { name: typed.agentName };
+          const lookupAgentIdByName = async (name: string): Promise<number | undefined> => {
+            const agentsResponse = await adapter.modules.agents.getAllAgents(
+              `name:(${name})`,
+              'agent(id,name)'
+            );
+            const agents = (agentsResponse.data ?? {}) as { agent?: Array<{ id?: number }> };
+            return agents.agent?.[0]?.id;
+          };
+          const resolvedAgentId =
+            typed.agentId ??
+            (typed.agentName ? await lookupAgentIdByName(typed.agentName) : undefined);
+          if (typed.agentName && resolvedAgentId === undefined) {
+            const errorPayload = {
+              success: false,
+              action: 'trigger_build',
+              error: `Agent not found: name='${typed.agentName}'.`,
+            } as const;
+            return {
+              success: false,
+              error: errorPayload.error,
+              content: [{ type: 'text', text: JSON.stringify(errorPayload, null, 2) }],
+            };
+          }
+          if (resolvedAgentId !== undefined) {
+            buildRequest.agent = { id: resolvedAgentId };
           }
 
           const sendXmlFallback = async (error: unknown) => {
@@ -1327,11 +1348,7 @@ const DEV_TOOLS: ToolDefinition[] = [
                   .join('')}</properties>`
               : '';
             const agentPart =
-              typed.agentId !== undefined
-                ? `<agent id="${typed.agentId}"/>`
-                : typed.agentName
-                  ? `<agent name="${escapeXml(typed.agentName)}"/>`
-                  : '';
+              resolvedAgentId !== undefined ? `<agent id="${resolvedAgentId}"/>` : '';
             const xml = `<?xml version="1.0" encoding="UTF-8"?><build><buildType id="${escapeXml(
               typed.buildTypeId
             )}"/>${agentPart}${branchPart}${commentPart}${propertiesPart}</build>`;
