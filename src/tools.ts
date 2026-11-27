@@ -1207,16 +1207,30 @@ const DEV_TOOLS: ToolDefinition[] = [
           description: 'Optional build parameters to set when triggering the build',
           additionalProperties: { type: 'string' },
         },
+        agentName: {
+          type: 'string',
+          description: 'Run the build on the agent with this name, e.g. "ciagent-h08" (optional)',
+        },
+        agentId: {
+          type: 'integer',
+          description: 'Run the build on the agent with this id (optional, excludes agentName)',
+        },
       },
       required: ['buildTypeId'],
     },
     handler: async (args: unknown) => {
-      const schema = z.object({
-        buildTypeId: z.string().min(1),
-        branchName: z.string().min(1).max(255).optional(),
-        comment: z.string().max(500).optional(),
-        properties: z.record(z.string(), z.string()).optional(),
-      });
+      const schema = z
+        .object({
+          buildTypeId: z.string().min(1),
+          branchName: z.string().min(1).max(255).optional(),
+          comment: z.string().max(500).optional(),
+          properties: z.record(z.string(), z.string()).optional(),
+          agentName: z.string().min(1).max(255).optional(),
+          agentId: z.number().int().positive().optional(),
+        })
+        .refine((value) => value.agentName === undefined || value.agentId === undefined, {
+          message: 'Specify either agentName or agentId, not both',
+        });
 
       return runTool(
         'trigger_build',
@@ -1283,6 +1297,33 @@ const DEV_TOOLS: ToolDefinition[] = [
             buildRequest.properties = propertiesPayload;
           }
 
+          const lookupAgentIdByName = async (name: string): Promise<number | undefined> => {
+            const agentsResponse = await adapter.modules.agents.getAllAgents(
+              `name:(${name})`,
+              'agent(id,name)'
+            );
+            const agents = (agentsResponse.data ?? {}) as { agent?: Array<{ id?: number }> };
+            return agents.agent?.[0]?.id;
+          };
+          const resolvedAgentId =
+            typed.agentId ??
+            (typed.agentName ? await lookupAgentIdByName(typed.agentName) : undefined);
+          if (typed.agentName && resolvedAgentId === undefined) {
+            const errorPayload = {
+              success: false,
+              action: 'trigger_build',
+              error: `Agent not found: name='${typed.agentName}'.`,
+            } as const;
+            return {
+              success: false,
+              error: errorPayload.error,
+              content: [{ type: 'text', text: JSON.stringify(errorPayload, null, 2) }],
+            };
+          }
+          if (resolvedAgentId !== undefined) {
+            buildRequest.agent = { id: resolvedAgentId };
+          }
+
           const sendXmlFallback = async (error: unknown) => {
             const escapeXml = (value: string): string =>
               value
@@ -1306,9 +1347,11 @@ const DEV_TOOLS: ToolDefinition[] = [
                   )
                   .join('')}</properties>`
               : '';
+            const agentPart =
+              resolvedAgentId !== undefined ? `<agent id="${resolvedAgentId}"/>` : '';
             const xml = `<?xml version="1.0" encoding="UTF-8"?><build><buildType id="${escapeXml(
               typed.buildTypeId
-            )}"/>${branchPart}${commentPart}${propertiesPart}</build>`;
+            )}"/>${agentPart}${branchPart}${commentPart}${propertiesPart}</build>`;
             const response = await adapter.http.post('/app/rest/buildQueue', xml, {
               headers: { 'Content-Type': 'application/xml', Accept: 'application/json' },
               params: { moveToTop: false },

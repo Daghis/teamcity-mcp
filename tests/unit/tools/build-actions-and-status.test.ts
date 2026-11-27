@@ -90,6 +90,124 @@ describe('tools: build actions and status/basic info', () => {
     });
   });
 
+  it('trigger_build pins the build to the agent given by name or id', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn(async () => ({
+            data: { id: 779, state: 'queued', status: 'UNKNOWN' },
+          }));
+          const getAllAgents = jest.fn(async () => ({
+            data: { agent: [{ id: 42, name: 'ciagent-h08' }] },
+          }));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: { buildQueue: { addBuildToQueue }, agents: { getAllAgents } },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const tool = getRequiredTool('trigger_build');
+
+          await tool.handler({ buildTypeId: 'bt1', agentName: 'ciagent-h08' });
+          expect(getAllAgents).toHaveBeenCalledTimes(1);
+          expect(getAllAgents).toHaveBeenCalledWith('name:(ciagent-h08)', 'agent(id,name)');
+
+          await tool.handler({ buildTypeId: 'bt1', agentId: 89 });
+          await tool.handler({ buildTypeId: 'bt1' });
+          expect(getAllAgents).toHaveBeenCalledTimes(1);
+
+          expect(addBuildToQueue).toHaveBeenNthCalledWith(
+            1,
+            false,
+            expect.objectContaining({ agent: { id: 42 } }),
+            expect.anything()
+          );
+          expect(addBuildToQueue).toHaveBeenNthCalledWith(
+            2,
+            false,
+            expect.objectContaining({ agent: { id: 89 } }),
+            expect.anything()
+          );
+          expect(addBuildToQueue).toHaveBeenNthCalledWith(
+            3,
+            false,
+            expect.not.objectContaining({ agent: expect.anything() }),
+            expect.anything()
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it.each([
+    ['an empty agent list', { agent: [] }],
+    ['a response without agents', undefined],
+  ])('trigger_build fails without queueing when the agent name yields %s', async (_label, data) => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn();
+          const getAllAgents = jest.fn(async () => ({ data }));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: { buildQueue: { addBuildToQueue }, agents: { getAllAgents } },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('trigger_build').handler({
+            buildTypeId: 'bt1',
+            agentName: 'no-such-agent',
+          });
+          const payload = JSON.parse((res.content?.[0]?.text as string) ?? '{}');
+          expect(payload).toMatchObject({
+            success: false,
+            action: 'trigger_build',
+            error: "Agent not found: name='no-such-agent'.",
+          });
+          expect(addBuildToQueue).not.toHaveBeenCalled();
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('trigger_build rejects agentName together with agentId', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn();
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: { buildQueue: { addBuildToQueue } },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('trigger_build').handler({
+            buildTypeId: 'bt1',
+            agentName: 'ciagent-h08',
+            agentId: 89,
+          });
+          expect(JSON.stringify(res)).toContain('either agentName or agentId');
+          expect(addBuildToQueue).not.toHaveBeenCalled();
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
   it('trigger_build infers branch from teamcity.build.branch property', async () => {
     jest.resetModules();
     await new Promise<void>((resolve, reject) => {
@@ -424,6 +542,49 @@ describe('tools: trigger_build XML fallback coverage', () => {
               headers: { 'Content-Type': 'application/xml', Accept: 'application/json' },
             })
           );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it.each([
+    ['the resolved agent id for agentName', { agentName: 'ciagent-h08' }, '<agent id="42"/>'],
+    ['the given agentId', { agentId: 89 }, '<agent id="89"/>'],
+    ['no agent element without a selection', {}, undefined],
+  ])('XML fallback sends %s', async (_label, agentArgs, expectedAgentXml) => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn().mockRejectedValue(new Error('Force XML'));
+          const getAllAgents = jest.fn(async () => ({
+            data: { agent: [{ id: 42, name: 'ciagent-h08' }] },
+          }));
+          const httpPost = jest.fn().mockResolvedValue({ data: { id: 1002, state: 'queued' } });
+
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: { buildQueue: { addBuildToQueue }, agents: { getAllAgents } },
+                http: createMockHttp(httpPost),
+                getBaseUrl: () => 'https://example.test',
+              }),
+            },
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          await getRequiredTool('trigger_build').handler({ buildTypeId: 'bt1', ...agentArgs });
+
+          expect(httpPost).toHaveBeenCalledTimes(1);
+          const xmlPayload = httpPost.mock.calls[0][1] as string;
+          if (expectedAgentXml) {
+            expect(xmlPayload).toContain(expectedAgentXml);
+          } else {
+            expect(xmlPayload).not.toContain('<agent');
+          }
+          expect(xmlPayload).not.toContain('agent name=');
           resolve();
         })().catch(reject);
       });
