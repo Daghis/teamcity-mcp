@@ -90,6 +90,81 @@ describe('tools: build actions and status/basic info', () => {
     });
   });
 
+  it('trigger_build pins the build to the agent given by name or id', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn(async () => ({
+            data: { id: 779, state: 'queued', status: 'UNKNOWN' },
+          }));
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: { buildQueue: { addBuildToQueue } },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const tool = getRequiredTool('trigger_build');
+
+          await tool.handler({ buildTypeId: 'bt1', agentName: 'ciagent-h08' });
+          await tool.handler({ buildTypeId: 'bt1', agentId: 89 });
+          await tool.handler({ buildTypeId: 'bt1' });
+
+          expect(addBuildToQueue).toHaveBeenNthCalledWith(
+            1,
+            false,
+            expect.objectContaining({ agent: { name: 'ciagent-h08' } }),
+            expect.anything()
+          );
+          expect(addBuildToQueue).toHaveBeenNthCalledWith(
+            2,
+            false,
+            expect.objectContaining({ agent: { id: 89 } }),
+            expect.anything()
+          );
+          expect(addBuildToQueue).toHaveBeenNthCalledWith(
+            3,
+            false,
+            expect.not.objectContaining({ agent: expect.anything() }),
+            expect.anything()
+          );
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
+  it('trigger_build rejects agentName together with agentId', async () => {
+    jest.resetModules();
+    await new Promise<void>((resolve, reject) => {
+      jest.isolateModules(() => {
+        (async () => {
+          const addBuildToQueue = jest.fn();
+          jest.doMock('@/api-client', () => ({
+            TeamCityAPI: {
+              getInstance: () => ({
+                modules: { buildQueue: { addBuildToQueue } },
+              }),
+            },
+          }));
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { getRequiredTool } = require('@/tools');
+          const res = await getRequiredTool('trigger_build').handler({
+            buildTypeId: 'bt1',
+            agentName: 'ciagent-h08',
+            agentId: 89,
+          });
+          expect(JSON.stringify(res)).toContain('either agentName or agentId');
+          expect(addBuildToQueue).not.toHaveBeenCalled();
+          resolve();
+        })().catch(reject);
+      });
+    });
+  });
+
   it('trigger_build infers branch from teamcity.build.branch property', async () => {
     jest.resetModules();
     await new Promise<void>((resolve, reject) => {

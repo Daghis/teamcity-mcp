@@ -1207,16 +1207,30 @@ const DEV_TOOLS: ToolDefinition[] = [
           description: 'Optional build parameters to set when triggering the build',
           additionalProperties: { type: 'string' },
         },
+        agentName: {
+          type: 'string',
+          description: 'Run the build on the agent with this name, e.g. "ciagent-h08" (optional)',
+        },
+        agentId: {
+          type: 'integer',
+          description: 'Run the build on the agent with this id (optional, excludes agentName)',
+        },
       },
       required: ['buildTypeId'],
     },
     handler: async (args: unknown) => {
-      const schema = z.object({
-        buildTypeId: z.string().min(1),
-        branchName: z.string().min(1).max(255).optional(),
-        comment: z.string().max(500).optional(),
-        properties: z.record(z.string(), z.string()).optional(),
-      });
+      const schema = z
+        .object({
+          buildTypeId: z.string().min(1),
+          branchName: z.string().min(1).max(255).optional(),
+          comment: z.string().max(500).optional(),
+          properties: z.record(z.string(), z.string()).optional(),
+          agentName: z.string().min(1).max(255).optional(),
+          agentId: z.number().int().positive().optional(),
+        })
+        .refine((value) => value.agentName === undefined || value.agentId === undefined, {
+          message: 'Specify either agentName or agentId, not both',
+        });
 
       return runTool(
         'trigger_build',
@@ -1283,6 +1297,12 @@ const DEV_TOOLS: ToolDefinition[] = [
             buildRequest.properties = propertiesPayload;
           }
 
+          if (typed.agentId !== undefined) {
+            buildRequest.agent = { id: typed.agentId };
+          } else if (typed.agentName) {
+            buildRequest.agent = { name: typed.agentName };
+          }
+
           const sendXmlFallback = async (error: unknown) => {
             const escapeXml = (value: string): string =>
               value
@@ -1306,9 +1326,15 @@ const DEV_TOOLS: ToolDefinition[] = [
                   )
                   .join('')}</properties>`
               : '';
+            const agentPart =
+              typed.agentId !== undefined
+                ? `<agent id="${typed.agentId}"/>`
+                : typed.agentName
+                  ? `<agent name="${escapeXml(typed.agentName)}"/>`
+                  : '';
             const xml = `<?xml version="1.0" encoding="UTF-8"?><build><buildType id="${escapeXml(
               typed.buildTypeId
-            )}"/>${branchPart}${commentPart}${propertiesPart}</build>`;
+            )}"/>${agentPart}${branchPart}${commentPart}${propertiesPart}</build>`;
             const response = await adapter.http.post('/app/rest/buildQueue', xml, {
               headers: { 'Content-Type': 'application/xml', Accept: 'application/json' },
               params: { moveToTop: false },
